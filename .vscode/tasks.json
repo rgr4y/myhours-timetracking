@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "dev",
+			"problemMatcher": [],
+			"label": "npm: dev",
+			"detail": "concurrently \"npm run start-renderer\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\""
+		}
+	]
+}

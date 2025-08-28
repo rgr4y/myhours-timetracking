@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="url(#gradient)"/>
+  
+  <!-- Clock face -->
+  <circle cx="128" cy="128" r="90" fill="#FFFFFF" opacity="0.1"/>
+  
+  <!-- Clock hands -->
+  <!-- Hour hand -->
+  <line x1="128" y1="128" x2="128" y2="80" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+  <!-- Minute hand -->
+  <line x1="128" y1="128" x2="165" y2="128" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  
+  <!-- Center dot -->
+  <circle cx="128" cy="128" r="8" fill="#FFFFFF"/>
+  
+  <!-- Hour markers -->
+  <circle cx="128" cy="50" r="4" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="206" cy="128" r="4" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="128" cy="206" r="4" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="50" cy="128" r="4" fill="#FFFFFF" opacity="0.8"/>
+  
+  <!-- Play button overlay -->
+  <polygon points="110,105 110,151 148,128" fill="#FFFFFF" opacity="0.3"/>
+</svg>

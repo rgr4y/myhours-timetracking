@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./myhours.db"
+}
+
+model Client {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String?
+  hourlyRate Float    @default(0) @map("hourly_rate")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  projects    Project[]
+  timeEntries TimeEntry[]
+
+  @@map("clients")
+}
+
+model Project {
+  id         Int      @id @default(autoincrement())
+  name       String
+  clientId   Int      @map("client_id")
+  hourlyRate Float?   @map("hourly_rate")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tasks  Task[]
+
+  @@map("projects")
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  name        String
+  projectId   Int      @map("project_id")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+
+  @@map("tasks")
+}
+
+model TimeEntry {
+  id          Int      @id @default(autoincrement())
+  clientId    Int?     @map("client_id")
+  taskId      Int?     @map("task_id")
+  description String?
+  startTime   DateTime @map("start_time")
+  endTime     DateTime? @map("end_time")
+  duration    Int      @default(0) // in minutes
+  isActive    Boolean  @default(false) @map("is_active")
+  isInvoiced  Boolean  @default(false) @map("is_invoiced")
+  invoiceId   Int?     @map("invoice_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  client  Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  task    Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@map("time_entries")
+}
+
+model Invoice {
+  id            Int      @id @default(autoincrement())
+  invoiceNumber String   @unique @map("invoice_number")
+  clientId      Int      @map("client_id")
+  totalAmount   Float    @map("total_amount")
+  status        String   @default("draft")
+  dueDate       DateTime? @map("due_date")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  timeEntries TimeEntry[]
+
+  @@map("invoices")
+}
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+
+  @@map("settings")
+}
