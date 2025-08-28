@@ -233,11 +233,18 @@ class InvoiceGenerator {
   async generateInvoice(data) {
     try {
       // Get settings for company info
-      const settings = this.database.getSettings();
+      const settings = await this.database.getSettings();
+      
+      // Convert the form data to the correct filter format
+      const filters = {
+        clientId: parseInt(data.client_id),
+        startDate: data.start_date,
+        endDate: data.end_date
+      };
       
       // Get uninvoiced time entries for the specified filters
-      const timeEntries = this.database.getTimeEntries({
-        ...data.filters,
+      const timeEntries = await this.database.getTimeEntries({
+        ...filters,
         isInvoiced: false
       });
 
@@ -250,21 +257,21 @@ class InvoiceGenerator {
       
       // Calculate totals
       const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 60;
-      const hourlyRate = data.hourlyRate || timeEntries[0]?.hourly_rate || 0;
+      const hourlyRate = data.hourlyRate || timeEntries[0]?.client?.hourlyRate || 0;
       const totalAmount = totalHours * hourlyRate;
 
       // Prepare template data
       const templateData = {
-        companyName: settings.company_name || 'Your Company',
-        companyEmail: settings.company_email || '',
-        companyPhone: settings.company_phone || '',
-        companyWebsite: settings.company_website || '',
-        invoiceNumber: data.invoiceNumber || this.generateInvoiceNumber(),
+        companyName: settings.company_name || settings.companyName || 'Your Company',
+        companyEmail: settings.company_email || settings.companyEmail || '',
+        companyPhone: settings.company_phone || settings.companyPhone || '',
+        companyWebsite: settings.company_website || settings.companyWebsite || '',
+        invoiceNumber: data.invoice_number || this.generateInvoiceNumber(),
         invoiceDate: new Date().toLocaleDateString(),
-        periodStart: data.periodStart || this.getOldestEntryDate(timeEntries),
-        periodEnd: data.periodEnd || this.getNewestEntryDate(timeEntries),
-        clientName: data.clientName || timeEntries[0]?.client_name || 'Client',
-        clientEmail: data.clientEmail || '',
+        periodStart: data.start_date || this.getOldestEntryDate(timeEntries),
+        periodEnd: data.end_date || this.getNewestEntryDate(timeEntries),
+        clientName: timeEntries[0]?.client?.name || 'Client',
+        clientEmail: timeEntries[0]?.client?.email || '',
         lineItems: lineItems,
         totalHours: totalHours.toFixed(2),
         hourlyRate: hourlyRate.toFixed(2),
@@ -276,7 +283,7 @@ class InvoiceGenerator {
       
       // Mark entries as invoiced
       const entryIds = timeEntries.map(entry => entry.id);
-      this.database.markAsInvoiced(entryIds, templateData.invoiceNumber);
+      await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber);
 
       return pdfPath;
     } catch (error) {
@@ -289,7 +296,7 @@ class InvoiceGenerator {
     const days = {};
     
     entries.forEach(entry => {
-      const entryDate = new Date(entry.start_time);
+      const entryDate = new Date(entry.startTime);
       const dayKey = entryDate.toISOString().split('T')[0]; // YYYY-MM-DD format
       
       if (!days[dayKey]) {
@@ -298,12 +305,12 @@ class InvoiceGenerator {
           descriptions: [],
           totalHours: 0,
           totalAmount: 0,
-          hourlyRate: entry.hourly_rate || 0
+          hourlyRate: entry.client?.hourlyRate || 0
         };
       }
       
       const hours = (entry.duration || 0) / 60;
-      const amount = hours * (entry.hourly_rate || 0);
+      const amount = hours * (entry.client?.hourlyRate || 0);
       
       // Add description if it exists and isn't already included
       if (entry.description && entry.description.trim()) {

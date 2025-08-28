@@ -1,0 +1,187 @@
+import React, { useState, useEffect } from 'react';
+import { Save, Building } from 'lucide-react';
+import {
+  Container,
+  Card,
+  FlexBox,
+  Title,
+  Heading,
+  Text,
+  Button,
+  Input,
+  Label,
+  Select
+} from './ui';
+
+const Settings = () => {
+  const [settings, setSettings] = useState({
+    company_name: '',
+    company_email: '',
+    company_phone: '',
+    company_website: '',
+    timer_rounding: '15',
+    invoice_template: 'default'
+  });
+
+  const [originalSettings, setOriginalSettings] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (window.electronAPI) {
+        try {
+          const currentSettings = await window.electronAPI.settings.get();
+          const mergedSettings = { ...settings, ...currentSettings };
+          setSettings(mergedSettings);
+          setOriginalSettings(mergedSettings);
+        } catch (error) {
+          console.error('Error loading settings:', error);
+        }
+      }
+    };
+    loadData();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check if settings have changed
+  const hasUnsavedChanges = () => {
+    return JSON.stringify(settings) !== JSON.stringify(originalSettings);
+  };
+
+  const handleSave = async () => {
+    if (window.electronAPI) {
+      try {
+        setIsLoading(true);
+        await window.electronAPI.settings.update(settings);
+        
+        // Show saved animation
+        setIsSaved(true);
+        setOriginalSettings({ ...settings }); // Update original to current
+        
+        // Reset saved state after 2 seconds
+        setTimeout(() => {
+          setIsSaved(false);
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Error saving settings:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setSettings(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <Container padding="40px" style={{ height: '100vh', overflowY: 'auto' }}>
+      <FlexBox justify="space-between" align="center" margin="0 0 30px 0">
+        <Title>Settings</Title>
+        <Button 
+          variant="primary" 
+          onClick={handleSave} 
+          disabled={isLoading || !hasUnsavedChanges() || isSaved}
+        >
+          <Save size={16} />
+          {isLoading ? 'Saving...' : isSaved ? 'Saved!' : 'Save Settings'}
+        </Button>
+      </FlexBox>
+
+      <FlexBox direction="column" gap="30px">
+        {/* Company Information */}
+        <Card>
+          <Heading margin="0 0 20px 0">
+            <Building size={20} style={{ marginRight: '10px' }} />
+            Company Information
+          </Heading>
+          
+          <FlexBox direction="column" gap="20px">
+            <FlexBox direction="column" gap="5px">
+              <Label>Company Name</Label>
+              <Input
+                value={settings.company_name}
+                onChange={(e) => handleInputChange('company_name', e.target.value)}
+                placeholder="Your Company Name"
+              />
+            </FlexBox>
+            
+            <FlexBox direction="column" gap="5px">
+              <Label>Email Address</Label>
+              <Input
+                type="email"
+                value={settings.company_email}
+                onChange={(e) => handleInputChange('company_email', e.target.value)}
+                placeholder="contact@yourcompany.com"
+              />
+            </FlexBox>
+            
+            <FlexBox direction="column" gap="5px">
+              <Label>Phone Number</Label>
+              <Input
+                value={settings.company_phone}
+                onChange={(e) => handleInputChange('company_phone', e.target.value)}
+                placeholder="+1 (555) 123-4567"
+              />
+            </FlexBox>
+            
+            <FlexBox direction="column" gap="5px">
+              <Label>Website</Label>
+              <Input
+                value={settings.company_website}
+                onChange={(e) => handleInputChange('company_website', e.target.value)}
+                placeholder="www.yourcompany.com"
+              />
+            </FlexBox>
+          </FlexBox>
+        </Card>
+
+        {/* Timer Settings */}
+        <Card>
+          <Heading margin="0 0 20px 0">Timer Settings</Heading>
+          
+          <FlexBox direction="column" gap="15px">
+            <FlexBox direction="column" gap="5px">
+              <Label>Time Rounding (minutes)</Label>
+              <Select
+                value={settings.timer_rounding}
+                onChange={(e) => handleInputChange('timer_rounding', e.target.value)}
+              >
+                <option value="1">1 minute</option>
+                <option value="5">5 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
+              </Select>
+              <Text variant="secondary" size="small">
+                Round time entries to the nearest interval
+              </Text>
+            </FlexBox>
+          </FlexBox>
+        </Card>
+
+        {/* Invoice Settings */}
+        <Card>
+          <Heading margin="0 0 20px 0">Invoice Settings</Heading>
+          
+          <FlexBox direction="column" gap="15px">
+            <FlexBox direction="column" gap="5px">
+              <Label>Invoice Template</Label>
+              <Select
+                value={settings.invoice_template}
+                onChange={(e) => handleInputChange('invoice_template', e.target.value)}
+              >
+                <option value="default">Default Template</option>
+                <option value="minimal">Minimal Template</option>
+                <option value="detailed">Detailed Template</option>
+              </Select>
+            </FlexBox>
+          </FlexBox>
+        </Card>
+      </FlexBox>
+    </Container>
+  );
+};
+
+export default Settings;

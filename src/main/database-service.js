@@ -559,6 +559,55 @@ class DatabaseService {
       throw error;
     }
   }
+
+  async getSettings() {
+    try {
+      const settings = await this.prisma.setting.findMany();
+      
+      // Convert array of settings to object
+      const settingsObj = {};
+      settings.forEach(setting => {
+        settingsObj[setting.key] = setting.value;
+      });
+      
+      return settingsObj;
+    } catch (error) {
+      console.error('Error getting settings:', error);
+      throw error;
+    }
+  }
+
+  async markAsInvoiced(entryIds, invoiceNumber) {
+    try {
+      // First create the invoice record
+      const invoice = await this.prisma.invoice.create({
+        data: {
+          invoiceNumber: invoiceNumber,
+          clientId: 1, // This should be properly determined
+          totalAmount: 0, // This should be calculated
+          status: 'generated'
+        }
+      });
+
+      // Then update the time entries to mark them as invoiced
+      const updatedEntries = await this.prisma.timeEntry.updateMany({
+        where: {
+          id: {
+            in: entryIds
+          }
+        },
+        data: {
+          isInvoiced: true,
+          invoiceId: invoice.id
+        }
+      });
+
+      return updatedEntries;
+    } catch (error) {
+      console.error('Error marking entries as invoiced:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = DatabaseService;
