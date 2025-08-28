@@ -65,23 +65,19 @@ const TimeEntries = () => {
           const projectList = await window.electronAPI.projects.getAll(parseInt(entryForm.clientId));
           console.log('Projects loaded for client', entryForm.clientId, ':', projectList);
           setProjects(projectList);
-          // Reset project/task selection when client changes
-          if (entryForm.projectId) {
-            setEntryForm(prev => ({ ...prev, projectId: '', taskId: '' }));
-          }
-          setTasks([]);
         } catch (error) {
           console.error('Error loading projects:', error);
           setProjects([]);
         }
       } else {
         setProjects([]);
-        setTasks([]);
       }
+      // Always reset tasks when client changes
+      setTasks([]);
     };
 
     loadProjects();
-  }, [entryForm.clientId, entryForm.projectId]);
+  }, [entryForm.clientId]);
 
   // Load tasks when project changes  
   useEffect(() => {
@@ -141,9 +137,17 @@ const TimeEntries = () => {
   };
 
   const handleCreateEntry = async () => {
-    if (window.electronAPI && entryForm.clientId && entryForm.taskId && entryForm.startTime && entryForm.endTime) {
+    if (window.electronAPI && entryForm.clientId && entryForm.startTime && entryForm.endTime) {
       try {
-        await window.electronAPI.timeEntries.create(entryForm);
+        // Prepare data with proper type conversion
+        const createData = {
+          ...entryForm,
+          clientId: parseInt(entryForm.clientId),
+          projectId: entryForm.projectId ? parseInt(entryForm.projectId) : null,
+          taskId: entryForm.taskId ? parseInt(entryForm.taskId) : null
+        };
+        
+        await window.electronAPI.timeEntries.create(createData);
         setEntryForm({
           clientId: '',
           projectId: '',
@@ -162,9 +166,21 @@ const TimeEntries = () => {
   };
 
   const handleUpdateEntry = async () => {
-    if (window.electronAPI && editingEntry) {
+    if (window.electronAPI && editingEntry && entryForm.clientId && entryForm.startTime && entryForm.endTime) {
       try {
-        await window.electronAPI.timeEntries.update(editingEntry.id, entryForm);
+        console.log('Update entry form data:', entryForm);
+        console.log('Editing entry ID:', editingEntry.id);
+        
+        // Prepare data with proper type conversion
+        const updateData = {
+          ...entryForm,
+          clientId: parseInt(entryForm.clientId),
+          projectId: entryForm.projectId ? parseInt(entryForm.projectId) : null,
+          taskId: entryForm.taskId ? parseInt(entryForm.taskId) : null
+        };
+        
+        console.log('Converted update data:', updateData);
+        await window.electronAPI.timeEntries.update(editingEntry.id, updateData);
         setEntryForm({
           clientId: '',
           projectId: '',
@@ -354,7 +370,7 @@ const TimeEntries = () => {
               </FlexBox>
 
               <FlexBox direction="column" gap="5px">
-                <Label>Project *</Label>
+                <Label>Project</Label>
                 <Select
                   value={entryForm.projectId}
                   onChange={(e) => {
@@ -362,7 +378,7 @@ const TimeEntries = () => {
                   }}
                   disabled={!entryForm.clientId}
                 >
-                  <option value="">Select a project</option>
+                  <option value="">Select a project (optional)</option>
                   {projects.map(project => (
                     <option key={project.id} value={project.id}>{project.name}</option>
                   ))}
@@ -370,7 +386,7 @@ const TimeEntries = () => {
               </FlexBox>
 
               <FlexBox direction="column" gap="5px">
-                <Label>Task *</Label>
+                <Label>Task</Label>
                 <Select
                   value={entryForm.taskId}
                   onChange={(e) => {
@@ -378,7 +394,7 @@ const TimeEntries = () => {
                   }}
                   disabled={!entryForm.projectId}
                 >
-                  <option value="">Select a task</option>
+                  <option value="">Select a task (optional)</option>
                   {tasks.map(task => (
                     <option key={task.id} value={task.id}>{task.name}</option>
                   ))}
