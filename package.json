@@ -1,0 +1,67 @@
+{
+  "name": "myhours",
+  "version": "1.0.0",
+  "description": "Cross-platform time tracking app with invoicing",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently \"npm run start-renderer\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "start-renderer": "cd src/renderer && npm start",
+    "build": "npm run build-renderer && electron-builder",
+    "build-renderer": "cd src/renderer && npm run build",
+    "dist": "npm run build",
+    "pack": "electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.myhours.app",
+    "productName": "MyHours",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/main/**/*",
+      "src/renderer/build/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^10.0.0",
+    "electron": "^26.2.1",
+    "electron-builder": "^24.6.4",
+    "wait-on": "^7.0.1"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.15.0",
+    "electron-updater": "^6.1.4",
+    "handlebars": "^4.7.8",
+    "node-json-db": "^2.3.0",
+    "prisma": "^6.15.0",
+    "puppeteer-core": "^21.3.6"
+  },
+  "author": "Rob",
+  "license": "MIT"
+}

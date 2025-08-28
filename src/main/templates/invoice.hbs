@@ -1,0 +1,215 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Invoice</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 40px;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+        }
+        
+        .company-info h1 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 28px;
+        }
+        
+        .company-info p {
+            margin: 5px 0;
+            color: #7f8c8d;
+        }
+        
+        .invoice-info {
+            text-align: right;
+        }
+        
+        .invoice-info h2 {
+            margin: 0;
+            color: #e74c3c;
+            font-size: 24px;
+        }
+        
+        .client-info {
+            margin-bottom: 30px;
+        }
+        
+        .client-info h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .summary {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .summary-item {
+            text-align: center;
+        }
+        
+        .summary-item .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .summary-item .label {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #34495e;
+            color: white;
+            font-weight: 500;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .week-header {
+            background-color: #ecf0f1 !important;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .total-row {
+            background-color: #2c3e50 !important;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        .amount {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-info">
+            <h1>{{companyName}}</h1>
+            <p>{{companyEmail}}</p>
+            <p>{{companyPhone}}</p>
+            <p>{{companyWebsite}}</p>
+        </div>
+        <div class="invoice-info">
+            <h2>INVOICE</h2>
+            <p><strong>Invoice #:</strong> {{invoiceNumber}}</p>
+            <p><strong>Date:</strong> {{invoiceDate}}</p>
+            <p><strong>Period:</strong> {{periodStart}} - {{periodEnd}}</p>
+        </div>
+    </div>
+
+    <div class="client-info">
+        <h3>Bill To:</h3>
+        <p><strong>{{clientName}}</strong></p>
+        {{#if clientEmail}}<p>{{clientEmail}}</p>{{/if}}
+    </div>
+
+    <div class="summary">
+        <div class="summary-item">
+            <div class="value">{{totalHours}}</div>
+            <div class="label">Total Hours</div>
+        </div>
+        <div class="summary-item">
+            <div class="value">${{hourlyRate}}</div>
+            <div class="label">Hourly Rate</div>
+        </div>
+        <div class="summary-item">
+            <div class="value">${{totalAmount}}</div>
+            <div class="label">Total Amount</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Week</th>
+                <th>Description</th>
+                <th class="text-right">Hours</th>
+                <th class="text-right">Rate</th>
+                <th class="text-right">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each weeks}}
+            <tr class="week-header">
+                <td colspan="5">Week of {{this.weekStart}}</td>
+            </tr>
+            {{#each this.entries}}
+            <tr>
+                <td></td>
+                <td>{{this.description}}</td>
+                <td class="text-right">{{this.hours}}</td>
+                <td class="text-right">${{this.rate}}</td>
+                <td class="text-right amount">${{this.amount}}</td>
+            </tr>
+            {{/each}}
+            <tr>
+                <td></td>
+                <td><strong>Week Subtotal</strong></td>
+                <td class="text-right"><strong>{{this.totalHours}}</strong></td>
+                <td></td>
+                <td class="text-right amount"><strong>${{this.totalAmount}}</strong></td>
+            </tr>
+            {{/each}}
+            <tr class="total-row">
+                <td colspan="2"><strong>TOTAL</strong></td>
+                <td class="text-right"><strong>{{totalHours}}</strong></td>
+                <td></td>
+                <td class="text-right"><strong>${{totalAmount}}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>Thank you for your business!</p>
+        <p>Payment is due within 30 days of invoice date.</p>
+    </div>
+</body>
+</html>
