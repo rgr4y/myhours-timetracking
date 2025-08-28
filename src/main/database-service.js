@@ -15,6 +15,26 @@ class DatabaseService {
     await this.prisma.$disconnect();
   }
 
+  // Helper method to parse time string (HH:MM) with date
+  parseTimeWithDate(timeString, dateString) {
+    if (!timeString || !dateString) return null;
+    
+    try {
+      const [hours, minutes] = timeString.split(':').map(num => parseInt(num, 10));
+      const date = new Date(dateString);
+      
+      if (isNaN(date.getTime()) || isNaN(hours) || isNaN(minutes)) {
+        return null;
+      }
+      
+      date.setHours(hours, minutes, 0, 0);
+      return date.toISOString();
+    } catch (error) {
+      console.error('Error parsing time with date:', error);
+      return null;
+    }
+  }
+
   // Time Entry methods
   async startTimer(data = {}) {
     try {
@@ -173,6 +193,28 @@ class DatabaseService {
       if (cleanData.projectId) cleanData.projectId = parseInt(cleanData.projectId);
       if (cleanData.taskId) cleanData.taskId = parseInt(cleanData.taskId);
       
+      // Handle date and time fields - combine date with startTime and endTime
+      if (cleanData.date && cleanData.startTime) {
+        const startDateTime = this.parseTimeWithDate(cleanData.startTime, cleanData.date);
+        if (startDateTime) cleanData.startTime = startDateTime;
+      }
+      
+      if (cleanData.date && cleanData.endTime) {
+        const endDateTime = this.parseTimeWithDate(cleanData.endTime, cleanData.date);
+        if (endDateTime) cleanData.endTime = endDateTime;
+      }
+      
+      // Remove the separate date field as it's not in the schema
+      delete cleanData.date;
+      
+      // Calculate duration if both start and end times are provided
+      if (cleanData.startTime && cleanData.endTime) {
+        const start = new Date(cleanData.startTime);
+        const end = new Date(cleanData.endTime);
+        const diffMs = end.getTime() - start.getTime();
+        cleanData.duration = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Convert to minutes
+      }
+      
       console.log('[DATABASE] Cleaned data:', cleanData);
       
       const updatedTimeEntry = await this.prisma.timeEntry.update({
@@ -216,17 +258,26 @@ class DatabaseService {
       if (cleanData.projectId) cleanData.projectId = parseInt(cleanData.projectId);
       if (cleanData.taskId) cleanData.taskId = parseInt(cleanData.taskId);
       
-      // Convert date string to Date object if needed
-      if (cleanData.date && typeof cleanData.date === 'string') {
-        cleanData.date = new Date(cleanData.date);
+      // Handle date and time fields - combine date with startTime and endTime
+      if (cleanData.date && cleanData.startTime) {
+        const startDateTime = this.parseTimeWithDate(cleanData.startTime, cleanData.date);
+        if (startDateTime) cleanData.startTime = startDateTime;
       }
       
-      // Create full datetime strings for startTime and endTime
-      if (cleanData.startTime && cleanData.date) {
-        cleanData.startTime = new Date(`${cleanData.date.toISOString().split('T')[0]}T${cleanData.startTime}:00`);
+      if (cleanData.date && cleanData.endTime) {
+        const endDateTime = this.parseTimeWithDate(cleanData.endTime, cleanData.date);
+        if (endDateTime) cleanData.endTime = endDateTime;
       }
-      if (cleanData.endTime && cleanData.date) {
-        cleanData.endTime = new Date(`${cleanData.date.toISOString().split('T')[0]}T${cleanData.endTime}:00`);
+      
+      // Remove the separate date field as it's not in the schema
+      delete cleanData.date;
+      
+      // Calculate duration if both start and end times are provided
+      if (cleanData.startTime && cleanData.endTime) {
+        const start = new Date(cleanData.startTime);
+        const end = new Date(cleanData.endTime);
+        const diffMs = end.getTime() - start.getTime();
+        cleanData.duration = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Convert to minutes
       }
       
       console.log('[DATABASE] Cleaned data for create:', cleanData);
