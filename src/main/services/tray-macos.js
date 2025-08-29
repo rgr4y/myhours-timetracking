@@ -1,5 +1,6 @@
 const { Tray, Menu, nativeImage, app } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 class MacOSTrayService {
   constructor(mainWindow, databaseService) {
@@ -9,39 +10,53 @@ class MacOSTrayService {
     this.contextMenu = null;
     this.isQuitting = false;
     this.currentTimer = null;
+    this.iconPath = path.join(__dirname, '../../../assets/tray-icon.png');
     
     // Bind methods to maintain context
     this.updateTimerStatus = this.updateTimerStatus.bind(this);
     this.handleTrayClick = this.handleTrayClick.bind(this);
   }
 
+  // Centralized icon loading method with cache busting
+  loadIcon(size = { width: 16, height: 16 }) {
+    try {
+      console.log('[TRAY-MACOS] Loading icon from:', this.iconPath);
+      
+      // Force reload by reading file fresh to avoid caching
+      const iconBuffer = fs.readFileSync(this.iconPath);
+      const icon = nativeImage.createFromBuffer(iconBuffer);
+      
+      if (icon.isEmpty()) {
+        console.error('[TRAY-MACOS] Failed to load tray icon from:', this.iconPath);
+        return null;
+      }
+      
+      const resizedIcon = icon.resize(size);
+      if (size.width === 16 && size.height === 16) {
+        resizedIcon.setTemplateImage(true); // Makes icon adapt to system theme for tray
+      }
+      
+      return resizedIcon;
+    } catch (error) {
+      console.error('[TRAY-MACOS] Error loading icon:', error);
+      return null;
+    }
+  }
+
   initialize() {
     console.log('[TRAY-MACOS] Initializing macOS tray...');
     
     try {
-      // Create tray icon with cache busting
-      const iconPath = path.join(__dirname, '../../../assets/tray-icon.png');
-      console.log('[TRAY-MACOS] Loading icon from:', iconPath);
-      console.log('[TRAY-MACOS] Icon path exists:', require('fs').existsSync(iconPath));
+      console.log('[TRAY-MACOS] Icon path exists:', fs.existsSync(this.iconPath));
       
-      // Force reload by reading file fresh
-      const iconBuffer = require('fs').readFileSync(iconPath);
-      const icon = nativeImage.createFromBuffer(iconBuffer);
-      
-      if (icon.isEmpty()) {
-        console.error('[TRAY-MACOS] Failed to load tray icon from:', iconPath);
+      const icon = this.loadIcon();
+      if (!icon) {
         return false;
       }
       
       console.log('[TRAY-MACOS] Original icon size:', icon.getSize());
       
-      // Resize to appropriate size for menu bar (16x16)
-      const resizedIcon = icon.resize({ width: 16, height: 16 });
-      resizedIcon.setTemplateImage(true); // Makes icon adapt to system theme
-      
-      console.log('[TRAY-MACOS] Resized icon size:', resizedIcon.getSize());
-      
-      this.tray = new Tray(resizedIcon);
+      this.tray = new Tray(icon);
       this.tray.setToolTip('myHours Time Tracker');
       
       // Set up tray interactions
@@ -50,7 +65,7 @@ class MacOSTrayService {
       
       // Set up file watcher for development (hot reload icons)
       if (process.env.NODE_ENV === 'development') {
-        this.setupIconWatcher(iconPath);
+        this.setupIconWatcher();
       }
       
       console.log('[TRAY-MACOS] Tray initialized successfully');
@@ -62,12 +77,11 @@ class MacOSTrayService {
   }
 
   // Set up file watcher for icon hot reload during development
-  setupIconWatcher(iconPath) {
+  setupIconWatcher() {
     try {
-      const fs = require('fs');
       console.log('[TRAY-MACOS] Setting up icon file watcher for development');
       
-      this.iconWatcher = fs.watchFile(iconPath, { interval: 1000 }, (curr, prev) => {
+      this.iconWatcher = fs.watchFile(this.iconPath, { interval: 1000 }, (curr, prev) => {
         console.log('[TRAY-MACOS] Icon file changed, refreshing...');
         setTimeout(() => {
           this.refreshIcon();
@@ -82,23 +96,11 @@ class MacOSTrayService {
   refreshIcon() {
     if (!this.tray) return;
     
-    try {
-      const iconPath = path.join(__dirname, '../../../assets/tray-icon.png');
-      console.log('[TRAY-MACOS] Refreshing icon from:', iconPath);
-      
-      // Use buffer-based loading to avoid caching
-      const fs = require('fs');
-      const iconBuffer = fs.readFileSync(iconPath);
-      const icon = nativeImage.createFromBuffer(iconBuffer);
-      
-      if (!icon.isEmpty()) {
-        const resizedIcon = icon.resize({ width: 16, height: 16 });
-        resizedIcon.setTemplateImage(true);
-        this.tray.setImage(resizedIcon);
-        console.log('[TRAY-MACOS] Icon refreshed successfully using buffer');
-      }
-    } catch (error) {
-      console.error('[TRAY-MACOS] Error refreshing icon:', error);
+    console.log('[TRAY-MACOS] Refreshing icon...');
+    const icon = this.loadIcon();
+    if (icon) {
+      this.tray.setImage(icon);
+      console.log('[TRAY-MACOS] Icon refreshed successfully');
     }
   }
 
@@ -344,7 +346,7 @@ class MacOSTrayService {
     
     if (timerData) {
       // Update tray to show active timer
-      this.tray.setTitle('⏱️'); // Shows emoji next to icon
+      this.tray.setTitle('🟢'); // Shows green circle when timer is active
       
       const clientName = timerData.clientName || 'Unknown Client';
       const description = timerData.description || 'No description';
@@ -386,15 +388,7 @@ class MacOSTrayService {
   }
 
   getMenuIcon() {
-    try {
-      const iconPath = path.join(__dirname, '../../../assets/tray-icon.png');
-      // Force reload by reading file fresh
-      const iconBuffer = require('fs').readFileSync(iconPath);
-      const icon = nativeImage.createFromBuffer(iconBuffer);
-      return icon.resize({ width: 12, height: 12 });
-    } catch (error) {
-      return null;
-    }
+    return this.loadIcon({ width: 12, height: 12 });
   }
 
   preventWindowClose() {

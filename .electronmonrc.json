@@ -1,0 +1,17 @@
+{
+  "watch": [
+    "src/main",
+    "src/main/services"
+  ],
+  "ignore": [
+    "node_modules",
+    "src/renderer",
+    "build",
+    "dist",
+    "*.log"
+  ],
+  "ext": "js,json",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
