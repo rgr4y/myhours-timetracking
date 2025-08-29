@@ -419,6 +419,36 @@ class MyHoursApp {
       }
     });
 
+    // Dev-only: re-run Prisma seed script against the dev SQLite DB
+    ipcMain.handle('dev:runSeed', async () => {
+      try {
+        if (app.isPackaged) {
+          throw new Error('Seeding is only available in development.');
+        }
+        const { execFile } = require('child_process');
+        const path = require('path');
+        const projectRoot = path.join(__dirname, '..', '..');
+        const seedPath = path.join(projectRoot, 'prisma', 'seed.js');
+        const env = {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: '1',
+          DATABASE_URL: `file:${path.join(projectRoot, 'prisma', 'myhours.db')}`,
+        };
+        await new Promise((resolve, reject) => {
+          const child = execFile(process.execPath, [seedPath], { env, cwd: projectRoot }, (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+          child.stdout?.on('data', (d) => console.log('[SEED]', d.toString().trim()));
+          child.stderr?.on('data', (d) => console.error('[SEED]', d.toString().trim()));
+        });
+        return { success: true };
+      } catch (error) {
+        console.error('[MAIN] dev:runSeed error:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
     ipcMain.handle('db:getInvoices', async () => {
       try {
         const invoices = await this.database.getInvoices();

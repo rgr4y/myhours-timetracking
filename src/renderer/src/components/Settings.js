@@ -30,6 +30,7 @@ const Settings = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const isDev = process.env.NODE_ENV !== 'production';
 
   useEffect(() => {
     const loadData = async () => {
@@ -230,6 +231,29 @@ const Settings = () => {
               <Trash2 size={16} />
               {isRemoving ? 'Removing…' : 'Clear All Data'}
             </Button>
+            {isDev && (
+              <Button
+                variant="secondary"
+                style={{ marginLeft: '10px' }}
+                onClick={async () => {
+                  const ok = window.confirm('Re-run seed? This will clear and repopulate the dev database.');
+                  if (!ok) return;
+                  try {
+                    const res = await window.electronAPI.invoke('dev:runSeed');
+                    if (res?.success) {
+                      alert('Seed completed.');
+                    } else {
+                      alert('Seed failed: ' + (res?.error || 'Unknown error'));
+                    }
+                  } catch (e) {
+                    console.error('Seed error:', e);
+                    alert('Seed failed. See console for details.');
+                  }
+                }}
+              >
+                Re-run Seed (Dev)
+              </Button>
+            )}
           </FlexBox>
         </Card>
       </FlexBox>
