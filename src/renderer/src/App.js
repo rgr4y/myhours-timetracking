@@ -6,7 +6,7 @@ import { TimerProvider } from './context/TimerContext';
 import Sidebar from './components/Sidebar';
 import Timer from './components/Timer';
 import TimeEntries from './components/TimeEntries';
-import Projects from './components/Projects';
+import Clients from './components/Clients';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Invoice from './components/Invoice';
@@ -107,7 +107,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Timer />} />
               <Route path="/entries" element={<TimeEntries />} />
-              <Route path="/projects" element={<Projects />} />
+              <Route path="/projects" element={<Clients />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/invoice" element={<Invoice />} />
               <Route path="/settings" element={<Settings />} />

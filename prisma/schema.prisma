@@ -21,6 +21,7 @@ model Client {
   // Relations
   projects    Project[]
   timeEntries TimeEntry[]
+  invoices    Invoice[]
 
   @@map("clients")
 }
@@ -85,12 +86,15 @@ model Invoice {
   invoiceNumber String   @unique @map("invoice_number")
   clientId      Int      @map("client_id")
   totalAmount   Float    @map("total_amount")
+  periodStart   String?  @map("period_start")
+  periodEnd     String?  @map("period_end")
   status        String   @default("draft")
   dueDate       DateTime? @map("due_date")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
+  client      Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
 
   @@map("invoices")

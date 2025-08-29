@@ -24,15 +24,15 @@ src/
 ## Development Workflow
 
 ### Starting Development
-1. **Check running tasks first**: The `npm: dev` task should already be running
-2. **Start development**: `npm run dev` runs two processes concurrently:
+1. **Check running tasks first**: The `Start Dev` task should already be running
+2. **Start development**: `Start Dev` task runs two processes concurrently:
    - React dev server at `http://localhost:3000`
    - Electron app that loads the React app
 3. **Debug outputs**: Check all terminal tabs - main process logs appear in terminal, renderer logs forward through preload.js
 
 ### Critical Development Rules
-- **Never restart unless necessary**: Check if `npm: dev` task is running before starting
-- **Stop for Prisma operations**: Must stop `npm: dev` to run migrations (`npx prisma studio`, migrations)
+- **Never restart unless necessary**: Check if `Start Dev` task is running before starting
+- **Stop for Prisma operations**: Must stop `Start Dev` to run migrations (`npx prisma studio`, migrations)
 - **Kill processes**: Sometimes need to force-kill electron.exe processes
 - **Preload changes**: Electron main process changes require app restart
 
@@ -59,7 +59,7 @@ const clients = await window.electronAPI.clients.getAll()
 
 **Critical**: Preload.js exposes a safe 'electronAPI' pattern to renderer - changes require restart.
               You MUST use the safe electronAPI pattern to avoid race conditions.
-              
+
 ## Component Patterns
 
 ### UI System (src/renderer/src/components/ui/)
@@ -127,7 +127,7 @@ useEffect(() => {
 3. Verify foreign key relationships (Client → Project → Task)
 
 ### Build Issues
-1. Stop `npm: dev` task completely
+1. Stop `Start Dev` task completely
 2. Clear build: `cd src/renderer && npm run build`
 3. Restart development environment
 

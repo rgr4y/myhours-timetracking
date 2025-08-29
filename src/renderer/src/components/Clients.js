@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Building } from 'lucide-react';
+import { Plus, Building, Edit3 } from 'lucide-react';
 import styled from 'styled-components';
+import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import {
   Container,
   Grid,
@@ -78,7 +79,7 @@ const ResponsiveGrid = styled(Grid)`
   }
 `;
 
-const Projects = () => {
+const Clients = () => {
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -109,7 +110,8 @@ const Projects = () => {
     project_id: '',
     name: '',
     description: '',
-    is_recurring: false
+    is_recurring: false,
+    hourly_rate: ''
   });
 
   useEffect(() => {
@@ -197,6 +199,40 @@ const Projects = () => {
     }
   };
 
+  const handleUpdateClient = async () => {
+    if (window.electronAPI && editingClient && clientForm.name) {
+      try {
+        const clientData = {
+          name: clientForm.name,
+          email: clientForm.email || null,
+          hourlyRate: clientForm.hourly_rate ? parseFloat(clientForm.hourly_rate) : 0
+        };
+        const result = await window.electronAPI.clients.update(editingClient.id, clientData);
+        console.log('Client updated successfully:', result);
+        setClientForm({ name: '', email: '', hourly_rate: '' });
+        setEditingClient(null);
+        setShowClientInfoModal(false); // Close info modal instead of client modal
+        // Reload clients
+        const clientList = await window.electronAPI.clients.getAll();
+        setClients(clientList);
+        // Update selectedClient if it was the one being edited
+        if (selectedClient && selectedClient.id === editingClient.id) {
+          setSelectedClient(result);
+        }
+      } catch (error) {
+        logger.error('Error updating client:', error);
+      }
+    }
+  };
+
+  const handleSubmitClient = () => {
+    if (editingClient) {
+      handleUpdateClient();
+    } else {
+      handleCreateClient();
+    }
+  };
+
   const handleCreateProject = async () => {
     if (window.electronAPI && projectForm.name && selectedClient) {
       try {
@@ -239,6 +275,50 @@ const Projects = () => {
     }
   };
 
+  const handleUpdateProject = async () => {
+    if (window.electronAPI && projectForm.name && editingProject) {
+      try {
+        const projectData = {
+          name: projectForm.name,
+          hourlyRate: projectForm.hourly_rate ? parseFloat(projectForm.hourly_rate) : null
+        };
+        console.log('Updating project with data:', projectData);
+        await window.electronAPI.projects.update(editingProject.id, projectData);
+        console.log('Project updated successfully');
+        setShowProjectModal(false);
+        setEditingProject(null);
+        // Reload projects
+        const projectList = await window.electronAPI.projects.getAll(selectedClient.id);
+        setProjects(projectList);
+      } catch (error) {
+        logger.error('Error updating project:', error);
+        alert('Failed to update project: ' + error.message);
+      }
+    }
+  };
+
+  const handleUpdateTask = async () => {
+    if (window.electronAPI && taskForm.name && editingTask) {
+      try {
+        const taskData = {
+          name: taskForm.name,
+          description: taskForm.description || null
+        };
+        console.log('Updating task with data:', taskData);
+        await window.electronAPI.tasks.update(editingTask.id, taskData);
+        console.log('Task updated successfully');
+        setShowTaskModal(false);
+        setEditingTask(null);
+        // Reload tasks
+        const taskList = await window.electronAPI.tasks.getAll(selectedProject.id);
+        setTasks(taskList);
+      } catch (error) {
+        logger.error('Error updating task:', error);
+        alert('Failed to update task: ' + error.message);
+      }
+    }
+  };
+
   const handleDeleteClient = async (clientToDelete) => {
     if (window.confirm(`Are you sure you want to delete "${clientToDelete.name}"? This will also delete all associated projects and tasks.`)) {
       try {
@@ -271,8 +351,58 @@ const Projects = () => {
   const handleClientInfo = (client, event) => {
     event.stopPropagation(); // Prevent triggering the card click
     setEditingClient(client);
-    setShowClientInfoModal(true);
+    setClientForm({
+      name: client.name,
+      email: client.email || '',
+      hourly_rate: client.hourlyRate || ''
+    });
+    setShowClientInfoModal(true); // Use the info modal for editing
   };
+
+  // Keyboard shortcuts for modals
+  useModalKeyboard({
+    isOpen: showClientModal,
+    onSubmit: editingClient ? handleUpdateClient : handleCreateClient,
+    onClose: () => {
+      setShowClientModal(false);
+      setEditingClient(null);
+      setClientForm({ name: '', email: '', hourly_rate: '' });
+    },
+    formData: clientForm
+  });
+
+  useModalKeyboard({
+    isOpen: showProjectModal,
+    onSubmit: editingProject ? handleUpdateProject : handleCreateProject,
+    onClose: () => {
+      setShowProjectModal(false);
+      setEditingProject(null);
+      setProjectForm({ client_id: '', name: '', description: '', hourly_rate: '' });
+    },
+    formData: projectForm
+  });
+
+  useModalKeyboard({
+    isOpen: showTaskModal,
+    onSubmit: editingTask ? handleUpdateTask : handleCreateTask,
+    onClose: () => {
+      setShowTaskModal(false);
+      setEditingTask(null);
+      setTaskForm({ project_id: '', name: '', description: '', is_recurring: false, hourly_rate: '' });
+    },
+    formData: taskForm
+  });
+
+  useModalKeyboard({
+    isOpen: showClientInfoModal,
+    onSubmit: handleUpdateClient,
+    onClose: () => {
+      setShowClientInfoModal(false);
+      setEditingClient(null);
+      setClientForm({ name: '', email: '', hourly_rate: '' });
+    },
+    formData: clientForm
+  });
 
   return (
     <ResponsiveContainer padding="40px" style={{ height: '100vh', overflowY: 'auto' }}>
@@ -335,7 +465,6 @@ const Projects = () => {
                     border: selectedClient?.id === client.id ? '2px solid #007AFF' : '1px solid #404040'
                   }}
                   onClick={() => handleClientClick(client)}
-                  onDoubleClick={(e) => handleClientInfo(client, e)}
                 >
                   <FlexBox justify="space-between" align="center">
                     <div>
@@ -349,9 +478,9 @@ const Projects = () => {
                       size="small" 
                       variant="secondary"
                       onClick={(e) => handleClientInfo(client, e)}
-                      style={{ padding: '4px 8px', fontSize: '12px' }}
+                      style={{ padding: '6px', fontSize: '12px' }}
                     >
-                      Info
+                      <Edit3 size={14} />
                     </Button>
                   </FlexBox>
                 </Card>
@@ -384,6 +513,16 @@ const Projects = () => {
                       border: selectedProject?.id === project.id ? '2px solid #007AFF' : '1px solid #404040'
                     }}
                     onClick={() => setSelectedProject(project)}
+                    onDoubleClick={() => {
+                      setEditingProject(project);
+                      setProjectForm({
+                        client_id: project.client_id,
+                        name: project.name,
+                        description: project.description || '',
+                        hourly_rate: project.hourly_rate || ''
+                      });
+                      setShowProjectModal(true);
+                    }}
                   >
                     <div>
                       <Heading size="small" margin="0 0 4px 0">{project.name}</Heading>
@@ -420,11 +559,26 @@ const Projects = () => {
                     padding="16px" 
                     margin="0 0 12px 0"
                     hoverable
+                    style={{ cursor: 'pointer' }}
+                    onDoubleClick={() => {
+                      setEditingTask(task);
+                      setTaskForm({
+                        project_id: task.project_id,
+                        name: task.name,
+                        description: task.description || '',
+                        is_recurring: task.is_recurring || false,
+                        hourly_rate: task.hourly_rate || ''
+                      });
+                      setShowTaskModal(true);
+                    }}
                   >
                     <div>
                       <Heading size="small" margin="0 0 4px 0">{task.name}</Heading>
                       {task.description && (
                         <Text variant="secondary" size="small">{task.description}</Text>
+                      )}
+                      {task.hourly_rate && (
+                        <Text size="small">${task.hourly_rate}/hr</Text>
                       )}
                       {task.is_recurring && (
                         <Text size="small" style={{ color: '#007AFF' }}>Recurring</Text>
@@ -449,11 +603,11 @@ const Projects = () => {
             
             <FlexBox direction="column" gap="15px">
               <FlexBox direction="column" gap="5px">
-                <Label>Client Name *</Label>
+                <Label>Name *</Label>
                 <Input
                   value={clientForm.name}
                   onChange={(e) => setClientForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter client name"
+                  placeholder="Client name"
                 />
               </FlexBox>
               
@@ -463,17 +617,23 @@ const Projects = () => {
                   type="email"
                   value={clientForm.email}
                   onChange={(e) => setClientForm(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="client@company.com"
+                  placeholder="client@example.com"
                 />
               </FlexBox>
               
               <FlexBox direction="column" gap="5px">
-                <Label>Hourly Rate</Label>
+                <Label>Hourly Rate ($)</Label>
                 <Input
-                  type="number"
+                  type="text"
                   value={clientForm.hourly_rate}
-                  onChange={(e) => setClientForm(prev => ({ ...prev, hourly_rate: e.target.value }))}
-                  placeholder="75"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow numbers, decimal point, and empty string
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setClientForm(prev => ({ ...prev, hourly_rate: value }));
+                    }
+                  }}
+                  placeholder="30.00"
                 />
               </FlexBox>
               
@@ -483,10 +643,10 @@ const Projects = () => {
                 </Button>
                 <Button 
                   variant="primary" 
-                  onClick={handleCreateClient}
+                  onClick={handleSubmitClient}
                   disabled={!clientForm.name}
                 >
-                  Create Client
+                  {editingClient ? 'Update' : 'Create'} Client
                 </Button>
               </FlexBox>
             </FlexBox>
@@ -525,9 +685,15 @@ const Projects = () => {
               <FlexBox direction="column" gap="5px">
                 <Label>Hourly Rate (overrides client rate)</Label>
                 <Input
-                  type="number"
+                  type="text"
                   value={projectForm.hourly_rate}
-                  onChange={(e) => setProjectForm(prev => ({ ...prev, hourly_rate: e.target.value }))}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow numbers, decimal point, and empty string
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setProjectForm(prev => ({ ...prev, hourly_rate: value }));
+                    }
+                  }}
                   placeholder="100"
                 />
               </FlexBox>
@@ -538,10 +704,10 @@ const Projects = () => {
                 </Button>
                 <Button 
                   variant="primary" 
-                  onClick={handleCreateProject}
+                  onClick={editingProject ? handleUpdateProject : handleCreateProject}
                   disabled={!projectForm.name}
                 >
-                  Create Project
+                  {editingProject ? 'Update' : 'Create'} Project
                 </Button>
               </FlexBox>
             </FlexBox>
@@ -576,6 +742,22 @@ const Projects = () => {
                   placeholder="Task description"
                 />
               </FlexBox>
+
+              <FlexBox direction="column" gap="5px">
+                <Label>Hourly Rate</Label>
+                <Input
+                  type="text"
+                  value={taskForm.hourly_rate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow numbers, decimal point, and empty string
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setTaskForm(prev => ({ ...prev, hourly_rate: value }));
+                    }
+                  }}
+                  placeholder="Override project/client rate"
+                />
+              </FlexBox>
               
               <FlexBox align="center" gap="10px">
                 <input
@@ -593,10 +775,10 @@ const Projects = () => {
                 </Button>
                 <Button 
                   variant="primary" 
-                  onClick={handleCreateTask}
+                  onClick={editingTask ? handleUpdateTask : handleCreateTask}
                   disabled={!taskForm.name}
                 >
-                  Create Task
+                  {editingTask ? 'Update' : 'Create'} Task
                 </Button>
               </FlexBox>
             </FlexBox>
@@ -604,32 +786,58 @@ const Projects = () => {
         </Modal>
       )}
 
-      {/* Client Info Modal */}
+      {/* Client Info/Edit Modal */}
       {showClientInfoModal && editingClient && (
         <Modal onClick={() => setShowClientInfoModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
-              <ModalTitle>Client Information</ModalTitle>
+              <ModalTitle>Edit Client</ModalTitle>
               <ModalCloseButton onClick={() => setShowClientInfoModal(false)}>×</ModalCloseButton>
             </ModalHeader>
             
-            <FlexBox direction="column" gap="20px">
-              <div>
-                <Heading size="medium" margin="0 0 10px 0">{editingClient.name}</Heading>
+            <FlexBox direction="column" gap="15px">
+              <FlexBox direction="column" gap="5px">
+                <Label>Name *</Label>
+                <Input
+                  value={clientForm.name}
+                  onChange={(e) => setClientForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Client name"
+                />
+              </FlexBox>
+              
+              <FlexBox direction="column" gap="5px">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={clientForm.email}
+                  onChange={(e) => setClientForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="client@example.com"
+                />
+              </FlexBox>
+              
+              <FlexBox direction="column" gap="5px">
+                <Label>Hourly Rate ($)</Label>
+                <Input
+                  type="text"
+                  value={clientForm.hourly_rate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow numbers, decimal point, and empty string
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setClientForm(prev => ({ ...prev, hourly_rate: value }));
+                    }
+                  }}
+                  placeholder="30.00"
+                />
+              </FlexBox>
+              
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #333' }}>
                 <Text variant="secondary" size="small" style={{ display: 'block', marginBottom: '5px' }}>
-                  Email: {editingClient.email || 'No email provided'}
+                  Created: {editingClient.createdAt ? new Date(editingClient.createdAt).toLocaleDateString() : 'Unknown'}
                 </Text>
-                {editingClient.hourly_rate && (
-                  <Text size="small" style={{ display: 'block', marginBottom: '5px' }}>
-                    Hourly Rate: ${editingClient.hourly_rate}/hr
-                  </Text>
-                )}
-                <Text variant="secondary" size="small" style={{ display: 'block', marginBottom: '5px' }}>
-                  Created: {new Date(editingClient.created_at).toLocaleDateString()}
-                </Text>
-                {editingClient.updated_at !== editingClient.created_at && (
+                {editingClient.updatedAt && editingClient.updatedAt !== editingClient.createdAt && (
                   <Text variant="secondary" size="small" style={{ display: 'block', marginBottom: '5px' }}>
-                    Last Updated: {new Date(editingClient.updated_at).toLocaleDateString()}
+                    Last Updated: {new Date(editingClient.updatedAt).toLocaleDateString()}
                   </Text>
                 )}
               </div>
@@ -638,12 +846,22 @@ const Projects = () => {
                 <Button 
                   variant="danger" 
                   onClick={() => handleDeleteClient(editingClient)}
-                  style={{ backgroundColor: '#dc3545', color: 'white' }}
                 >
                   Delete Client
                 </Button>
                 <Button variant="secondary" onClick={() => setShowClientInfoModal(false)}>
-                  Close
+                  Cancel
+                </Button>
+                <Button 
+                  variant="primary" 
+                  onClick={() => {
+                    if (clientForm.name) {
+                      handleUpdateClient();
+                    }
+                  }}
+                  disabled={!clientForm.name}
+                >
+                  Update Client
                 </Button>
               </FlexBox>
             </FlexBox>
@@ -654,4 +872,4 @@ const Projects = () => {
   );
 };
 
-export default Projects;
+export default Clients;
