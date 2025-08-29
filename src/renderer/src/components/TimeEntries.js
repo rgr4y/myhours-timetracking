@@ -477,20 +477,32 @@ const TimeEntries = () => {
         </EmptyState>
       ) : (
         <FlexBox direction="column" gap="0">
-          {Object.entries(groupEntriesByDate(timeEntries)).map(([date, entries], groupIndex) => (
-            <div key={date} style={{ marginBottom: groupIndex < Object.keys(groupEntriesByDate(timeEntries)).length - 1 ? '20px' : '0' }}>
-              {/* Day Header */}
-              <Card 
-                padding="15px" 
-                margin="0"
+          {Object.entries(groupEntriesByDate(timeEntries)).map(([date, entries], groupIndex) => {
+            // Check if any entry in this day group is active
+            const hasActiveEntry = entries.some(entry => entry.isActive);
+            
+            return (
+              <div 
+                key={date} 
                 style={{ 
-                  cursor: 'pointer',
-                  backgroundColor: '#2a2a2a',
-                  border: '1px solid #404040',
-                  borderRadius: collapsedDays.has(date) ? '8px' : '8px 8px 0 0'
+                  marginBottom: groupIndex < Object.keys(groupEntriesByDate(timeEntries)).length - 1 ? '20px' : '0',
+                  border: hasActiveEntry ? '2px solid #007AFF' : 'none',
+                  borderRadius: '8px',
+                  padding: hasActiveEntry ? '2px' : '0'
                 }}
-                onClick={() => toggleDayCollapse(date)}
               >
+                {/* Day Header */}
+                <Card 
+                  padding="15px" 
+                  margin="0"
+                  style={{ 
+                    cursor: 'pointer',
+                    backgroundColor: hasActiveEntry ? '#1a1a2e' : '#2a2a2a',
+                    border: hasActiveEntry ? 'none' : '1px solid #404040',
+                    borderRadius: collapsedDays.has(date) ? '8px' : '8px 8px 0 0'
+                  }}
+                  onClick={() => toggleDayCollapse(date)}
+                >
                 <FlexBox justify="space-between" align="center">
                   <FlexBox align="center" gap="10px">
                     {collapsedDays.has(date) ? (
@@ -515,7 +527,7 @@ const TimeEntries = () => {
                       padding="15px"
                       margin="0"
                       style={{
-                        border: entry.isActive ? '2px solid #007AFF' : '1px solid #404040',
+                        border: hasActiveEntry ? (entry.isActive ? 'none' : '1px solid #404040') : (entry.isActive ? '2px solid #007AFF' : '1px solid #404040'),
                         borderTop: index === 0 ? 'none' : '1px solid #404040',
                         borderRadius: index === entries.length - 1 ? '0 0 8px 8px' : '0',
                         backgroundColor: entry.isActive ? '#1a1a2e' : undefined
@@ -630,7 +642,8 @@ const TimeEntries = () => {
                 </FlexBox>
               )}
             </div>
-          ))}
+            );
+          })}
         </FlexBox>
       )}
 
