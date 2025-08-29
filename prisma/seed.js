@@ -246,7 +246,7 @@ async function main() {
         totalAmount: 8750.00,
         periodStart: '2025-07-01',
         periodEnd: '2025-07-31',
-        status: 'paid',
+        status: 'generated',
         dueDate: new Date('2025-07-31'),
         createdAt: new Date('2025-07-01')
       }
@@ -258,7 +258,7 @@ async function main() {
         totalAmount: 5250.00,
         periodStart: '2025-07-01',
         periodEnd: '2025-07-31',
-        status: 'sent',
+        status: 'generated',
         dueDate: new Date('2025-08-14'),
         createdAt: new Date('2025-07-15')
       }
@@ -270,7 +270,7 @@ async function main() {
         totalAmount: 3600.00,
         periodStart: '2025-08-01',
         periodEnd: '2025-08-31',
-        status: 'draft',
+        status: 'generated',
         dueDate: new Date('2025-08-31'),
         createdAt: new Date('2025-08-01')
       }

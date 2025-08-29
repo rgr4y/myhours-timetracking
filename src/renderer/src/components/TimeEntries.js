@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Edit, Trash2, Plus, Clock, Play, Square, Folder } from 'lucide-react';
+import { Edit, Trash2, Plus, Clock, Play, Square, Folder, Building, CheckSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Container,
   Card,
@@ -17,10 +17,11 @@ import {
   ModalTitle,
   ModalCloseButton,
   EmptyState,
-  IconButton
+  IconButton,
+  LoadingOverlay
 } from './ui';
 import { useTimer } from '../context/TimerContext';
-import { formatDurationHumanFriendly, formatTime, formatDate, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
+import { formatDurationHumanFriendly, formatTime, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
 
 const TimeEntries = () => {
   const { activeTimer, startTimer, stopTimer } = useTimer();
@@ -32,6 +33,8 @@ const TimeEntries = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [collapsedDays, setCollapsedDays] = useState(new Set());
+  const [isLoading, setIsLoading] = useState(true);
 
   const [entryForm, setEntryForm] = useState({
     clientId: '',
@@ -45,10 +48,44 @@ const TimeEntries = () => {
 
   useEffect(() => {
     console.log('TimeEntries component mounting, loading data...');
-    loadTimeEntries();
-    loadClients();
-    loadSettings();
+    const loadAllData = async () => {
+      try {
+        setIsLoading(true);
+        await Promise.all([
+          loadTimeEntries(),
+          loadClients(),
+          loadAllTasks(),
+          loadSettings()
+        ]);
+        // Small delay to ensure rendering is complete
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 100);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setIsLoading(false);
+      }
+    };
+    
+    loadAllData();
   }, []);
+
+  // Set up initial collapsed state: all days collapsed except the most recent
+  useEffect(() => {
+    if (timeEntries.length > 0) {
+      const grouped = groupEntriesByDate(timeEntries);
+      const dates = Object.keys(grouped);
+      
+      if (dates.length > 0) {
+        // All days should be collapsed except the first one (most recent)
+        const allDatesExceptMostRecent = new Set(dates.slice(1));
+        setCollapsedDays(allDatesExceptMostRecent);
+      }
+    } else {
+      // No entries, reset to empty set
+      setCollapsedDays(new Set());
+    }
+  }, [timeEntries]);
 
   // Update current time every second for active timers
   useEffect(() => {
@@ -141,6 +178,37 @@ const TimeEntries = () => {
         setClients(clientList);
       } catch (error) {
         console.error('Error loading clients:', error);
+      }
+    }
+  };
+
+  const loadAllTasks = async () => {
+    if (window.electronAPI) {
+      try {
+        // Load tasks from all projects to be able to resolve task names
+        const allTasks = [];
+        const clientList = await window.electronAPI.clients.getAll();
+        
+        for (const client of clientList) {
+          try {
+            const projects = await window.electronAPI.projects.getAll(client.id);
+            for (const project of projects) {
+              try {
+                const projectTasks = await window.electronAPI.tasks.getAll(project.id);
+                allTasks.push(...(projectTasks || []));
+              } catch (error) {
+                console.error(`Error loading tasks for project ${project.id}:`, error);
+              }
+            }
+          } catch (error) {
+            console.error(`Error loading projects for client ${client.id}:`, error);
+          }
+        }
+        
+        setTasks(allTasks);
+        console.log('All tasks loaded:', allTasks.length, 'tasks');
+      } catch (error) {
+        console.error('Error loading all tasks:', error);
       }
     }
   };
@@ -323,9 +391,77 @@ const TimeEntries = () => {
     return client ? client.name : 'Unknown Client';
   };
 
+  const getTaskName = (taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    return task ? task.name : null;
+  };
+
+  // Group time entries by date
+  const groupEntriesByDate = (entries) => {
+    const groups = {};
+    entries.forEach(entry => {
+      const date = new Date(entry.startTime);
+      const dateKey = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric', 
+        month: 'short',
+        day: 'numeric'
+      });
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(entry);
+    });
+    
+    // Sort dates in descending order (newest first)
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      const dateA = new Date(groups[a][0].startTime);
+      const dateB = new Date(groups[b][0].startTime);
+      return dateB - dateA;
+    });
+    const sortedGroups = {};
+    sortedKeys.forEach(key => {
+      sortedGroups[key] = groups[key];
+    });
+    
+    return sortedGroups;
+  };
+
+  // Calculate total duration for a day's entries
+  const calculateDayTotal = (entries) => {
+    const totalMinutes = entries.reduce((total, entry) => {
+      if (entry.isActive) {
+        // For active entries, calculate elapsed time
+        const start = new Date(entry.startTime);
+        const now = currentTime;
+        const diffMs = now.getTime() - start.getTime();
+        const minutes = Math.floor(diffMs / (1000 * 60));
+        return total + minutes;
+      } else {
+        // For completed entries, calculate the duration
+        return total + calculateDuration(entry.startTime, entry.endTime);
+      }
+    }, 0);
+    
+    return formatDurationHumanFriendly(totalMinutes);
+  };
+
+  // Toggle day collapse state
+  const toggleDayCollapse = (date) => {
+    setCollapsedDays(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(date)) {
+        newSet.delete(date);
+      } else {
+        newSet.add(date);
+      }
+      return newSet;
+    });
+  };
+
   return (
-    <Container padding="40px" style={{ height: '100vh', overflowY: 'auto' }}>
-      <FlexBox justify="space-between" align="center" margin="0 0 30px 0">
+    <Container padding="40px" style={{ height: '100vh', overflowY: 'auto', position: 'relative' }}>
+      <FlexBox justify="space-between" align="center" margin="0 0 20px 0">
         <Title>Time Entries</Title>
         <Button variant="primary" onClick={() => setShowModal(true)}>
           <Plus size={16} />
@@ -340,115 +476,160 @@ const TimeEntries = () => {
           <p>Start tracking your time or add a manual entry</p>
         </EmptyState>
       ) : (
-        <FlexBox direction="column" gap="15px">
-          {timeEntries.map(entry => (
-            <Card 
-              key={entry.id} 
-              padding="20px"
-              style={{
-                border: entry.isActive ? '2px solid #007AFF' : undefined,
-                backgroundColor: entry.isActive ? '#1a1a2e' : undefined
-              }}
-            >
-              <FlexBox justify="space-between" align="center">
-                <FlexBox direction="column" gap="5px">
+        <FlexBox direction="column" gap="0">
+          {Object.entries(groupEntriesByDate(timeEntries)).map(([date, entries], groupIndex) => (
+            <div key={date} style={{ marginBottom: groupIndex < Object.keys(groupEntriesByDate(timeEntries)).length - 1 ? '20px' : '0' }}>
+              {/* Day Header */}
+              <Card 
+                padding="15px" 
+                margin="0"
+                style={{ 
+                  cursor: 'pointer',
+                  backgroundColor: '#2a2a2a',
+                  border: '1px solid #404040',
+                  borderRadius: collapsedDays.has(date) ? '8px' : '8px 8px 0 0'
+                }}
+                onClick={() => toggleDayCollapse(date)}
+              >
+                <FlexBox justify="space-between" align="center">
                   <FlexBox align="center" gap="10px">
-                    <Heading size="small" style={{ marginBottom: '15px' }}>{entry.description || 'No description'}</Heading>
-                    {entry.isActive && (
-                      <Text size="small" variant="success" style={{ 
-                        padding: '2px 8px', 
-                        borderRadius: '12px', 
-                        marginBottom: '15px',
-                        backgroundColor: '#28a745',
-                        color: 'white',
-                        fontSize: '10px',
-                        fontWeight: 'bold'
-                      }}>
-                        ACTIVE
-                      </Text>
+                    {collapsedDays.has(date) ? (
+                      <ChevronDown size={20} />
+                    ) : (
+                      <ChevronUp size={20} />
                     )}
+                    <Heading size="medium">{date}</Heading>
                   </FlexBox>
-                  <Text variant="secondary" size="small">
-                    {getClientName(entry.clientId)}
-                    {entry.project && (
-                      <>
-                        {' '}
-                        <Folder size={14} style={{ margin: '0 4px 0 10px', verticalAlign: 'text-bottom' }} />
-                        {entry.project.name}
-                      </>
-                    )}
+                  <Text size="medium" variant="success" style={{ fontWeight: 'bold' }}>
+                    {calculateDayTotal(entries)}
                   </Text>
-                  <FlexBox gap="15px">
-                    <Text size="small">
-                      <Calendar size={14} style={{ marginRight: '5px' }} />
-                      {formatDate(entry.startTime)}
-                    </Text>
-                    <Text size="small">
-                      <Clock size={14} style={{ marginRight: '5px' }} />
-                      {entry.isActive 
-                        ? `${formatTime(entry.startTime)} - Running`
-                        : `${formatTime(entry.startTime)} - ${formatTime(entry.endTime)}`
-                      }
-                    </Text>
-                    <Text size="medium" variant="success">
-                      {entry.isActive 
-                        ? getElapsedTime(entry.startTime)
-                        : formatDurationHumanFriendly(calculateDuration(entry.startTime, entry.endTime))
-                      }
-                    </Text>
-                  </FlexBox>
                 </FlexBox>
-                
-                <FlexBox gap="10px">
-                  {!entry.isActive && (
-                    <IconButton 
-                      variant="primary" 
-                      size="small" 
-                      onClick={() => handlePlayEntry(entry)}
-                      title="Start timer with this entry's details"
+              </Card>
+
+              {/* Day Entries */}
+              {!collapsedDays.has(date) && (
+                <FlexBox direction="column" gap="0">
+                  {entries.map((entry, index) => (
+                    <Card 
+                      key={entry.id} 
+                      padding="15px"
+                      margin="0"
+                      style={{
+                        border: entry.isActive ? '2px solid #007AFF' : '1px solid #404040',
+                        borderTop: index === 0 ? 'none' : '1px solid #404040',
+                        borderRadius: index === entries.length - 1 ? '0 0 8px 8px' : '0',
+                        backgroundColor: entry.isActive ? '#1a1a2e' : undefined
+                      }}
                     >
-                      <Play size={14} />
-                    </IconButton>
-                  )}
-                  {entry.isActive && (
-                    <IconButton 
-                      variant="danger" 
-                      size="small" 
-                      onClick={handleStopTimer}
-                      title="Stop the active timer"
-                    >
-                      <Square size={14} />
-                    </IconButton>
-                  )}
-                  <IconButton 
-                    variant="secondary" 
-                    size="small" 
-                    onClick={() => openEditModal(entry)}
-                    disabled={entry.isActive}
-                    style={{ 
-                      opacity: entry.isActive ? 0.5 : 1,
-                      cursor: entry.isActive ? 'not-allowed' : 'pointer'
-                    }}
-                    title={entry.isActive ? "Cannot edit active timer" : "Edit entry"}
-                  >
-                    <Edit size={14} />
-                  </IconButton>
-                  <IconButton 
-                    variant={entry.isActive ? "secondary" : "danger"} 
-                    size="small" 
-                    onClick={() => handleDeleteEntry(entry.id)}
-                    disabled={entry.isActive}
-                    style={{ 
-                      opacity: entry.isActive ? 0.5 : 1,
-                      cursor: entry.isActive ? 'not-allowed' : 'pointer'
-                    }}
-                    title={entry.isActive ? "Cannot delete active timer" : "Delete entry"}
-                  >
-                    <Trash2 size={14} />
-                  </IconButton>
+                      <FlexBox justify="space-between" align="center">
+                        <FlexBox direction="column" gap="5px">
+                          <FlexBox align="center" gap="10px">
+                            <Heading size="small" style={{ marginBottom: '15px' }}>
+                              {entry.taskId && getTaskName(entry.taskId) && (
+                                <>
+                                  <CheckSquare size={16} style={{ marginRight: '6px', verticalAlign: 'text-bottom' }} />
+                                  {getTaskName(entry.taskId)}
+                                  {entry.description && ' • '}
+                                </>
+                              )}
+                              {entry.description || (!entry.taskId || !getTaskName(entry.taskId) ? 'No description' : '')}
+                            </Heading>
+                            {entry.isActive && (
+                              <Text size="small" variant="success" style={{ 
+                                padding: '2px 8px', 
+                                borderRadius: '12px', 
+                                marginBottom: '15px',
+                                backgroundColor: '#28a745',
+                                color: 'white',
+                                fontSize: '10px',
+                                fontWeight: 'bold'
+                              }}>
+                                ACTIVE
+                              </Text>
+                            )}
+                          </FlexBox>
+                          <Text variant="secondary" size="small">
+                            <Building size={14} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
+                            {getClientName(entry.clientId)}
+                            {entry.project && (
+                              <>
+                                {' '}
+                                <Folder size={14} style={{ margin: '0 4px 0 10px', verticalAlign: 'text-bottom' }} />
+                                {entry.project.name}
+                              </>
+                            )}
+                          </Text>
+                          <FlexBox gap="15px">
+                            <Text size="small">
+                              <Clock size={14} style={{ marginRight: '5px' }} />
+                              {entry.isActive 
+                                ? `${formatTime(entry.startTime)} - Running`
+                                : `${formatTime(entry.startTime)} - ${formatTime(entry.endTime)}`
+                              }
+                            </Text>
+                            <Text size="medium" variant="success">
+                              {entry.isActive 
+                                ? getElapsedTime(entry.startTime)
+                                : formatDurationHumanFriendly(calculateDuration(entry.startTime, entry.endTime))
+                              }
+                            </Text>
+                          </FlexBox>
+                        </FlexBox>
+                        
+                        <FlexBox gap="10px">
+                          {!entry.isActive && (
+                            <IconButton 
+                              variant="primary" 
+                              size="small" 
+                              onClick={() => handlePlayEntry(entry)}
+                              title="Start timer with this entry's details"
+                            >
+                              <Play size={14} />
+                            </IconButton>
+                          )}
+                          {entry.isActive && (
+                            <IconButton 
+                              variant="danger" 
+                              size="small" 
+                              onClick={handleStopTimer}
+                              title="Stop the active timer"
+                            >
+                              <Square size={14} />
+                            </IconButton>
+                          )}
+                          <IconButton 
+                            variant="secondary" 
+                            size="small" 
+                            onClick={() => openEditModal(entry)}
+                            disabled={entry.isActive}
+                            style={{ 
+                              opacity: entry.isActive ? 0.5 : 1,
+                              cursor: entry.isActive ? 'not-allowed' : 'pointer'
+                            }}
+                            title={entry.isActive ? "Cannot edit active timer" : "Edit entry"}
+                          >
+                            <Edit size={14} />
+                          </IconButton>
+                          <IconButton 
+                            variant={entry.isActive ? "secondary" : "danger"} 
+                            size="small" 
+                            onClick={() => handleDeleteEntry(entry.id)}
+                            disabled={entry.isActive}
+                            style={{ 
+                              opacity: entry.isActive ? 0.5 : 1,
+                              cursor: entry.isActive ? 'not-allowed' : 'pointer'
+                            }}
+                            title={entry.isActive ? "Cannot delete active timer" : "Delete entry"}
+                          >
+                            <Trash2 size={14} />
+                          </IconButton>
+                        </FlexBox>
+                      </FlexBox>
+                    </Card>
+                  ))}
                 </FlexBox>
-              </FlexBox>
-            </Card>
+              )}
+            </div>
           ))}
         </FlexBox>
       )}
@@ -564,6 +745,13 @@ const TimeEntries = () => {
           </ModalContent>
         </Modal>
       )}
+
+      {/* Loading Overlay */}
+      <LoadingOverlay 
+        isVisible={isLoading} 
+        text="Loading Time Entries..." 
+        noFadeIn={true}
+      />
     </Container>
   );
 };
