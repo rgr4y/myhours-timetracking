@@ -119,7 +119,6 @@ const Projects = () => {
         console.log('Loading clients from electronAPI...');
         try {
           const clientList = await window.electronAPI.clients.getAll();
-          console.log('Clients loaded:', clientList);
           setClients(clientList);
           if (clientList.length > 0 && !selectedClient) {
             setSelectedClient(clientList[0]);

@@ -41,7 +41,7 @@ A cross-platform time tracking application built with Electron, React, and moder
 
 - **Frontend**: React, Styled Components, Lucide React (icons)
 - **Backend**: Electron (Node.js)
-- **Database**: JSON-based local storage (node-json-db)
+- **Database**: SQLite with Prisma ORM
 - **PDF Generation**: Puppeteer + Handlebars templates
 - **Build System**: Electron Builder
 
