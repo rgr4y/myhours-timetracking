@@ -109,6 +109,33 @@ export const TimerProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [isRunning, activeTimer]);
 
+  // Recalculate elapsed time when window regains focus or becomes visible
+  const recalcElapsed = useCallback(() => {
+    if (!isRunning || !activeTimer) return;
+    try {
+      const start = new Date(activeTimer.startTime);
+      if (!isNaN(start.getTime())) {
+        const elapsed = Math.floor((Date.now() - start.getTime()) / 1000);
+        setTime(elapsed);
+      }
+    } catch (_) {
+      // ignore
+    }
+  }, [isRunning, activeTimer]);
+
+  useEffect(() => {
+    const onFocus = () => recalcElapsed();
+    const onVisibility = () => {
+      if (!document.hidden) recalcElapsed();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [recalcElapsed]);
+
   const startTimer = async (timerData = {}, timerDescription = '') => {
     console.log('[TimerContext] Starting timer with data:', timerData, 'description:', timerDescription);
     
