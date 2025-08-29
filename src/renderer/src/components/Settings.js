@@ -176,9 +176,8 @@ const Settings = () => {
                 onChange={(e) => handleInputChange('invoice_template', e.target.value)}
               >
                 <option value="default">Default Template</option>
-                <option value="minimal">Minimal Template</option>
-                <option value="detailed">Detailed Template</option>
               </Select>
+              <Text variant="secondary" size="small">Additional templates coming soon.</Text>
             </FlexBox>
           </FlexBox>
         </Card>

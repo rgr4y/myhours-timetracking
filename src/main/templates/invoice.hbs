@@ -1,205 +1,232 @@
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Invoice</title>
-    <style>
-        body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            margin: 0;
-            padding: 40px;
-            color: #333;
-        }
-        
-        .header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 15px;
-        }
-        
-        .company-info h1 {
-            margin: 0;
-            color: #2c3e50;
-            font-size: 28px;
-        }
-        
-        .company-info p {
-            margin: 5px 0;
-            color: #7f8c8d;
-        }
-        
-        .invoice-info {
-            text-align: right;
-        }
-        
-        .invoice-info h2 {
-            margin: 0;
-            color: #e74c3c;
-            font-size: 24px;
-        }
-        
-        .client-info {
-            margin-bottom: 30px;
-        }
-        
-        .client-info h3 {
-            margin: 0 0 10px 0;
-            color: #2c3e50;
-        }
-        
-        .summary {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-        }
-        
-        .summary-item {
-            text-align: center;
-        }
-        
-        .summary-item .value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        
-        .summary-item .label {
-            color: #7f8c8d;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        th {
-            background-color: #ECEFF3; /* light gray for better print contrast */
-            color: #2c3e50;
-            font-weight: 600;
-            border-bottom: 1px solid #d0d5db;
-        }
-        
-        tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-        
-        .week-header {
-            background-color: #ecf0f1 !important;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        
-        .text-right {
-            text-align: right;
-        }
-        
-        .total-row {
-            background-color: #ECEFF3 !important; /* match header */
-            color: #2c3e50;
-            font-weight: bold;
-            border-top: 1px solid #d0d5db;
-            border-bottom: 1px solid #d0d5db;
-        }
-        
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            text-align: center;
-            color: #7f8c8d;
-            font-size: 14px;
-        }
-        
-        .amount {
-            font-weight: bold;
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Invoice</title>
+  <style>
+    :root {
+      --ink: #0f172a;             /* slate-900 */
+      --subtle: #475569;          /* slate-600 */
+      --muted: #64748b;           /* slate-500 */
+      --border: #e2e8f0;          /* slate-200 */
+      --bg: #ffffff;
+      --accent-start: #536BCE;    /* brand gradient start */
+      --accent-end: #1FA58A;      /* brand gradient end */
+      --radius: 14px;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--ink);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      margin: 0;
+    }
+
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      line-height: 1.5;
+      padding: 30px 36px;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 21px;
+    }
+
+    .brand h1 {
+      margin: 0 0 6px 0;
+      font-size: 28px;
+      letter-spacing: 0.2px;
+    }
+    .brand p { margin: 2px 0; color: var(--muted); font-size: 13px; }
+
+    .badge {
+      display: inline-block;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      font-size: 12px;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+      align-self: start;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(3, max-content);
+      gap: 18px 28px;
+      margin-top: 8px;
+    }
+    .meta .k { color: var(--subtle); font-size: 12px; }
+    .meta .v { font-weight: 600; }
+
+    /* Cards */
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+    .card h3 { margin: 0 0 8px 0; font-size: 14px; color: var(--subtle); text-transform: uppercase; letter-spacing: 0.08em; }
+    .card p { margin: 2px 0; }
+
+    /* Summary band */
+    .summary {
+      display: flex;
+      flex-wrap: nowrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, rgba(83,107,206,0.06), rgba(31,165,138,0.06));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin: 14px 0 18px 0;
+    }
+    .summary .item { text-align: center; flex: 1; }
+    .summary .value { font-size: 22px; font-weight: 700; }
+    .summary .label { color: var(--muted); font-size: 12px; letter-spacing: 0.04em; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    thead th {
+      background: #f8fafc;
+      color: var(--subtle);
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td { padding: 10px; border-bottom: 1px solid var(--border); }
+    tbody tr:nth-child(even) { background: #fbfdff; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .desc { color: var(--ink); }
+
+    .total-row td { background: #f8fafc; font-weight: 700; }
+
+    /* Totals */
+    .totals {
+      display: grid;
+      grid-template-columns: 1fr minmax(240px, 320px);
+      gap: 18px;
+      margin-top: 12px;
+      align-items: start;
+    }
+    .amount-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+    .amount-line { display: flex; justify-content: space-between; margin: 8px 0; }
+    .amount-line .k { color: var(--subtle); }
+    .amount-line.total { font-size: 18px; font-weight: 800; }
+
+    /* Footer */
+    .footer { margin-top: 21px; padding-top: 12px; border-top: 1px dashed var(--border); color: var(--muted); font-size: 12px; text-align: center; }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <div class="company-info">
-            <h1>{{companyName}}</h1>
-            <p>{{companyEmail}}</p>
-            <p>{{companyPhone}}</p>
-            <p>{{companyWebsite}}</p>
+  <div class="page">
+    <div class="topbar">
+      <div class="brand">
+        <div class="badge">INVOICE</div>
+        <h1>{{companyName}}</h1>
+        {{#if companyEmail}}<p>{{companyEmail}}</p>{{/if}}
+        {{#if companyPhone}}<p>{{companyPhone}}</p>{{/if}}
+        {{#if companyWebsite}}<p>{{companyWebsite}}</p>{{/if}}
+      </div>
+      <div class="meta">
+        <div>
+          <div class="k">Invoice #</div>
+          <div class="v">{{invoiceNumber}}</div>
         </div>
-        <div class="invoice-info">
-            <h2>INVOICE</h2>
-            <p><strong>Invoice #:</strong> {{invoiceNumber}}</p>
-            <p><strong>Date:</strong> {{invoiceDate}}</p>
-            <p><strong>Period:</strong> {{periodStart}} - {{periodEnd}}</p>
+        <div>
+          <div class="k">Date</div>
+          <div class="v">{{invoiceDate}}</div>
         </div>
+        <div>
+          <div class="k">Period</div>
+          <div class="v">{{periodStart}} – {{periodEnd}}</div>
+        </div>
+      </div>
     </div>
 
-    <div class="client-info">
-        <h3>Bill To:</h3>
+    <div class="row">
+      <div class="card">
+        <h3>Bill To</h3>
         <p><strong>{{clientName}}</strong></p>
         {{#if clientEmail}}<p>{{clientEmail}}</p>{{/if}}
-    </div>
-
-    <div class="summary">
-        <div class="summary-item">
+      </div>
+      <div class="card">
+        <h3>Summary</h3>
+        <div class="summary">
+          <div class="item">
             <div class="value">{{totalHours}}</div>
             <div class="label">Total Hours</div>
-        </div>
-        <div class="summary-item">
-            <div class="value">${{hourlyRate}}</div>
-            <div class="label">Hourly Rate</div>
-        </div>
-        <div class="summary-item">
+          </div>
+          <div class="item">
             <div class="value">${{totalAmount}}</div>
             <div class="label">Total Amount</div>
+          </div>
         </div>
+      </div>
     </div>
 
     <table>
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th class="text-right">Hours</th>
-                <th class="text-right">Rate</th>
-                <th class="text-right">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{#each lineItems}}
-            <tr>
-                <td>{{this.date}}</td>
-                <td>{{this.description}}</td>
-                <td class="text-right">{{this.hours}}</td>
-                <td class="text-right">${{this.rate}}</td>
-                <td class="text-right amount">${{this.amount}}</td>
-            </tr>
-            {{/each}}
-            <tr class="total-row">
-                <td colspan="2"><strong>TOTAL</strong></td>
-                <td class="text-right"><strong>{{totalHours}}</strong></td>
-                <td></td>
-                <td class="text-right"><strong>${{totalAmount}}</strong></td>
-            </tr>
-        </tbody>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th class="num">Hours</th>
+          <th class="num">Rate</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each lineItems}}
+        <tr>
+          <td>{{this.date}}</td>
+          <td class="desc">{{this.description}}</td>
+          <td class="num">{{this.hours}}</td>
+          <td class="num">${{this.rate}}</td>
+          <td class="num">${{this.amount}}</td>
+        </tr>
+        {{/each}}
+        <tr class="total-row">
+          <td colspan="2">TOTAL</td>
+          <td class="num">{{totalHours}}</td>
+          <td></td>
+          <td class="num">${{totalAmount}}</td>
+        </tr>
+      </tbody>
     </table>
 
-    <div class="footer">
-        <p>Thank you for your business!</p>
-        <p>Payment is due within 30 days of invoice date.</p>
+    <div class="totals">
+      <div></div>
+      <div class="amount-card">
+        <div class="amount-line"><div class="k">Subtotal</div><div class="v">${{totalAmount}}</div></div>
+        <div class="amount-line total"><div class="k">Amount Due</div><div class="v">${{totalAmount}}</div></div>
+      </div>
     </div>
+
+    <div class="footer">
+      <p>Thank you for your business. Payment is due within 30 days.</p>
+    </div>
+  </div>
 </body>
 </html>
