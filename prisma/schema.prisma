@@ -36,6 +36,7 @@ model Project {
   // Relations
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tasks  Task[]
+  timeEntries TimeEntry[]
 
   @@map("projects")
 }
@@ -58,6 +59,7 @@ model Task {
 model TimeEntry {
   id          Int      @id @default(autoincrement())
   clientId    Int?     @map("client_id")
+  projectId   Int?     @map("project_id")
   taskId      Int?     @map("task_id")
   description String?
   startTime   DateTime @map("start_time")
@@ -71,6 +73,7 @@ model TimeEntry {
 
   // Relations
   client  Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   task    Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
   invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 

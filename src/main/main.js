@@ -118,7 +118,10 @@ class MyHoursApp {
 
     ipcMain.handle('db:getTasks', async (event, projectId) => {
       try {
-        return await this.database.getTasks(projectId);
+        console.log('[MAIN] IPC: Getting tasks for project:', projectId);
+        const tasks = await this.database.getTasks(projectId);
+        console.log('[MAIN] IPC: Returning', tasks.length, 'tasks');
+        return tasks;
       } catch (error) {
         console.error('[MAIN] IPC: Error getting tasks:', error);
         throw error;

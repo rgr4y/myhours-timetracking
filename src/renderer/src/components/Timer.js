@@ -176,7 +176,7 @@ const Timer = () => {
         try {
           // Use the same API call as Projects component
           const clientList = await window.electronAPI.clients.getAll();
-          console.log('Clients loaded:', clientList);
+          // console.log('Clients loaded:', clientList);
           setClients(clientList);
         } catch (error) {
           console.error('Error loading clients:', error);

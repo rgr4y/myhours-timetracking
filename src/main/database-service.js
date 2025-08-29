@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const sampleData = require('./sample-data');
 
 class DatabaseService {
   constructor() {
@@ -9,6 +10,70 @@ class DatabaseService {
     // Connect to the database
     await this.prisma.$connect();
     console.log('Database connected successfully');
+    
+    // Check if database needs seeding
+    await this.seedIfEmpty();
+  }
+
+  async seedIfEmpty() {
+    try {
+      // Check if there are any clients (if empty, assume database needs seeding)
+      const clientCount = await this.prisma.client.count();
+      
+      if (clientCount === 0) {
+        console.log('[DATABASE] Database is empty, seeding with sample data...');
+        await this.seedSampleData();
+      } else {
+        console.log('[DATABASE] Database already contains data, skipping seed');
+      }
+    } catch (error) {
+      console.error('[DATABASE] Error checking/seeding database:', error);
+    }
+  }
+
+  async seedSampleData() {
+    try {
+      // Insert clients
+      for (const clientData of sampleData.clients) {
+        await this.prisma.client.create({
+          data: {
+            name: clientData.name,
+            email: clientData.email,
+            hourlyRate: clientData.hourly_rate
+          }
+        });
+      }
+      console.log('[DATABASE] Seeded', sampleData.clients.length, 'clients');
+
+      // Insert projects
+      for (const projectData of sampleData.projects) {
+        await this.prisma.project.create({
+          data: {
+            name: projectData.name,
+            clientId: projectData.client_id,
+            hourlyRate: projectData.hourly_rate
+          }
+        });
+      }
+      console.log('[DATABASE] Seeded', sampleData.projects.length, 'projects');
+
+      // Insert tasks
+      for (const taskData of sampleData.tasks) {
+        await this.prisma.task.create({
+          data: {
+            name: taskData.name,
+            projectId: taskData.project_id,
+            description: taskData.description
+          }
+        });
+      }
+      console.log('[DATABASE] Seeded', sampleData.tasks.length, 'tasks');
+
+      console.log('[DATABASE] Sample data seeding completed successfully');
+    } catch (error) {
+      console.error('[DATABASE] Error seeding sample data:', error);
+      throw error;
+    }
   }
 
   async disconnect() {
@@ -154,6 +219,7 @@ class DatabaseService {
         where,
         include: {
           client: true,
+          project: true,
           task: {
             include: {
               project: true
@@ -161,7 +227,7 @@ class DatabaseService {
           }
         },
         orderBy: {
-          startTime: 'desc'
+          id: 'desc'
         }
       });
 
@@ -185,13 +251,17 @@ class DatabaseService {
       
       // Convert empty strings to null for optional foreign key fields
       if (cleanData.clientId === '') cleanData.clientId = null;
-      if (cleanData.projectId === '') cleanData.projectId = null;
       if (cleanData.taskId === '') cleanData.taskId = null;
       
       // Convert string IDs to integers where needed
       if (cleanData.clientId) cleanData.clientId = parseInt(cleanData.clientId);
       if (cleanData.projectId) cleanData.projectId = parseInt(cleanData.projectId);
       if (cleanData.taskId) cleanData.taskId = parseInt(cleanData.taskId);
+      
+      // Handle empty string to null conversion for projectId
+      if (cleanData.projectId === '') cleanData.projectId = null;
+      
+      console.log('[DATABASE] Processing projectId:', cleanData.projectId, 'and taskId:', cleanData.taskId);
       
       // Handle date and time fields - combine date with startTime and endTime
       if (cleanData.date && cleanData.startTime) {
@@ -217,11 +287,53 @@ class DatabaseService {
       
       console.log('[DATABASE] Cleaned data:', cleanData);
       
+      // Prepare the update data object with relationship operations
+      const updateData = { ...cleanData };
+      
+      // Handle client relationship
+      if ('clientId' in updateData) {
+        const clientId = updateData.clientId;
+        delete updateData.clientId;
+        
+        if (clientId === null) {
+          updateData.client = { disconnect: true };
+        } else {
+          updateData.client = { connect: { id: clientId } };
+        }
+      }
+      
+      // Handle project relationship
+      if ('projectId' in updateData) {
+        const projectId = updateData.projectId;
+        delete updateData.projectId;
+        
+        if (projectId === null) {
+          updateData.project = { disconnect: true };
+        } else {
+          updateData.project = { connect: { id: projectId } };
+        }
+      }
+      
+      // Handle task relationship
+      if ('taskId' in updateData) {
+        const taskId = updateData.taskId;
+        delete updateData.taskId;
+        
+        if (taskId === null) {
+          updateData.task = { disconnect: true };
+        } else {
+          updateData.task = { connect: { id: taskId } };
+        }
+      }
+      
+      console.log('[DATABASE] Update data with relationships:', updateData);
+      
       const updatedTimeEntry = await this.prisma.timeEntry.update({
         where: { id: parseInt(id) },
-        data: cleanData,
+        data: updateData,
         include: {
           client: true,
+          project: true,
           task: {
             include: {
               project: true
@@ -258,6 +370,8 @@ class DatabaseService {
       if (cleanData.projectId) cleanData.projectId = parseInt(cleanData.projectId);
       if (cleanData.taskId) cleanData.taskId = parseInt(cleanData.taskId);
       
+      console.log('[DATABASE] Processing create with projectId:', cleanData.projectId, 'and taskId:', cleanData.taskId);
+      
       // Handle date and time fields - combine date with startTime and endTime
       if (cleanData.date && cleanData.startTime) {
         const startDateTime = this.parseTimeWithDate(cleanData.startTime, cleanData.date);
@@ -286,6 +400,7 @@ class DatabaseService {
         data: cleanData,
         include: {
           client: true,
+          project: true,
           task: {
             include: {
               project: true
@@ -434,7 +549,9 @@ class DatabaseService {
   // Task methods
   async getTasks(projectId = null) {
     try {
+      console.log('[DATABASE] getTasks called with projectId:', projectId);
       const where = projectId ? { projectId: parseInt(projectId) } : {};
+      console.log('[DATABASE] Query where clause:', where);
       
       const tasks = await this.prisma.task.findMany({
         where,
@@ -450,6 +567,7 @@ class DatabaseService {
         }
       });
 
+      console.log('[DATABASE] Found', tasks.length, 'tasks');
       return tasks;
     } catch (error) {
       console.error('Error getting tasks:', error);

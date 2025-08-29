@@ -58,7 +58,6 @@
     "@prisma/client": "^6.15.0",
     "electron-updater": "^6.1.4",
     "handlebars": "^4.7.8",
-    "node-json-db": "^2.3.0",
     "prisma": "^6.15.0",
     "puppeteer-core": "^21.3.6"
   },

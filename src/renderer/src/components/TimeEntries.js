@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Edit, Trash2, Plus, Clock } from 'lucide-react';
+import { Calendar, Edit, Trash2, Plus, Clock, Play } from 'lucide-react';
 import {
   Container,
   Card,
@@ -23,7 +23,7 @@ import { useTimer } from '../context/TimerContext';
 import { formatDuration, formatTime, formatDate, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
 
 const TimeEntries = () => {
-  const { activeTimer } = useTimer();
+  const { activeTimer, startTimer } = useTimer();
   const [timeEntries, setTimeEntries] = useState([]);
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -82,26 +82,33 @@ const TimeEntries = () => {
   // Load tasks when project changes  
   useEffect(() => {
     const loadTasks = async () => {
-      if (entryForm.projectId && window.electronAPI) {
+      if (entryForm.projectId) {
         try {
+          console.log('Attempting to load tasks for project:', entryForm.projectId);
+          console.log('electronAPI available:', !!window.electronAPI);
+          console.log('electronAPI.tasks available:', !!window.electronAPI?.tasks);
+          
+          if (!window.electronAPI?.tasks?.getAll) {
+            console.error('electronAPI.tasks.getAll is not available');
+            setTasks([]);
+            return;
+          }
+          
           const taskList = await window.electronAPI.tasks.getAll(parseInt(entryForm.projectId));
           console.log('Tasks loaded for project', entryForm.projectId, ':', taskList);
-          setTasks(taskList);
-          // Reset task selection when project changes
-          if (entryForm.taskId) {
-            setEntryForm(prev => ({ ...prev, taskId: '' }));
-          }
+          setTasks(taskList || []);
         } catch (error) {
           console.error('Error loading tasks:', error);
           setTasks([]);
         }
       } else {
+        console.log('No project selected, clearing tasks');
         setTasks([]);
       }
     };
 
     loadTasks();
-  }, [entryForm.projectId, entryForm.taskId]);
+  }, [entryForm.projectId]);
 
   // Helper function to calculate elapsed time for active entries
   const getElapsedTime = (startTime) => {
@@ -147,7 +154,7 @@ const TimeEntries = () => {
           taskId: entryForm.taskId ? parseInt(entryForm.taskId) : null
         };
         
-        await window.electronAPI.timeEntries.create(createData);
+        await window.electronAPI.invoke('db:createTimeEntry', createData);
         setEntryForm({
           clientId: '',
           projectId: '',
@@ -168,9 +175,6 @@ const TimeEntries = () => {
   const handleUpdateEntry = async () => {
     if (window.electronAPI && editingEntry && entryForm.clientId && entryForm.startTime && entryForm.endTime) {
       try {
-        console.log('Update entry form data:', entryForm);
-        console.log('Editing entry ID:', editingEntry.id);
-        
         // Prepare data with proper type conversion
         const updateData = {
           ...entryForm,
@@ -179,8 +183,8 @@ const TimeEntries = () => {
           taskId: entryForm.taskId ? parseInt(entryForm.taskId) : null
         };
         
-        console.log('Converted update data:', updateData);
-        await window.electronAPI.timeEntries.update(editingEntry.id, updateData);
+        await window.electronAPI.invoke('db:updateTimeEntry', editingEntry.id, updateData);
+        
         setEntryForm({
           clientId: '',
           projectId: '',
@@ -229,7 +233,7 @@ const TimeEntries = () => {
     setEditingEntry(entry);
     setEntryForm({
       clientId: entry.clientId || '',
-      projectId: entry.task?.project?.id || '',
+      projectId: entry.projectId || '',
       taskId: entry.taskId || '',
       description: entry.description || '',
       startTime: formatTimeForForm(entry.startTime),
