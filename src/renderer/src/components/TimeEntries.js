@@ -20,7 +20,7 @@ import {
   IconButton
 } from './ui';
 import { useTimer } from '../context/TimerContext';
-import { formatDuration, formatTime, formatDate, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
+import { formatDurationHumanFriendly, formatTime, formatDate, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
 
 const TimeEntries = () => {
   const { activeTimer, startTimer, stopTimer } = useTimer();
@@ -118,7 +118,7 @@ const TimeEntries = () => {
     const now = currentTime;
     const diffMs = now.getTime() - start.getTime();
     const minutes = Math.floor(diffMs / (1000 * 60));
-    return formatDuration(minutes);
+    return formatDurationHumanFriendly(minutes);
   };
 
   const loadTimeEntries = async () => {
@@ -383,7 +383,7 @@ const TimeEntries = () => {
                     <Text size="medium" variant="success">
                       {entry.isActive 
                         ? getElapsedTime(entry.startTime)
-                        : formatDuration(calculateDuration(entry.startTime, entry.endTime))
+                        : formatDurationHumanFriendly(calculateDuration(entry.startTime, entry.endTime))
                       }
                     </Text>
                   </FlexBox>
