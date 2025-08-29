@@ -71,7 +71,15 @@ export default function BackgroundClockOrbits({
     };
 
     const onVis = () => {
-      if (document.hidden) cancelAnimationFrame(rafRef.current);
+      if (document.hidden) {
+        cancelAnimationFrame(rafRef.current);
+      } else {
+        // Reset timebase and resume loop when visible again
+        t0 = performance.now();
+        if (!paused && !prefersReducedMotion) {
+          rafRef.current = requestAnimationFrame(loop);
+        }
+      }
     };
 
     resize();
