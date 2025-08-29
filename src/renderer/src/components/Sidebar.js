@@ -84,7 +84,7 @@ const Sidebar = () => {
     { path: '/entries', icon: FileText, label: 'Time Entries' },
     { path: '/projects', icon: Folder, label: 'Clients' },
     { path: '/reports', icon: BarChart, label: 'Reports' },
-    { path: '/invoice', icon: FileInput, label: 'Invoice' },
+    { path: '/invoice', icon: FileInput, label: 'Invoices' },
     { path: '/settings', icon: Settings, label: 'Settings' }
   ];
 

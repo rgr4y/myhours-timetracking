@@ -141,7 +141,8 @@ const Clients = () => {
           const projectList = await window.electronAPI.projects.getAll(selectedClient.id);
           console.log('Projects loaded for client', selectedClient.id, ':', projectList);
           setProjects(projectList);
-          if (projectList.length > 0 && !selectedProject) {
+          // Auto-select first project if there are projects available
+          if (projectList.length > 0) {
             setSelectedProject(projectList[0]);
           }
         } catch (error) {
@@ -153,7 +154,7 @@ const Clients = () => {
       }
     };
     loadProjects();
-  }, [selectedClient, selectedProject]);
+  }, [selectedClient]); // selectedClient changes trigger project reload
 
   // Load tasks when project changes
   useEffect(() => {
@@ -356,6 +357,7 @@ const Clients = () => {
 
   const handleClientClick = (client) => {
     setSelectedClient(client);
+    setSelectedProject(null); // Clear selected project when client changes
   };
 
   const handleClientInfo = (client, event) => {
@@ -523,26 +525,36 @@ const Clients = () => {
                       border: selectedProject?.id === project.id ? '2px solid #007AFF' : '1px solid #404040'
                     }}
                     onClick={() => setSelectedProject(project)}
-                    onDoubleClick={() => {
-                      setEditingProject(project);
-                      setProjectForm({
-                        client_id: project.client_id,
-                        name: project.name,
-                        description: project.description || '',
-                        hourly_rate: project.hourly_rate || ''
-                      });
-                      setShowProjectModal(true);
-                    }}
                   >
-                    <div>
-                      <Heading size="small" margin="0 0 4px 0">{project.name}</Heading>
-                      {project.description && (
-                        <Text variant="secondary" size="small">{project.description}</Text>
-                      )}
-                      {project.hourly_rate && (
-                        <Text size="small">${project.hourly_rate}/hr</Text>
-                      )}
-                    </div>
+                    <FlexBox justify="space-between" align="center">
+                      <div>
+                        <Heading size="small" margin="0 0 4px 0">{project.name}</Heading>
+                        {project.description && (
+                          <Text variant="secondary" size="small">{project.description}</Text>
+                        )}
+                        {project.hourly_rate && (
+                          <Text size="small">${project.hourly_rate}/hr</Text>
+                        )}
+                      </div>
+                      <Button 
+                        size="small" 
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingProject(project);
+                          setProjectForm({
+                            client_id: project.client_id,
+                            name: project.name,
+                            description: project.description || '',
+                            hourly_rate: project.hourly_rate || ''
+                          });
+                          setShowProjectModal(true);
+                        }}
+                        style={{ padding: '6px', fontSize: '12px' }}
+                      >
+                        <Edit3 size={14} />
+                      </Button>
+                    </FlexBox>
                   </Card>
                 ))}
               </div>
@@ -570,30 +582,40 @@ const Clients = () => {
                     margin="0 0 12px 0"
                     hoverable
                     style={{ cursor: 'pointer' }}
-                    onDoubleClick={() => {
-                      setEditingTask(task);
-                      setTaskForm({
-                        project_id: task.project_id,
-                        name: task.name,
-                        description: task.description || '',
-                        is_recurring: task.is_recurring || false,
-                        hourly_rate: task.hourly_rate || ''
-                      });
-                      setShowTaskModal(true);
-                    }}
                   >
-                    <div>
-                      <Heading size="small" margin="0 0 4px 0">{task.name}</Heading>
-                      {task.description && (
-                        <Text variant="secondary" size="small">{task.description}</Text>
-                      )}
-                      {task.hourly_rate && (
-                        <Text size="small">${task.hourly_rate}/hr</Text>
-                      )}
-                      {task.is_recurring && (
-                        <Text size="small" style={{ color: '#007AFF' }}>Recurring</Text>
-                      )}
-                    </div>
+                    <FlexBox justify="space-between" align="center">
+                      <div>
+                        <Heading size="small" margin="0 0 4px 0">{task.name}</Heading>
+                        {task.description && (
+                          <Text variant="secondary" size="small">{task.description}</Text>
+                        )}
+                        {task.hourly_rate && (
+                          <Text size="small">${task.hourly_rate}/hr</Text>
+                        )}
+                        {task.is_recurring && (
+                          <Text size="small" style={{ color: '#007AFF' }}>Recurring</Text>
+                        )}
+                      </div>
+                      <Button 
+                        size="small" 
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTask(task);
+                          setTaskForm({
+                            project_id: task.project_id,
+                            name: task.name,
+                            description: task.description || '',
+                            is_recurring: task.is_recurring || false,
+                            hourly_rate: task.hourly_rate || ''
+                          });
+                          setShowTaskModal(true);
+                        }}
+                        style={{ padding: '6px', fontSize: '12px' }}
+                      >
+                        <Edit3 size={14} />
+                      </Button>
+                    </FlexBox>
                   </Card>
                 ))}
               </div>

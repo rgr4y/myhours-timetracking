@@ -217,7 +217,7 @@ const Invoice = () => {
                   </Heading>
                   <Text variant="secondary">{invoice.client?.name || 'Unknown Client'}</Text>
                 </div>
-                <Text variant={invoice.status === 'paid' ? 'success' : 'warning'} size="small">
+                <Text variant={invoice.status === 'generated' ? 'success' : 'warning'} size="small">
                   {invoice.status || 'pending'}
                 </Text>
               </FlexBox>
