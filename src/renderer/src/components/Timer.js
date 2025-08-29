@@ -12,7 +12,8 @@ import {
   Dropdown,
   DropdownButton,
   DropdownMenu,
-  DropdownItem 
+  DropdownItem,
+  TextArea
 } from './ui';
 
 const TimerContainer = styled.div`
@@ -52,10 +53,18 @@ const ControlButton = styled(Button)`
 
 const TaskSelector = styled(Card)`
   margin-bottom: 30px;
+  min-width: 400px;
 `;
 
 const SelectorHeader = styled(Heading)`
   margin-bottom: 15px;
+`;
+
+const ExpandingTextArea = styled(TextArea)`
+  min-height: 40px;
+  max-height: 200px;
+  resize: none;
+  overflow: hidden;
 `;
 
 const RoundingSelector = styled(FlexBox)`
@@ -107,6 +116,7 @@ const Timer = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const saveTimeoutRef = useRef(null);
   const isUnloadingRef = useRef(false);
+  const textAreaRef = useRef(null);
 
   // Sync local state with context when timer is running
   useEffect(() => {
@@ -389,9 +399,26 @@ const Timer = () => {
     }
   }, [activeTimer, hasUnsavedChanges]);
 
+  // Auto-resize textarea based on content
+  const autoResizeTextarea = useCallback(() => {
+    if (textAreaRef.current) {
+      const textarea = textAreaRef.current;
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  }, []);
+
+  // Auto-resize textarea when description changes
+  useEffect(() => {
+    autoResizeTextarea();
+  }, [localDescription, autoResizeTextarea]);
+
   const handleDescriptionChange = (e) => {
     const newDescription = e.target.value;
     setLocalDescription(newDescription);
+    
+    // Auto-resize the textarea
+    setTimeout(autoResizeTextarea, 0);
     
     // Track if there are unsaved changes
     setHasUnsavedChanges(newDescription !== originalDescription);
@@ -455,6 +482,20 @@ const Timer = () => {
 
       <TaskSelector>
         <SelectorHeader>{isRunning ? 'Timer Controls' : 'Timer Settings'}</SelectorHeader>
+
+        <div className="mb20">
+          <Text variant="secondary" size="small" style={{ display: 'block', marginBottom: '10px' }}>
+            Description (Optional):
+          </Text>
+          <ExpandingTextArea
+            ref={textAreaRef}
+            value={localDescription}
+            onChange={handleDescriptionChange}
+            onBlur={handleDescriptionBlur}
+            placeholder="What are you working on?"
+            rows={1}
+          />
+        </div>
 
         <div className="mb20">
           <Text variant="secondary" size="small" style={{ display: 'block', marginBottom: '10px' }}>
@@ -534,28 +575,6 @@ const Timer = () => {
               </DropdownMenu>
             )}
           </Dropdown>
-        </div>
-
-        <div className="mb20">
-          <Text variant="secondary" size="small" style={{ display: 'block', marginBottom: '10px' }}>
-            Description (Optional):
-          </Text>
-          <input
-            type="text"
-            value={localDescription}
-            onChange={handleDescriptionChange}
-            onBlur={handleDescriptionBlur}
-            placeholder="What are you working on?"
-            style={{
-              width: '100%',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #404040',
-              background: '#1a1a1a',
-              color: '#ffffff',
-              fontSize: '14px'
-            }}
-          />
         </div>
 
         {!isRunning && (

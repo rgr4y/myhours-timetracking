@@ -119,6 +119,7 @@ class DatabaseService {
       const timeEntry = await this.prisma.timeEntry.create({
         data: {
           clientId: data.clientId || null,
+          projectId: data.projectId || null,
           taskId: data.taskId || null,
           description: data.description || '',
           startTime: new Date(),
