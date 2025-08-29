@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import styled, { createGlobalStyle } from 'styled-components';
 import './App.css';
 import { TimerProvider } from './context/TimerContext';
@@ -55,11 +55,52 @@ const MainContent = styled.div`
   overflow: hidden;
 `;
 
+// Component to handle window visibility detection
+const VisibilityHandler = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const timeoutRef = useRef(null);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Window became hidden, start 30-second timer
+        timeoutRef.current = setTimeout(() => {
+          // Navigate to Timer page if not already there
+          if (location.pathname !== '/') {
+            navigate('/');
+          }
+        }, 30000); // 30 seconds
+      } else {
+        // Window became visible, clear the timer
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      }
+    };
+
+    // Add event listener for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup function
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [navigate, location]);
+
+  return null; // This component doesn't render anything
+};
+
 function App() {
   return (
     <TimerProvider>
       <Router>
         <GlobalStyle />
+        <VisibilityHandler />
         <AppContainer>
           <Sidebar />
           <MainContent>

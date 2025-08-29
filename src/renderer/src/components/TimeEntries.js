@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Edit, Trash2, Plus, Clock, Play } from 'lucide-react';
+import { Calendar, Edit, Trash2, Plus, Clock, Play, Square } from 'lucide-react';
 import {
   Container,
   Card,
@@ -23,11 +23,12 @@ import { useTimer } from '../context/TimerContext';
 import { formatDuration, formatTime, formatDate, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
 
 const TimeEntries = () => {
-  const { activeTimer, startTimer } = useTimer();
+  const { activeTimer, startTimer, stopTimer } = useTimer();
   const [timeEntries, setTimeEntries] = useState([]);
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [settings, setSettings] = useState({ timer_rounding: '15' });
   const [showModal, setShowModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -46,6 +47,7 @@ const TimeEntries = () => {
     console.log('TimeEntries component mounting, loading data...');
     loadTimeEntries();
     loadClients();
+    loadSettings();
   }, []);
 
   // Update current time every second for active timers
@@ -140,6 +142,79 @@ const TimeEntries = () => {
       } catch (error) {
         console.error('Error loading clients:', error);
       }
+    }
+  };
+
+  const loadSettings = async () => {
+    if (window.electronAPI) {
+      try {
+        const settingsData = await window.electronAPI.settings.get();
+        setSettings(settingsData || { timer_rounding: '15' });
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    }
+  };
+
+  const handlePlayEntry = async (entry) => {
+    try {
+      await loadSettings(); // Ensure we have current settings
+      
+      const roundingMinutes = parseInt(settings.timer_rounding || '15');
+      
+      if (activeTimer) {
+        // Calculate elapsed time for active timer
+        const elapsedMinutes = Math.floor((new Date() - new Date(activeTimer.startTime)) / (1000 * 60));
+        
+        if (elapsedMinutes <= roundingMinutes) {
+          // Less than rounding time - copy details without confirmation
+          await startTimer({
+            clientId: entry.clientId,
+            projectId: entry.projectId,
+            taskId: entry.taskId,
+            description: entry.description
+          });
+          await loadTimeEntries(); // Refresh the time entries list
+        } else {
+          // More than rounding time - ask for confirmation
+          const confirmed = window.confirm(
+            `Are you sure? This will overwrite the current timer's client, project, and task. Current timer has been running for ${elapsedMinutes} minutes.`
+          );
+          
+          if (confirmed) {
+            await startTimer({
+              clientId: entry.clientId,
+              projectId: entry.projectId,
+              taskId: entry.taskId,
+              description: entry.description
+            });
+            await loadTimeEntries(); // Refresh the time entries list
+          }
+        }
+      } else {
+        // No active timer - start new timer
+        await startTimer({
+          clientId: entry.clientId,
+          projectId: entry.projectId,
+          taskId: entry.taskId,
+          description: entry.description
+        });
+        await loadTimeEntries(); // Refresh the time entries list
+      }
+    } catch (error) {
+      console.error('Error starting timer from entry:', error);
+    }
+  };
+
+  const handleStopTimer = async () => {
+    try {
+      await loadSettings(); // Ensure we have current settings
+      const roundingMinutes = parseInt(settings.timer_rounding || '15');
+      
+      await stopTimer(roundingMinutes);
+      await loadTimeEntries(); // Refresh the time entries list
+    } catch (error) {
+      console.error('Error stopping timer:', error);
     }
   };
 
@@ -315,6 +390,26 @@ const TimeEntries = () => {
                 </FlexBox>
                 
                 <FlexBox gap="10px">
+                  {!entry.isActive && (
+                    <IconButton 
+                      variant="primary" 
+                      size="small" 
+                      onClick={() => handlePlayEntry(entry)}
+                      title="Start timer with this entry's details"
+                    >
+                      <Play size={14} />
+                    </IconButton>
+                  )}
+                  {entry.isActive && (
+                    <IconButton 
+                      variant="danger" 
+                      size="small" 
+                      onClick={handleStopTimer}
+                      title="Stop the active timer"
+                    >
+                      <Square size={14} />
+                    </IconButton>
+                  )}
                   <IconButton 
                     variant="secondary" 
                     size="small" 

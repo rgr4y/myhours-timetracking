@@ -114,12 +114,16 @@ export const TimerProvider = ({ children }) => {
     
     if (window.electronAPI) {
       try {
-        // Extract clientId and description from the data object
+        // Extract clientId, projectId, taskId and description from the data object
         const clientId = timerData.clientId || null;
+        const projectId = timerData.projectId || null;
+        const taskId = timerData.taskId || null;
         const description = timerData.description || timerDescription || '';
         
         const timer = await window.electronAPI.invoke('db:startTimer', {
           clientId,
+          projectId,
+          taskId,
           description
         });
         
