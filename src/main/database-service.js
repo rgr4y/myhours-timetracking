@@ -9,26 +9,51 @@ const execAsync = promisify(exec);
 
 class DatabaseService {
   constructor() {
-    // Ensure DATABASE_URL points to a writable location in packaged builds
-    const userDataDir = app.getPath('userData');
-    const dbFile = path.join(userDataDir, 'myhours.sqlite');
-    if (!process.env.DATABASE_URL) {
-      process.env.DATABASE_URL = `file:${dbFile}`;
+    // Resolve a deterministic, writable DB path for runtime, independent of .env
+    const isPackaged = app.isPackaged;
+    const projectRoot = path.join(__dirname, '..', '..');
+    let dbFile;
+
+    if (isPackaged) {
+      // Packaged app: keep DB under userData
+      const userDataDir = app.getPath('userData');
+      dbFile = path.join(userDataDir, 'myhours.sqlite');
+      // Ensure directory exists
+      try { fs.mkdirSync(path.dirname(dbFile), { recursive: true }); } catch (_) {}
+
+      // If DB doesn't exist, seed from packaged template
+      try {
+        if (!fs.existsSync(dbFile)) {
+          const base = process.resourcesPath || path.dirname(app.getAppPath());
+          const templatePath = path.join(base, 'prisma', 'template.db');
+          if (fs.existsSync(templatePath)) {
+            fs.copyFileSync(templatePath, dbFile);
+            console.log('[DATABASE] Copied template DB to user data');
+          }
+        }
+      } catch (e) {
+        console.warn('[DATABASE] Unable to provision packaged DB:', e.message);
+      }
+    } else {
+      // Dev: use the workspace DB (checked into repo) to avoid odd CWD issues
+      dbFile = path.join(projectRoot, 'prisma', 'myhours.db');
+      // Ensure prisma folder exists (it should in dev)
+      try { fs.mkdirSync(path.dirname(dbFile), { recursive: true }); } catch (_) {}
+      // If it doesn't exist but a template exists, bootstrap from it
+      try {
+        const templatePath = path.join(projectRoot, 'prisma', 'template.db');
+        if (!fs.existsSync(dbFile) && fs.existsSync(templatePath)) {
+          fs.copyFileSync(templatePath, dbFile);
+          console.log('[DATABASE] Bootstrapped dev DB from template.db');
+        }
+      } catch (e) {
+        console.warn('[DATABASE] Unable to bootstrap dev DB:', e.message);
+      }
     }
 
-    // If DB file doesn't exist yet, try to seed it from a packaged template
-    try {
-      if (!fs.existsSync(dbFile)) {
-        const templatePath = path.join(process.resourcesPath || path.dirname(app.getAppPath()), 'prisma', 'template.db');
-        if (fs.existsSync(templatePath)) {
-          fs.mkdirSync(path.dirname(dbFile), { recursive: true });
-          fs.copyFileSync(templatePath, dbFile);
-          console.log('[DATABASE] Copied template DB to user data');
-        }
-      }
-    } catch (e) {
-      console.warn('[DATABASE] Unable to copy template DB:', e.message);
-    }
+    // Force Prisma to use our resolved path (ignore any DATABASE_URL from .env)
+    process.env.DATABASE_URL = `file:${dbFile}`;
+    console.log('[DATABASE] Using SQLite at', dbFile);
 
     this.prisma = new PrismaClient();
   }

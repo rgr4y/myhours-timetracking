@@ -182,10 +182,6 @@ class InvoiceGenerator {
             <div class="label">Total Hours</div>
         </div>
         <div class="summary-item">
-            <div class="value">\${{hourlyRate}}</div>
-            <div class="label">Hourly Rate</div>
-        </div>
-        <div class="summary-item">
             <div class="value">\${{totalAmount}}</div>
             <div class="label">Total Amount</div>
         </div>
@@ -295,7 +291,11 @@ class InvoiceGenerator {
       const uniqueRates = [...new Set(rates)];
       const displayRate = uniqueRates.length === 1 ? uniqueRates[0] : null;
 
-      // Prepare template data
+      // Determine actual period from the entries (not the raw filter)
+      const periodStartDisplay = this.getOldestEntryDate(timeEntries);
+      const periodEndDisplay = this.getNewestEntryDate(timeEntries);
+
+      // Prepare template data (support snake_case and camelCase settings)
       const templateData = {
         companyName: settings.company_name || settings.companyName || 'Your Company',
         companyEmail: settings.company_email || settings.companyEmail || '',
@@ -303,8 +303,9 @@ class InvoiceGenerator {
         companyWebsite: settings.company_website || settings.companyWebsite || '',
         invoiceNumber: data.invoice_number || this.generateInvoiceNumber(),
         invoiceDate: new Date().toLocaleDateString(),
-        periodStart: data.start_date || this.getOldestEntryDate(timeEntries),
-        periodEnd: data.end_date || this.getNewestEntryDate(timeEntries),
+        // Always show the true invoice period based on included entries
+        periodStart: periodStartDisplay,
+        periodEnd: periodEndDisplay,
         clientName: clientInfo?.name || 'Unknown Client',
         clientEmail: clientInfo?.email || '',
         lineItems: lineItems,
@@ -350,13 +351,13 @@ class InvoiceGenerator {
       
       const displayRate = ratesUsed.size === 1 ? Array.from(ratesUsed)[0] : null;
       
-      // Prepare template data
+      // Prepare template data (support snake_case and camelCase settings)
       const templateData = {
         // Company info from settings
-        companyName: settings?.companyName || 'Your Company',
-        companyAddress: settings?.companyAddress || 'Your Address',
-        companyPhone: settings?.companyPhone || 'Your Phone',
-        companyEmail: settings?.companyEmail || 'your@email.com',
+        companyName: settings.company_name || settings.companyName || 'Your Company',
+        companyEmail: settings.company_email || settings.companyEmail || '',
+        companyPhone: settings.company_phone || settings.companyPhone || '',
+        companyWebsite: settings.company_website || settings.companyWebsite || '',
         
         // Invoice info
         invoiceNumber: invoice.invoiceNumber,
@@ -368,9 +369,9 @@ class InvoiceGenerator {
         clientAddress: invoice.client?.address || '',
         clientEmail: invoice.client?.email || '',
         
-        // Period info
-        periodStart: invoice.periodStart ? new Date(invoice.periodStart).toLocaleDateString() : '',
-        periodEnd: invoice.periodEnd ? new Date(invoice.periodEnd).toLocaleDateString() : '',
+        // Period info (stored as YYYY-MM-DD; format as local date without timezone shift)
+        periodStart: invoice.periodStart ? this.formatYMDToLocale(invoice.periodStart) : '',
+        periodEnd: invoice.periodEnd ? this.formatYMDToLocale(invoice.periodEnd) : '',
         
         // Line items and totals
         lineItems: lineItems,
@@ -494,6 +495,19 @@ class InvoiceGenerator {
   getNewestEntryDate(entries) {
     const dates = entries.map(entry => new Date(entry.startTime));
     return new Date(Math.max(...dates)).toLocaleDateString();
+  }
+
+  // Format a stored YYYY-MM-DD date string as a locale date without timezone drift
+  formatYMDToLocale(ymd) {
+    try {
+      if (!ymd || typeof ymd !== 'string') return '';
+      const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
+      if (!y || !m || !d) return '';
+      const dt = new Date(y, m - 1, d); // local time
+      return dt.toLocaleDateString();
+    } catch (_) {
+      return ymd;
+    }
   }
 }
 

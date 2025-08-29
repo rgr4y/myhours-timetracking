@@ -36,7 +36,8 @@ function qlThumbSvgToPng(svgPath, outDir) {
   const buildDir = join(process.cwd(), 'build');
   const icnsPath = join(buildDir, 'icon.icns');
   const svgPath = join(process.cwd(), 'assets', 'icon.svg');
-  const pngFallback = join(process.cwd(), 'assets', 'icon-1024.png');
+  const pngFallback1024 = join(process.cwd(), 'assets', 'icon-1024.png');
+  const pngFallbackGeneric = join(process.cwd(), 'assets', 'icon.png');
 
   if (existsSync(icnsPath)) {
     log('Existing build/icon.icns found; skipping generation.');
@@ -45,10 +46,15 @@ function qlThumbSvgToPng(svgPath, outDir) {
 
   mkdirSync(buildDir, { recursive: true });
 
-  // 1) Prefer a pre-rendered 1024 PNG if present
-  if (existsSync(pngFallback)) {
+  // 1) Prefer a pre-rendered PNG if present (icon-1024.png or icon.png)
+  if (existsSync(pngFallback1024)) {
     log('Found assets/icon-1024.png; generating ICNS...');
-    generateIcnsFromPng(pngFallback);
+    generateIcnsFromPng(pngFallback1024);
+    return;
+  }
+  if (existsSync(pngFallbackGeneric)) {
+    log('Found assets/icon.png; generating ICNS...');
+    generateIcnsFromPng(pngFallbackGeneric);
     return;
   }
 
@@ -67,4 +73,3 @@ function qlThumbSvgToPng(svgPath, outDir) {
 
   log('Warning: Could not generate macOS icon. Provide assets/icon-1024.png or run scripts/generate-mac-icns.sh manually.');
 })();
-

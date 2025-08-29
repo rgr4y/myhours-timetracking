@@ -37,6 +37,8 @@ const Reports = () => {
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
 
+  const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+
   useEffect(() => {
     loadData();
     loadClients();
@@ -54,7 +56,7 @@ const Reports = () => {
         
         setStats({
           totalHours: totalHours.toFixed(1),
-          totalEarnings: totalEarnings.toFixed(2),
+          totalEarnings: parseFloat(totalEarnings.toFixed(2)),
           completedTasks: timeEntries.length
         });
       } catch (error) {
@@ -139,7 +141,7 @@ const Reports = () => {
               <Heading margin="0" size="small">Total Earnings</Heading>
             </div>
           </FlexBox>
-          <BigNumber size="32px" margin="0 0 8px 0">${stats.totalEarnings}</BigNumber>
+          <BigNumber size="32px" margin="0 0 8px 0">{formatCurrency(stats.totalEarnings)}</BigNumber>
           <Text variant="secondary" size="small">This month</Text>
         </Card>
 
