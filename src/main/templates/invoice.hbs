@@ -169,7 +169,7 @@
     <table>
         <thead>
             <tr>
-                <th>Week</th>
+                <th>Date</th>
                 <th>Description</th>
                 <th class="text-right">Hours</th>
                 <th class="text-right">Rate</th>
@@ -177,25 +177,13 @@
             </tr>
         </thead>
         <tbody>
-            {{#each weeks}}
-            <tr class="week-header">
-                <td colspan="5">Week of {{this.weekStart}}</td>
-            </tr>
-            {{#each this.entries}}
+            {{#each lineItems}}
             <tr>
-                <td></td>
+                <td>{{this.date}}</td>
                 <td>{{this.description}}</td>
                 <td class="text-right">{{this.hours}}</td>
                 <td class="text-right">${{this.rate}}</td>
                 <td class="text-right amount">${{this.amount}}</td>
-            </tr>
-            {{/each}}
-            <tr>
-                <td></td>
-                <td><strong>Week Subtotal</strong></td>
-                <td class="text-right"><strong>{{this.totalHours}}</strong></td>
-                <td></td>
-                <td class="text-right amount"><strong>${{this.totalAmount}}</strong></td>
             </tr>
             {{/each}}
             <tr class="total-row">

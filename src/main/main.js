@@ -353,15 +353,18 @@ class MyHoursApp {
     // Invoice operations
     ipcMain.handle('invoice:generate', async (event, data) => {
       try {
+        console.log('[MAIN] invoice:generate called with data:', data);
         const filePath = await this.invoiceGenerator.generateInvoice(data);
         return { success: true, filePath };
       } catch (error) {
+        console.log('[MAIN] invoice:generate error:', error.message);
         return { success: false, error: error.message };
       }
     });
 
     ipcMain.handle('invoice:download', async (event, invoiceId) => {
       try {
+        console.log('[MAIN] invoice:download called with invoiceId:', invoiceId);
         // Get the invoice data from database
         const invoice = await this.database.getInvoiceById(invoiceId);
         if (!invoice) {
@@ -384,8 +387,10 @@ class MyHoursApp {
           // Copy the generated file to the chosen location
           const fs = require('fs').promises;
           await fs.copyFile(filePath, result.filePath);
+          console.log('[MAIN] invoice:download completed successfully');
           return { success: true, filePath: result.filePath };
         } else {
+          console.log('[MAIN] invoice:download cancelled by user');
           return { success: false, error: 'Download cancelled' };
         }
       } catch (error) {
