@@ -10,6 +10,7 @@ import Clients from './components/Clients';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Invoice from './components/Invoice';
+import BackgroundClockOrbits from './components/BackgroundClockOrbits';
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -44,8 +45,29 @@ const GlobalStyle = createGlobalStyle`
 `;
 
 const AppContainer = styled.div`
+  position: relative;
+  min-height: 100vh;
+  background: #1a1a1a;
+  color: #ffffff;
   display: flex;
-  height: 100vh;
+  overflow: hidden;
+`;
+
+const BackgroundContainer = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  opacity: 0.3;
+`;
+
+const ContentWrapper = styled.div`
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
 `;
 
 const MainContent = styled.div`
@@ -102,17 +124,22 @@ function App() {
         <GlobalStyle />
         <VisibilityHandler />
         <AppContainer>
-          <Sidebar />
-          <MainContent>
-            <Routes>
-              <Route path="/" element={<Timer />} />
-              <Route path="/entries" element={<TimeEntries />} />
-              <Route path="/projects" element={<Clients />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/invoice" element={<Invoice />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </MainContent>
+          <BackgroundContainer>
+            <BackgroundClockOrbits />
+          </BackgroundContainer>
+          <ContentWrapper>
+            <Sidebar />
+            <MainContent>
+              <Routes>
+                <Route path="/" element={<Timer />} />
+                <Route path="/entries" element={<TimeEntries />} />
+                <Route path="/projects" element={<Clients />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/invoice" element={<Invoice />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
+            </MainContent>
+          </ContentWrapper>
         </AppContainer>
       </Router>
     </TimerProvider>
