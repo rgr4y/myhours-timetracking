@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Edit, Trash2, Plus, Clock, Play, Square, Folder, Building, CheckSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Container,
@@ -95,6 +95,69 @@ const TimeEntries = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Handle stopping timer (used by tray and UI)
+  const handleStopTimer = useCallback(async () => {
+    try {
+      const roundingMinutes = parseInt(settings.timer_rounding || '15');
+      await stopTimer(roundingMinutes);
+      // Note: We'll rely on timer state changes to refresh the UI
+    } catch (error) {
+      console.error('Error stopping timer:', error);
+    }
+  }, [stopTimer, settings.timer_rounding]);
+
+  // Handle tray events
+  useEffect(() => {
+    if (window.electronAPI && window.electronAPI.on) {
+      const handleTrayStartTimer = () => {
+        console.log('[TimeEntries] Start timer requested from tray');
+        setShowModal(true);
+      };
+      
+      const handleTrayStopTimer = async () => {
+        console.log('[TimeEntries] Stop timer requested from tray');
+        if (activeTimer) {
+          try {
+            const roundingMinutes = parseInt(settings.timer_rounding || '15');
+            await stopTimer(roundingMinutes);
+            // Note: We'll rely on timer state changes to refresh the UI
+          } catch (error) {
+            console.error('Error stopping timer from tray:', error);
+          }
+        }
+      };
+      
+      const handleTrayQuickStartTimer = (event, data) => {
+        console.log('[TimeEntries] Quick start timer from tray:', data);
+        if (data && data.clientId) {
+          startTimer({
+            clientId: data.clientId,
+            description: `Quick timer for ${data.clientName}`
+          });
+        }
+      };
+      
+      const handleTrayShowTimerSetup = () => {
+        console.log('[TimeEntries] Show timer setup from tray');
+        setShowModal(true);
+      };
+      
+      // Register event listeners
+      window.electronAPI.on('tray-start-timer', handleTrayStartTimer);
+      window.electronAPI.on('tray-stop-timer', handleTrayStopTimer);
+      window.electronAPI.on('tray-quick-start-timer', handleTrayQuickStartTimer);
+      window.electronAPI.on('tray-show-timer-setup', handleTrayShowTimerSetup);
+      
+      // Cleanup listeners on unmount
+      return () => {
+        window.electronAPI.removeListener('tray-start-timer', handleTrayStartTimer);
+        window.electronAPI.removeListener('tray-stop-timer', handleTrayStopTimer);
+        window.electronAPI.removeListener('tray-quick-start-timer', handleTrayQuickStartTimer);
+        window.electronAPI.removeListener('tray-show-timer-setup', handleTrayShowTimerSetup);
+      };
+    }
+  }, [activeTimer, stopTimer, startTimer, settings.timer_rounding]);
 
   // Load projects when client changes
   useEffect(() => {
@@ -271,18 +334,6 @@ const TimeEntries = () => {
       }
     } catch (error) {
       console.error('Error starting timer from entry:', error);
-    }
-  };
-
-  const handleStopTimer = async () => {
-    try {
-      await loadSettings(); // Ensure we have current settings
-      const roundingMinutes = parseInt(settings.timer_rounding || '15');
-      
-      await stopTimer(roundingMinutes);
-      await loadTimeEntries(); // Refresh the time entries list
-    } catch (error) {
-      console.error('Error stopping timer:', error);
     }
   };
 

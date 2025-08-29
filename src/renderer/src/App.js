@@ -110,12 +110,26 @@ const VisibilityHandler = () => {
       }
     };
 
+    // Handle tray events for navigation
+    const handleTrayOpenSettings = () => {
+      console.log('[App] Navigate to settings from tray');
+      navigate('/settings');
+    };
+
     // Add event listener for visibility changes
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Add tray event listeners
+    if (window.electronAPI && window.electronAPI.on) {
+      window.electronAPI.on('tray-open-settings', handleTrayOpenSettings);
+    }
 
     // Cleanup function
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (window.electronAPI && window.electronAPI.removeListener) {
+        window.electronAPI.removeListener('tray-open-settings', handleTrayOpenSettings);
+      }
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
