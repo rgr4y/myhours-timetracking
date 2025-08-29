@@ -177,8 +177,13 @@ const Clients = () => {
     console.log('handleCreateClient called', { clientForm, electronAPI: !!window.electronAPI });
     if (window.electronAPI && clientForm.name) {
       try {
-        console.log('Creating client with data:', clientForm);
-        const result = await window.electronAPI.clients.create(clientForm);
+        const clientData = {
+          name: clientForm.name,
+          email: clientForm.email || null,
+          hourlyRate: clientForm.hourly_rate ? parseFloat(clientForm.hourly_rate) : 0
+        };
+        console.log('Creating client with data:', clientData);
+        const result = await window.electronAPI.clients.create(clientData);
         console.log('Client created successfully:', result);
         setClientForm({ name: '', email: '', hourly_rate: '' });
         setShowClientModal(false);
@@ -187,6 +192,11 @@ const Clients = () => {
         const clientList = await window.electronAPI.clients.getAll();
         console.log('Clients after reload:', clientList);
         setClients(clientList);
+        // Optionally select the newly created client
+        try {
+          const newlyCreated = clientList.find(c => c.id === result.id);
+          if (newlyCreated) setSelectedClient(newlyCreated);
+        } catch (_) {}
       } catch (error) {
         logger.error('Error creating client:', error);
       }

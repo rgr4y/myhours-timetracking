@@ -251,34 +251,75 @@ const Timer = () => {
     initializeData();
   }, [checkActiveTimer, waitForReady]);
 
-  // Separate effect for loading last used client - only when timer stops
+  // Restore last-used selections (client, project, task) after stopping timer
   useEffect(() => {
-    const loadLastUsedClient = async () => {
-      console.log('Timer stopped, checking if should load last used client...');
-      // Only auto-select last used client when timer stops and no client is selected
-      if (!activeTimer && !localSelectedClient) {
-        try {
-          const api = await waitForReady();
-          if (api && api.invoke) {
-            const lastClient = await api.invoke('db:getLastUsedClient');
-            
-            if (lastClient) {
-              console.log('Auto-selecting last used client after timer stop:', lastClient);
-              setLocalSelectedClient(lastClient);
-            }
+    const loadLastUsedSelections = async () => {
+      if (activeTimer) return; // Only when timer is not running
+      try {
+        const api = await waitForReady();
+        if (!api?.invoke) return;
+
+        // Ensure we have clients in memory to resolve IDs
+        let currentClients = clients;
+        if ((!clients || clients.length === 0) && window.electronAPI?.clients?.getAll) {
+          try {
+            currentClients = await window.electronAPI.clients.getAll();
+            setClients(currentClients);
+          } catch (e) {
+            // ignore
           }
-        } catch (error) {
-          console.error('Error loading last used client:', error);
         }
+
+        const [lastClient, lastProject, lastTask] = await Promise.all([
+          api.invoke('db:getLastUsedClient'),
+          api.invoke('db:getLastUsedProject'),
+          api.invoke('db:getLastUsedTask')
+        ]);
+
+        // Decide client
+        let resolvedClient = localSelectedClient;
+        if (!resolvedClient) {
+          if (lastProject?.clientId && currentClients?.length) {
+            resolvedClient = currentClients.find(c => c.id === lastProject.clientId) || null;
+          }
+          if (!resolvedClient && lastClient) {
+            resolvedClient = lastClient;
+          }
+        }
+        if (resolvedClient) {
+          setLocalSelectedClient(resolvedClient);
+        }
+
+        // Decide project (must match client if one is selected)
+        let resolvedProject = localSelectedProject;
+        const clientIdToMatch = (resolvedClient ? resolvedClient.id : null);
+        if (!resolvedProject && lastProject && (!clientIdToMatch || lastProject.clientId === clientIdToMatch)) {
+          resolvedProject = lastProject;
+          setLocalSelectedProject(resolvedProject);
+        }
+
+        // Load tasks for the resolved project, then set last task if matches
+        if (resolvedProject?.id && window.electronAPI?.tasks?.getAll) {
+          try {
+            const taskList = await window.electronAPI.tasks.getAll(resolvedProject.id);
+            setTasks(taskList || []);
+            if (lastTask && lastTask.projectId === resolvedProject.id) {
+              setLocalSelectedTask(lastTask);
+            }
+          } catch (e) {
+            // ignore
+          }
+        } else {
+          setLocalSelectedTask(null);
+        }
+      } catch (error) {
+        console.error('Error loading last used selections:', error);
       }
     };
 
-    // Only run when activeTimer becomes false (timer stops)
-    if (!activeTimer) {
-      loadLastUsedClient();
-    }
+    loadLastUsedSelections();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTimer]); // Intentionally not including localSelectedClient to avoid infinite loops
+  }, [activeTimer]);
 
   // Load settings for timer rounding
   useEffect(() => {
@@ -306,35 +347,38 @@ const Timer = () => {
           const projectList = await window.electronAPI.projects.getAll(localSelectedClient.id);
           console.log('Projects loaded for client', localSelectedClient.id, ':', projectList);
           setProjects(projectList);
-          // Reset project and task selection when client changes
-          setLocalSelectedProject(null);
-          setLocalSelectedTask(null);
-          setTasks([]);
+          // If current project is not in this client's projects, clear it and tasks
+          if (!localSelectedProject || !projectList.some(p => p.id === localSelectedProject.id)) {
+            setLocalSelectedProject(null);
+            setLocalSelectedTask(null);
+            setTasks([]);
+          }
         } catch (error) {
           console.error('Error loading projects:', error);
           setProjects([]);
         }
       } else {
         setProjects([]);
-        setLocalSelectedProject(null);
-        setLocalSelectedTask(null);
-        setTasks([]);
+        // Do not force-clear selections here; rely on user interaction or restoration logic
       }
     };
 
     loadProjects();
   }, [localSelectedClient]);
 
-  // Load tasks when project changes
+  // Load tasks when project changes (or when active timer has a project)
   useEffect(() => {
     const loadTasks = async () => {
-      if (localSelectedProject && window.electronAPI) {
+      const projectId = localSelectedProject?.id 
+        || activeTimer?.project?.id 
+        || activeTimer?.task?.project?.id 
+        || null;
+
+      if (projectId && window.electronAPI) {
         try {
-          const taskList = await window.electronAPI.tasks.getAll(localSelectedProject.id);
-          console.log('Tasks loaded for project', localSelectedProject.id, ':', taskList);
+          const taskList = await window.electronAPI.tasks.getAll(projectId);
+          console.log('Tasks loaded for project', projectId, ':', taskList);
           setTasks(taskList);
-          // Reset task selection when project changes
-          setLocalSelectedTask(null);
         } catch (error) {
           console.error('Error loading tasks:', error);
           setTasks([]);
@@ -346,7 +390,7 @@ const Timer = () => {
     };
 
     loadTasks();
-  }, [localSelectedProject]);
+  }, [localSelectedProject, activeTimer]);
 
   const handleStartTimer = async () => {
     console.log('Timer button clicked!');
@@ -359,7 +403,17 @@ const Timer = () => {
         taskId: localSelectedTask?.id || null,
         description: localDescription || ''
       };
-      await startTimer(timerData, localDescription);
+      const timer = await startTimer(timerData, localDescription);
+      // Immediately reflect project in UI if backend returned it
+      if (timer?.project) {
+        setLocalSelectedProject(timer.project);
+      } else if (timer?.task?.project) {
+        setLocalSelectedProject(timer.task.project);
+      }
+      // Immediately reflect task in UI if backend returned it
+      if (timer?.task) {
+        setLocalSelectedTask(timer.task);
+      }
     } catch (error) {
       console.error('Error starting timer:', error);
       alert('Failed to start timer: ' + error.message);
@@ -383,6 +437,11 @@ const Timer = () => {
     console.log('Client selected:', client);
     setLocalSelectedClient(client);
     setDropdownOpen(false);
+    // Clear dependent selections when user changes client
+    setLocalSelectedProject(null);
+    setLocalSelectedTask(null);
+    setProjects([]);
+    setTasks([]);
     
     // If timer is running, update the client in the database immediately
     if (isRunning && activeTimer) {
@@ -524,9 +583,8 @@ const Timer = () => {
         {activeTimer && (
           <TaskInfo>
             {selectedClient ? selectedClient.name : 'No Client'}
-            {activeTimer.task?.project && ` • ${activeTimer.task.project.name}`}
+            {(activeTimer.project || activeTimer.task?.project) && ` • ${(activeTimer.project?.name || activeTimer.task?.project?.name)}`}
             {activeTimer.task && ` • ${activeTimer.task.name}`}
-            {description && ` • ${description}`}
           </TaskInfo>
         )}
       </TimerDisplay>
@@ -596,7 +654,10 @@ const Timer = () => {
               disabled={!localSelectedClient}
               style={{ opacity: !localSelectedClient ? 0.5 : 1 }}
             >
-              {localSelectedProject ? localSelectedProject.name : 'No Project Selected'}
+              {localSelectedProject?.name 
+                || activeTimer?.project?.name 
+                || activeTimer?.task?.project?.name 
+                || 'No Project Selected'}
               <ChevronDown size={20} />
             </DropdownButton>
             {projectDropdownOpen && localSelectedClient && (
@@ -621,10 +682,12 @@ const Timer = () => {
           <Dropdown>
             <DropdownButton 
               onClick={() => setTaskDropdownOpen(!taskDropdownOpen)}
-              disabled={!localSelectedProject}
-              style={{ opacity: !localSelectedProject ? 0.5 : 1 }}
+              disabled={!(localSelectedProject || activeTimer?.project || activeTimer?.task?.project)}
+              style={{ opacity: (localSelectedProject || activeTimer?.project || activeTimer?.task?.project) ? 1 : 0.5 }}
             >
-              {localSelectedTask ? localSelectedTask.name : 'No Task Selected'}
+              {localSelectedTask?.name 
+                || activeTimer?.task?.name 
+                || 'No Task Selected'}
               <ChevronDown size={20} />
             </DropdownButton>
             {taskDropdownOpen && localSelectedProject && (

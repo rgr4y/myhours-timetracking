@@ -187,23 +187,23 @@ const Settings = () => {
         <Card>
           <Heading margin="0 0 12px 0">Danger Zone</Heading>
           <Text variant="secondary" size="small" style={{ marginBottom: '12px' }}>
-            Removes all demo data created by the initial seed (clients, projects, tasks, time entries, invoices). Your settings are preserved.
+            Removes all data (clients, projects, tasks, time entries, invoices). Your settings are preserved.
           </Text>
           <FlexBox justify="flex-start">
             <Button
               variant="danger"
               onClick={async () => {
                 if (isRemoving) return;
-                const ok = window.confirm('Remove demo data? This will delete all sample clients, projects, tasks, time entries, and invoices. Settings will be kept. This cannot be undone.');
+                const ok = window.confirm('Reset all data? This will delete all sample clients, projects, tasks, time entries, and invoices. Settings will be kept. This cannot be undone.');
                 if (!ok) return;
                 try {
                   setIsRemoving(true);
                   await window.electronAPI.invoke('db:removeDemoData');
-                  alert('Demo data removed.');
+                  alert('All data removed.');
                   navigate('/');
                 } catch (e) {
-                  console.error('Failed to remove demo data:', e);
-                  alert('Failed to remove demo data. See console for details.');
+                  console.error('Failed to remove all data:', e);
+                  alert('Failed to remove all data. See console for details.');
                 } finally {
                   setIsRemoving(false);
                 }
@@ -211,7 +211,7 @@ const Settings = () => {
               disabled={isRemoving}
             >
               <Trash2 size={16} />
-              {isRemoving ? 'Removing…' : 'Remove Demo Data'}
+              {isRemoving ? 'Removing…' : 'Clear All Data'}
             </Button>
           </FlexBox>
         </Card>
