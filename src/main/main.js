@@ -360,6 +360,40 @@ class MyHoursApp {
       }
     });
 
+    ipcMain.handle('invoice:download', async (event, invoiceId) => {
+      try {
+        // Get the invoice data from database
+        const invoice = await this.database.getInvoiceById(invoiceId);
+        if (!invoice) {
+          throw new Error('Invoice not found');
+        }
+
+        // Generate the PDF using the existing invoice data
+        const filePath = await this.invoiceGenerator.generateInvoicePDF(invoice);
+        
+        // Show save dialog
+        const result = await dialog.showSaveDialog(this.mainWindow, {
+          title: 'Save Invoice',
+          defaultPath: `Invoice-${invoice.invoiceNumber}.pdf`,
+          filters: [
+            { name: 'PDF Files', extensions: ['pdf'] }
+          ]
+        });
+
+        if (!result.canceled && result.filePath) {
+          // Copy the generated file to the chosen location
+          const fs = require('fs').promises;
+          await fs.copyFile(filePath, result.filePath);
+          return { success: true, filePath: result.filePath };
+        } else {
+          return { success: false, error: 'Download cancelled' };
+        }
+      } catch (error) {
+        console.error('[MAIN] Error downloading invoice:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
     // Export operations (TODO: implement with new DatabaseService)
     // Temporarily removed until we implement export methods in DatabaseService
 

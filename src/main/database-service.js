@@ -696,6 +696,33 @@ class DatabaseService {
     }
   }
 
+  async getInvoiceById(id) {
+    try {
+      const invoice = await this.prisma.invoice.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          client: true,
+          timeEntries: {
+            include: {
+              client: true,
+              project: true,
+              task: {
+                include: {
+                  project: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      return invoice;
+    } catch (error) {
+      console.error('Error getting invoice by ID:', error);
+      throw error;
+    }
+  }
+
   async createInvoice(data) {
     try {
       const invoice = await this.prisma.invoice.create({
