@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Clock, FileText, Folder, BarChart, FileInput, Settings } from 'lucide-react';
-import { Text } from './ui';
+import { Text, Modal, ModalContent, ModalHeader, ModalTitle, ModalCloseButton } from './ui';
 import styled from 'styled-components';
 
 const SidebarContainer = styled.div`
@@ -46,16 +46,25 @@ const NavScroll = styled.div`
 
 const VersionFooter = styled.div`
   margin-top: auto;
-  padding: 12px 20px;
+  padding: 10px 0 0 20px;
   border-top: 1px solid #404040;
   color: #8a8a8a;
   font-size: 12px;
+`;
+
+const VersionLink = styled.span`
+  text-decoration: none;
+  cursor: default; /* keep pointer default */
+  color: inherit;
 `;
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [appVersion, setAppVersion] = useState('');
+  const [setEasterClicks] = useState(0);
+  const [showYay, setShowYay] = useState(false);
+  const resetTimerRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -100,8 +109,35 @@ const Sidebar = () => {
         </nav>
       </NavScroll>
       <VersionFooter>
-        v{appVersion || '—'}
+        <VersionLink
+          onClick={() => {
+            if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+            setEasterClicks((c) => {
+              const next = c + 1;
+              if (next >= 5) {
+                setShowYay(true);
+                return 0;
+              }
+              resetTimerRef.current = setTimeout(() => setEasterClicks(0), 1200);
+              return next;
+            });
+          }}
+        >
+          v{appVersion || '—'}
+        </VersionLink>
       </VersionFooter>
+
+      {showYay && (
+        <Modal onClick={() => setShowYay(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()} maxWidth="360px">
+            <ModalHeader>
+              <ModalTitle>yay!</ModalTitle>
+              <ModalCloseButton onClick={() => setShowYay(false)} aria-label="Close">×</ModalCloseButton>
+            </ModalHeader>
+            <Text>Hidden debug modal triggered.</Text>
+          </ModalContent>
+        </Modal>
+      )}
     </SidebarContainer>
   );
 };

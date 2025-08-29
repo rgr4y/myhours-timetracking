@@ -17,6 +17,8 @@ const GlobalStyle = createGlobalStyle`
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   body {
@@ -24,6 +26,12 @@ const GlobalStyle = createGlobalStyle`
     background-color: #1a1a1a;
     color: #ffffff;
     overflow: hidden;
+  }
+
+  /* Allow selecting and editing text in form controls */
+  input, textarea, select, [contenteditable="true"], [contenteditable=""] {
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   ::-webkit-scrollbar {

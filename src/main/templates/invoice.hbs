@@ -66,7 +66,7 @@
 
     .meta {
       display: grid;
-      grid-template-columns: repeat(3, max-content);
+      grid-template-columns: repeat(auto-fit, minmax(120px, max-content));
       gap: 18px 28px;
       margin-top: 8px;
     }
@@ -162,6 +162,14 @@
         <div>
           <div class="k">Period</div>
           <div class="v">{{periodStart}} – {{periodEnd}}</div>
+        </div>
+        <div>
+          <div class="k">Terms</div>
+          <div class="v">{{terms}}</div>
+        </div>
+        <div>
+          <div class="k">Due</div>
+          <div class="v">{{dueDate}}</div>
         </div>
       </div>
     </div>
