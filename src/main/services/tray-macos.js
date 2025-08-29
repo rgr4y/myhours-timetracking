@@ -135,6 +135,12 @@ class MacOSTrayService {
   }
 
   async setupTrayMenu() {
+    // Early return if tray is not initialized
+    if (!this.tray) {
+      console.warn('[TRAY-MACOS] Tray not initialized, cannot setup menu');
+      return;
+    }
+    
     // Get clients for the quick start menu
     let quickStartSubmenu = [];
     try {
@@ -373,6 +379,12 @@ class MacOSTrayService {
 
   updateTimerStatus(timerData) {
     this.currentTimer = timerData;
+    
+    // Early return if tray is not initialized
+    if (!this.tray) {
+      console.warn('[TRAY-MACOS] Tray not initialized, cannot update timer status');
+      return;
+    }
     
     if (timerData) {
       // Update tray to show active timer
