@@ -380,7 +380,7 @@ const TimeEntries = () => {
                         : `${formatTime(entry.startTime)} - ${formatTime(entry.endTime)}`
                       }
                     </Text>
-                    <Text size="small" variant="success">
+                    <Text size="medium" variant="success">
                       {entry.isActive 
                         ? getElapsedTime(entry.startTime)
                         : formatDuration(calculateDuration(entry.startTime, entry.endTime))

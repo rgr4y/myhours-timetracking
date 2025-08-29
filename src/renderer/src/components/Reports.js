@@ -22,9 +22,15 @@ const Reports = () => {
     totalEarnings: 0,
     completedTasks: 0
   });
+  
+  // Set default dates to current month
+  const today = new Date();
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  
   const [filterData, setFilterData] = useState({
-    startDate: '',
-    endDate: '',
+    startDate: firstOfMonth.toISOString().split('T')[0],
+    endDate: lastOfMonth.toISOString().split('T')[0],
     client: '',
     project: ''
   });
@@ -42,7 +48,7 @@ const Reports = () => {
         const timeEntries = await window.electronAPI.timeEntries.getAll();
         const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 60;
         const totalEarnings = timeEntries.reduce((sum, entry) => {
-          const rate = entry.hourly_rate || entry.project_rate || entry.client_rate || 0;
+          const rate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
           return sum + (rate * (entry.duration || 0) / 60);
         }, 0);
         
