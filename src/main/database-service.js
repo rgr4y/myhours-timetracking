@@ -1,11 +1,35 @@
 const { PrismaClient } = require('@prisma/client');
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const { app } = require('electron');
+const path = require('path');
+const fs = require('fs');
 
 const execAsync = promisify(exec);
 
 class DatabaseService {
   constructor() {
+    // Ensure DATABASE_URL points to a writable location in packaged builds
+    const userDataDir = app.getPath('userData');
+    const dbFile = path.join(userDataDir, 'myhours.sqlite');
+    if (!process.env.DATABASE_URL) {
+      process.env.DATABASE_URL = `file:${dbFile}`;
+    }
+
+    // If DB file doesn't exist yet, try to seed it from a packaged template
+    try {
+      if (!fs.existsSync(dbFile)) {
+        const templatePath = path.join(process.resourcesPath || path.dirname(app.getAppPath()), 'prisma', 'template.db');
+        if (fs.existsSync(templatePath)) {
+          fs.mkdirSync(path.dirname(dbFile), { recursive: true });
+          fs.copyFileSync(templatePath, dbFile);
+          console.log('[DATABASE] Copied template DB to user data');
+        }
+      }
+    } catch (e) {
+      console.warn('[DATABASE] Unable to copy template DB:', e.message);
+    }
+
     this.prisma = new PrismaClient();
   }
 
@@ -26,8 +50,19 @@ class DatabaseService {
       if (clientCount === 0) {
         console.log('[DATABASE] Starting database seeding...');
         
-        // Run the Prisma seed script
-        await execAsync('npx prisma db seed', { cwd: process.cwd() });
+        // In packaged builds, prefer running the seed script directly to avoid relying on the Prisma CLI
+        if (app.isPackaged) {
+          const seedPath = path.join(process.resourcesPath || path.dirname(app.getAppPath()), 'prisma', 'seed.js');
+          if (fs.existsSync(seedPath)) {
+            const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' };
+            await execAsync(`"${process.execPath}" "${seedPath}"`, { env });
+          } else {
+            console.warn('[DATABASE] Seed script not found in resources; skipping seed');
+          }
+        } else {
+          // Dev: use prisma CLI which is available locally
+          await execAsync('npx prisma db seed', { cwd: process.cwd() });
+        }
         
         console.log('[DATABASE] Database seeding completed');
       } else {
@@ -40,6 +75,24 @@ class DatabaseService {
 
   async disconnect() {
     await this.prisma.$disconnect();
+  }
+
+  // Danger: remove demo data created by seed script
+  async removeDemoData() {
+    try {
+      // Delete in FK-safe order
+      await this.prisma.timeEntry.deleteMany();
+      await this.prisma.invoice.deleteMany();
+      await this.prisma.task.deleteMany();
+      await this.prisma.project.deleteMany();
+      await this.prisma.client.deleteMany();
+      // Clear transient settings that reference IDs
+      try { await this.prisma.setting.delete({ where: { key: 'lastUsedClientId' } }); } catch (_) {}
+      return { success: true };
+    } catch (error) {
+      console.error('[DATABASE] Error removing demo data:', error);
+      throw error;
+    }
   }
 
   // Helper method to parse time string (HH:MM) with date
@@ -90,6 +143,7 @@ class DatabaseService {
         },
         include: {
           client: true,
+          project: true,
           task: {
             include: {
               project: true
@@ -148,6 +202,7 @@ class DatabaseService {
         where: { isActive: true },
         include: {
           client: true,
+          project: true,
           task: {
             include: {
               project: true

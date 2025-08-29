@@ -30,3 +30,5 @@ done
 iconutil -c icns "$ICONSET" -o "$ICNS_OUT"
 echo "Generated: $ICNS_OUT"
 
+# Cleanup intermediate iconset to keep build/ tidy
+rm -rf "$ICONSET"

@@ -95,6 +95,7 @@ const Timer = () => {
     updateTimerDescription,
     updateTimerClient,
     updateTimerTask,
+    updateTimerProject,
     checkActiveTimer,
     formatTime
   } = useTimer();
@@ -132,11 +133,15 @@ const Timer = () => {
       // Restore project and task from active timer
       if (activeTimer.task) {
         setLocalSelectedTask(activeTimer.task);
-        if (activeTimer.task.project) {
-          setLocalSelectedProject(activeTimer.task.project);
-        }
       } else {
         setLocalSelectedTask(null);
+      }
+
+      if (activeTimer.project) {
+        setLocalSelectedProject(activeTimer.project);
+      } else if (activeTimer.task && activeTimer.task.project) {
+        setLocalSelectedProject(activeTimer.task.project);
+      } else {
         setLocalSelectedProject(null);
       }
       
@@ -350,6 +355,7 @@ const Timer = () => {
       // Pass data as an object to match the new database service format
       const timerData = {
         clientId: localSelectedClient?.id || null,
+        projectId: localSelectedProject?.id || null,
         taskId: localSelectedTask?.id || null,
         description: localDescription || ''
       };
@@ -392,10 +398,24 @@ const Timer = () => {
     }
   };
 
-  const handleProjectSelect = (project) => {
+  const handleProjectSelect = async (project) => {
     console.log('Project selected:', project);
     setLocalSelectedProject(project);
     setProjectDropdownOpen(false);
+    // Reset task when project changes
+    setLocalSelectedTask(null);
+
+    // If timer is running, update the project in the database immediately
+    if (isRunning && activeTimer) {
+      try {
+        await updateTimerTask(null); // clear any existing task link
+        await updateTimerProject(project);
+        console.log('Timer project updated successfully');
+      } catch (error) {
+        console.error('Error updating timer project:', error);
+        alert('Failed to update project: ' + error.message);
+      }
+    }
   };
 
   const handleTaskSelect = async (task) => {
