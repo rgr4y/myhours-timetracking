@@ -22,7 +22,8 @@ const Settings = () => {
     company_phone: '',
     company_website: '',
     timer_rounding: '15',
-    invoice_template: 'default'
+    invoice_template: 'default',
+    invoice_terms: 'Net 30'
   });
 
   const [originalSettings, setOriginalSettings] = useState({});
@@ -178,6 +179,23 @@ const Settings = () => {
                 <option value="default">Default Template</option>
               </Select>
               <Text variant="secondary" size="small">Additional templates coming soon.</Text>
+            </FlexBox>
+
+            <FlexBox direction="column" gap="5px">
+              <Label>Payment Terms</Label>
+              <Select
+                value={settings.invoice_terms}
+                onChange={(e) => handleInputChange('invoice_terms', e.target.value)}
+              >
+                <option>Due on receipt</option>
+                <option>Net 7</option>
+                <option>Net 14</option>
+                <option>Net 15</option>
+                <option>Net 30</option>
+                <option>Net 45</option>
+                <option>Net 60</option>
+              </Select>
+              <Text variant="secondary" size="small">Controls the invoice due date shown on PDFs.</Text>
             </FlexBox>
           </FlexBox>
         </Card>

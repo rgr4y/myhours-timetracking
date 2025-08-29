@@ -11,6 +11,16 @@ class InvoiceGenerator {
     this.ensureTemplateDirectory();
   }
 
+  // Parse common NET terms into a number of days (default 30)
+  parseNetDays(terms) {
+    if (!terms) return 30;
+    const t = String(terms).toLowerCase();
+    if (t.includes('receipt')) return 0;
+    const m = t.match(/net\s*(\d+)/);
+    if (m) return parseInt(m[1], 10) || 30;
+    return 30;
+  }
+
   ensureTemplateDirectory() {
     const templateDir = path.join(__dirname, 'templates');
     if (!fs.existsSync(templateDir)) {
@@ -303,6 +313,13 @@ class InvoiceGenerator {
         companyWebsite: settings.company_website || settings.companyWebsite || '',
         invoiceNumber: data.invoice_number || this.generateInvoiceNumber(),
         invoiceDate: new Date().toLocaleDateString(),
+        terms: settings.invoice_terms || settings.invoiceTerms || 'Net 30',
+        dueDate: (() => {
+          const days = this.parseNetDays(settings.invoice_terms || settings.invoiceTerms || 'Net 30');
+          const d = new Date();
+          d.setDate(d.getDate() + days);
+          return d.toLocaleDateString();
+        })(),
         // Always show the true invoice period based on included entries
         periodStart: periodStartDisplay,
         periodEnd: periodEndDisplay,
@@ -358,11 +375,18 @@ class InvoiceGenerator {
         companyEmail: settings.company_email || settings.companyEmail || '',
         companyPhone: settings.company_phone || settings.companyPhone || '',
         companyWebsite: settings.company_website || settings.companyWebsite || '',
+        terms: settings.invoice_terms || settings.invoiceTerms || 'Net 30',
         
         // Invoice info
         invoiceNumber: invoice.invoiceNumber,
         invoiceDate: new Date(invoice.createdAt).toLocaleDateString(),
-        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+        dueDate: (() => {
+          if (invoice.dueDate) return new Date(invoice.dueDate).toLocaleDateString();
+          const days = this.parseNetDays(settings.invoice_terms || settings.invoiceTerms || 'Net 30');
+          const d = new Date(invoice.createdAt || Date.now());
+          d.setDate(d.getDate() + days);
+          return d.toLocaleDateString();
+        })(),
         
         // Client info
         clientName: invoice.client?.name || 'Unknown Client',

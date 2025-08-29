@@ -375,7 +375,8 @@ class MyHoursApp {
           'company_phone',
           'company_website',
           'timer_rounding',
-          'invoice_template'
+          'invoice_template',
+          'invoice_terms'
         ];
         
         const settingsObj = {};

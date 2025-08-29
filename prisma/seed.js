@@ -22,6 +22,7 @@ async function main() {
       { key: 'company_email', value: 'hello@yourcompany.com' },
       { key: 'company_phone', value: '+1 (555) 123-4567' },
       { key: 'company_website', value: 'www.yourcompany.com' },
+      { key: 'invoice_terms', value: 'Net 30' },
     ]
   });
   console.log('⚙️  Created settings');
