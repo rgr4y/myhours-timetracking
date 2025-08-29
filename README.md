@@ -1,199 +1,113 @@
-# MyHours - Time Tracking Application
+<div align="center">
 
-A cross-platform time tracking application built with Electron, React, and modern web technologies. Inspired by Working Hours, MyHours provides a clean, dark-themed interface for tracking time, managing projects, and generating professional invoices.
+# myHours ⏱️
+
+Cross‑platform time tracking with invoices. Electron + React + Prisma (SQLite).
+
+</div>
 
 ## Features
 
-### ⏱️ Time Tracking
-- Start/stop timer with automatic rounding (5, 10, 15, 30, 60 minutes)
-- Manual time entry and editing
-- Break time tracking
-- Recurring task support
-- Real-time timer display
+- Time tracking with rounding (5/10/15/30/60m) and manual edits
+- Clients → Projects → Tasks hierarchy with per‑client/project rates
+- Reports with exports (CSV/JSON)
+- Professional PDF invoices (Puppeteer + Handlebars)
+- Company profile, invoice terms (Net 7/14/15/30/45/60), and template styling
+- Background animation for a little delight (can be tuned in code)
 
-### 🏢 Project Management
-- Multi-client support with individual hourly rates
-- Project organization under clients
-- Task management with descriptions
-- Hierarchical structure: Clients → Projects → Tasks
+## Tech Stack
 
-### 📊 Reporting & Analytics
-- Basic reports: Today's time, This week's time, Uninvoiced time
-- Custom date range filtering
-- Export to CSV and JSON formats
-- Real-time statistics
+- UI: React 19, styled‑components, lucide‑react
+- Shell: Electron 26
+- Data: SQLite via Prisma Client
+- PDF: Puppeteer Core + custom Handlebars template
+- Packaging: electron‑builder
 
-### 🧾 Invoice Generation
-- Professional PDF invoice generation
-- Handlebars-based templating system
-- Weekly time grouping
-- Automatic invoice numbering
-- Customizable company information
-- Mark time entries as invoiced
+## Getting Started
 
-### ⚙️ Settings & Configuration
-- Company information setup
-- Timer rounding preferences
-- Invoice template selection
-- Cross-platform data storage
+Prereqs: Node.js ≥ 18, npm.
 
-## Technology Stack
+Install deps (root + renderer):
 
-- **Frontend**: React, Styled Components, Lucide React (icons)
-- **Backend**: Electron (Node.js)
-- **Database**: SQLite with Prisma ORM
-- **PDF Generation**: Puppeteer + Handlebars templates
-- **Build System**: Electron Builder
+```bash
+npm install
+cd src/renderer && npm install && cd ../..
+```
 
-## Installation
+Run in development:
 
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
+```bash
+# 1) React vite/dev-server
+cd src/renderer && npm start
 
-### Setup
-1. Clone or download the project
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+# 2) Electron in another terminal
+cd ../.. && npm run dev
+```
 
-3. Install React dependencies:
-   ```bash
-   cd src/renderer
-   npm install
-   ```
+## Build
 
-4. Return to root directory:
-   ```bash
-   cd ../..
-   ```
+Renderer:
 
-## Development
+```bash
+npm run build-renderer
+```
 
-### Running in Development Mode
-1. Start the React development server:
-   ```bash
-   cd src/renderer
-   npm start
-   ```
+App packaging (uses `scripts/run-builder.js`):
 
-2. In a new terminal, start the Electron app:
-   ```bash
-   cd ../..
-   npm run dev
-   ```
+```bash
+npm run build
+```
 
-### Building for Production
-1. Build the React app:
-   ```bash
-   npm run build-renderer
-   ```
+By default it builds only for your current OS. You can toggle targets via `.env`:
 
-2. Build the Electron app:
-   ```bash
-   npm run build
-   ```
+```ini
+# macOS: enable Apple Silicon in addition to x64
+BUILD_ARM64=1
 
-3. Create distribution packages:
-   ```bash
-   npm run dist
-   ```
+# Cross‑builds (off by default). Set to 1/true to include these.
+BUILD_MAC=0     # Build mac from non‑mac host
+BUILD_WIN=0     # Include Windows x64
+BUILD_LINUX=0   # Include Linux x64
 
-## Usage
+# mac target (what artifacts to produce)
+# dir = .app only (default), dmg = disk image, zip = ZIP of .app
+MAC_TARGET=dir
+```
 
-### First Time Setup
-1. Launch MyHours
-2. Go to Settings to configure your company information
-3. Create your first client in the Projects section
-4. Add a project under that client
-5. Create tasks under the project
-6. Start tracking time!
+Notes:
+- On macOS, default is `--mac --x64`; add `BUILD_ARM64=1` for universal output.
+- Windows/Linux builds require appropriate host tooling/CI; they’re disabled unless opted‑in.
 
-### Time Tracking Workflow
-1. **Select Task**: Choose Client → Project → Task from dropdowns
-2. **Start Timer**: Click "Start Timer" button
-3. **Work**: The timer runs in the background
-4. **Stop Timer**: Click "Stop Timer" when done
-5. **Review**: Check time entries in the Time Entries section
+## Database & Seeding
 
-### Creating Invoices
-1. Go to the Invoice section
-2. Select a client and date range
-3. Set hourly rate
-4. Preview the invoice
-5. Generate PDF
-6. Time entries are automatically marked as invoiced
+- Dev DB: `prisma/myhours.db` (SQLite). Prisma schema in `prisma/schema.prisma`.
+- Packaged app DB: stored under Electron `userData` as `myhours.sqlite` and initialized from `prisma/template.db` prepared at build time.
 
-### Exporting Data
-- Use the Reports section to export time data
-- Available formats: CSV, JSON
-- Filter by date range or invoice status
+Seeding options:
+- CLI: `npm run prebuild` (runs migrations and prepares `template.db`).
+- In‑app (dev only): Settings → Danger Zone → “Re‑run Seed (Dev)”.
 
-## Data Storage
+## Invoices
 
-MyHours stores all data locally in a JSON database file located at:
-- **macOS**: `~/Library/Application Support/MyHours/myhours_db.json`
-- **Windows**: `%APPDATA%/MyHours/myhours_db.json`
-- **Linux**: `~/.config/MyHours/myhours_db.json`
+- Template: `src/main/templates/invoice.hbs` (Handlebars + CSS). Modern layout with compact spacing.
+- Company fields come from Settings (name/email/phone/website).
+- Payment Terms configurable in Settings; due date computed from terms when not stored.
 
-## Customization
+## Shortcuts
 
-### Invoice Templates
-Invoice templates are stored in `src/main/templates/` and use Handlebars syntax. You can customize:
-- Company branding
-- Layout and styling
-- Data presentation
-- Colors and fonts
-
-### Styling
-The app uses Styled Components with a dark theme. Modify component styles in the respective React component files.
-
-## Keyboard Shortcuts
-
-- **Ctrl/Cmd + ,**: Open Settings
-- **Ctrl/Cmd + N**: Start new timer (when task selected)
-- **Ctrl/Cmd + Enter**: Stop active timer
-- **Ctrl/Cmd + E**: Export current view
+- Cmd/Ctrl + , → Settings
+- Cmd/Ctrl + Enter → Stop active timer
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **Timer not starting**: Ensure you have selected a Client, Project, and Task
-2. **PDF generation fails**: Check that Puppeteer dependencies are installed
-3. **Data not saving**: Verify write permissions to the data directory
-4. **Build failures**: Ensure all dependencies are installed correctly
-
-### Reset Application Data
-To reset all data:
-1. Close MyHours
-2. Delete the database file (see Data Storage section for location)
-3. Restart MyHours
+- Dev DB path: logged on startup as `[DATABASE] Using SQLite at ...`.
+- If PDFs are blank, confirm `printBackground: true` is set (it is) and try re‑seeding.
+- Icon transparency: place `assets/icon.png` (1024×1024, RGBA). Build prefers it over SVG rasterization.
 
 ## Contributing
 
-This is a personal project, but suggestions and improvements are welcome! Feel free to:
-- Report bugs
-- Suggest features
-- Submit pull requests
-- Share feedback
+PRs and suggestions welcome. This is an experimental project; issues/PRs that improve stability, DX, or polish are appreciated.
 
 ## License
 
-MIT License - feel free to use and modify for your own needs.
-
-## Roadmap
-
-Future features being considered:
-- Cloud sync support
-- Mobile companion app
-- Advanced reporting
-- Team collaboration features
-- Integration with accounting software
-- Multiple invoice templates
-- Automated backup system
-
----
-
-Built with ❤️ for productivity and time management.
+MIT

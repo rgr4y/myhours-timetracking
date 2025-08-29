@@ -25,23 +25,38 @@ function run(cmd, args) {
 }
 
 (function main() {
-  // Load .env (optional) so we can read BUILD_ARM64 flag
+  // Load .env (optional) so we can read flags
   loadDotEnvIntoProcess(join(process.cwd(), '.env'));
 
-  const enableArm = /^(1|true|yes|on)$/i.test(String(process.env.BUILD_ARM64 || ''));
+  const truthy = (v) => /^(1|true|yes|on)$/i.test(String(v || ''));
+  const enableArm = truthy(process.env.BUILD_ARM64);
+  const buildMac = process.platform === 'darwin' || truthy(process.env.BUILD_MAC);
+  const buildWin = process.platform === 'win32' || truthy(process.env.BUILD_WIN);
+  const buildLinux = process.platform === 'linux' || truthy(process.env.BUILD_LINUX);
 
-  // Build args: override mac arch to x64 by default, add arm64 only if flagged
+  // Build args per platform. By default, only build for the current OS.
   const args = [];
-  // Let config decide targets; we only restrict arch for mac
-  args.push('--mac');
-  args.push('--x64');
-  if (enableArm) args.push('--arm64');
-
-  // Keep Windows build as configured (x64). Include platform flag for clarity
-  args.push('--win');
+  if (buildMac) {
+    const macTarget = (process.env.MAC_TARGET || 'dir') // default: only .app bundle
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .join(',');
+    args.push('--mac');
+    args.push(macTarget); // e.g., 'dir' or 'dmg' or 'dir,dmg'
+    args.push('--x64');
+    if (enableArm) args.push('--arm64');
+  }
+  if (buildWin) {
+    args.push('--win');
+    args.push('--x64');
+  }
+  if (buildLinux) {
+    args.push('--linux');
+    args.push('--x64');
+  }
 
   // Use local electron-builder binary
   const bin = join(process.cwd(), 'node_modules', '.bin', process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder');
   run(bin, args);
 })();
-
