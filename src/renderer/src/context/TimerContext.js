@@ -90,6 +90,16 @@ export const TimerProvider = ({ children }) => {
               console.error('[TimerContext] Error loading client for timer:', error);
             }
           }
+          
+          // Update tray status with the restored timer
+          const clientName = timer.client?.name || 
+            (timer.clientId ? 'Loading...' : null);
+          updateTrayStatus({
+            id: timer.id,
+            clientName: clientName,
+            description: timer.description || '',
+            startTime: timer.startTime
+          });
         } else {
           console.log('[TimerContext] No active timer found');
           // Only reset if we don't currently have a running timer
@@ -103,7 +113,7 @@ export const TimerProvider = ({ children }) => {
     } catch (error) {
       console.error('[TimerContext] Error waiting for electronAPI:', error);
     }
-  }, [isRunning, activeTimer, waitForReady]);
+  }, [isRunning, activeTimer, waitForReady, updateTrayStatus]);
 
   // Initialize timer state on component mount
   useEffect(() => {

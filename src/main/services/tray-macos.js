@@ -68,6 +68,9 @@ class MacOSTrayService {
         this.setupIconWatcher();
       }
       
+      // Check for active timer and restore tray/dock state
+      this.restoreTimerState();
+      
       console.log('[TRAY-MACOS] Tray initialized successfully');
       return true;
     } catch (error) {
@@ -101,6 +104,33 @@ class MacOSTrayService {
     if (icon) {
       this.tray.setImage(icon);
       console.log('[TRAY-MACOS] Icon refreshed successfully');
+    }
+  }
+
+  // Check for active timer and restore tray/dock state on initialization
+  async restoreTimerState() {
+    try {
+      console.log('[TRAY-MACOS] Checking for active timer to restore state...');
+      const activeTimer = await this.database.getActiveTimer();
+      
+      if (activeTimer) {
+        console.log('[TRAY-MACOS] Found active timer on startup, restoring tray state');
+        
+        // Prepare timer data for tray update
+        const timerData = {
+          id: activeTimer.id,
+          clientName: activeTimer.client?.name || 'Unknown Client',
+          description: activeTimer.description || 'No description',
+          startTime: activeTimer.startTime
+        };
+        
+        // Update tray and dock status
+        this.updateTimerStatus(timerData);
+      } else {
+        console.log('[TRAY-MACOS] No active timer found on startup');
+      }
+    } catch (error) {
+      console.error('[TRAY-MACOS] Error restoring timer state:', error);
     }
   }
 
@@ -348,6 +378,11 @@ class MacOSTrayService {
       // Update tray to show active timer
       this.tray.setTitle('🟢'); // Shows green circle when timer is active
       
+      // Set dock badge to show timer is active
+      if (app.dock) {
+        app.dock.setBadge(' '); // Use a bullet point as the badge
+      }
+      
       const clientName = timerData.clientName || 'Unknown Client';
       const description = timerData.description || 'No description';
       const startTime = new Date(timerData.startTime);
@@ -358,6 +393,11 @@ class MacOSTrayService {
       // Clear timer display
       this.tray.setTitle('');
       this.tray.setToolTip('myHours Time Tracker');
+      
+      // Clear dock badge
+      if (app.dock) {
+        app.dock.setBadge('');
+      }
     }
     
     // Refresh the menu to update timer-related items

@@ -345,7 +345,7 @@ const Timer = () => {
       if (localSelectedClient && window.electronAPI) {
         try {
           const projectList = await window.electronAPI.projects.getAll(localSelectedClient.id);
-          console.log('Projects loaded for client', localSelectedClient.id, ':', projectList);
+          //console.log('Projects loaded for client', localSelectedClient.id, ':', projectList);
           setProjects(projectList);
           // If current project is not in this client's projects, clear it and tasks
           if (!localSelectedProject || !projectList.some(p => p.id === localSelectedProject.id)) {
@@ -377,7 +377,7 @@ const Timer = () => {
       if (projectId && window.electronAPI) {
         try {
           const taskList = await window.electronAPI.tasks.getAll(projectId);
-          console.log('Tasks loaded for project', projectId, ':', taskList);
+          // console.log('Tasks loaded for project', projectId, ':', taskList);
           setTasks(taskList);
         } catch (error) {
           console.error('Error loading tasks:', error);
