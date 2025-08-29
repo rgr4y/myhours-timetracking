@@ -14,6 +14,24 @@ export const formatDuration = (minutes) => {
 };
 
 /**
+ * Format duration in minutes to human-friendly format (e.g., "3h 45m")
+ */
+export const formatDurationHumanFriendly = (minutes) => {
+  if (!minutes || isNaN(minutes) || minutes === 0) return '0m';
+  
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  
+  if (hours === 0) {
+    return `${mins}m`;
+  } else if (mins === 0) {
+    return `${hours}h`;
+  } else {
+    return `${hours}h ${mins}m`;
+  }
+};
+
+/**
  * Format a date string or Date object to a readable date format
  */
 export const formatDate = (dateInput) => {

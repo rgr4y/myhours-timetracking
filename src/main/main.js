@@ -399,8 +399,111 @@ class MyHoursApp {
       }
     });
 
-    // Export operations (TODO: implement with new DatabaseService)
-    // Temporarily removed until we implement export methods in DatabaseService
+    // Export operations
+    ipcMain.handle('export:csv', async (event, filters) => {
+      try {
+        const { dialog } = require('electron');
+        
+        // Get time entries based on filters
+        const timeEntries = await this.database.getTimeEntries(filters || {});
+        
+        // Convert to CSV format
+        const csvHeader = 'Date,Client,Project,Task,Description,Duration (hours),Start Time,End Time,Hourly Rate,Amount\n';
+        const csvRows = timeEntries.map(entry => {
+          const date = new Date(entry.startTime).toLocaleDateString();
+          const client = entry.client?.name || '';
+          const project = entry.project?.name || '';
+          const task = entry.task?.name || '';
+          const description = (entry.description || '').replace(/"/g, '""'); // Escape quotes
+          const hours = ((entry.duration || 0) / 60).toFixed(2);
+          const startTime = new Date(entry.startTime).toLocaleString();
+          const endTime = entry.endTime ? new Date(entry.endTime).toLocaleString() : '';
+          const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
+          const amount = (hours * hourlyRate).toFixed(2);
+          
+          return `"${date}","${client}","${project}","${task}","${description}","${hours}","${startTime}","${endTime}","${hourlyRate}","${amount}"`;
+        }).join('\n');
+        
+        const csvContent = csvHeader + csvRows;
+        
+        // Show save dialog
+        const result = await dialog.showSaveDialog(this.mainWindow, {
+          title: 'Export Time Entries to CSV',
+          defaultPath: `time-entries-${new Date().toISOString().split('T')[0]}.csv`,
+          filters: [
+            { name: 'CSV Files', extensions: ['csv'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        });
+        
+        if (!result.canceled && result.filePath) {
+          const fs = require('fs').promises;
+          await fs.writeFile(result.filePath, csvContent, 'utf8');
+          return { success: true, filePath: result.filePath, entriesCount: timeEntries.length };
+        } else {
+          return { success: false, error: 'Export cancelled' };
+        }
+      } catch (error) {
+        console.error('[MAIN] Error exporting to CSV:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('export:json', async (event, filters) => {
+      try {
+        const { dialog } = require('electron');
+        
+        // Get time entries based on filters
+        const timeEntries = await this.database.getTimeEntries(filters || {});
+        
+        // Format data for JSON export
+        const exportData = {
+          exportDate: new Date().toISOString(),
+          filters: filters || {},
+          entriesCount: timeEntries.length,
+          timeEntries: timeEntries.map(entry => ({
+            id: entry.id,
+            date: new Date(entry.startTime).toLocaleDateString(),
+            client: entry.client?.name || null,
+            project: entry.project?.name || null,
+            task: entry.task?.name || null,
+            description: entry.description || null,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            duration: entry.duration,
+            durationHours: ((entry.duration || 0) / 60).toFixed(2),
+            hourlyRate: entry.project?.hourlyRate || entry.client?.hourlyRate || 0,
+            amount: (((entry.duration || 0) / 60) * (entry.project?.hourlyRate || entry.client?.hourlyRate || 0)).toFixed(2),
+            isInvoiced: entry.isInvoiced,
+            createdAt: entry.createdAt,
+            updatedAt: entry.updatedAt
+          }))
+        };
+        
+        const jsonContent = JSON.stringify(exportData, null, 2);
+        
+        // Show save dialog
+        const result = await dialog.showSaveDialog(this.mainWindow, {
+          title: 'Export Time Entries to JSON',
+          defaultPath: `time-entries-${new Date().toISOString().split('T')[0]}.json`,
+          filters: [
+            { name: 'JSON Files', extensions: ['json'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        });
+        
+        if (!result.canceled && result.filePath) {
+          const fs = require('fs').promises;
+          await fs.writeFile(result.filePath, jsonContent, 'utf8');
+          return { success: true, filePath: result.filePath, entriesCount: timeEntries.length };
+        } else {
+          return { success: false, error: 'Export cancelled' };
+        }
+      } catch (error) {
+        console.error('[MAIN] Error exporting to JSON:', error);
+        return { success: false, error: error.message };
+      }
+    });
 
     // Console forwarding from renderer
     ipcMain.on('console:log', (event, level, ...args) => {
