@@ -95,7 +95,8 @@ const api = {
   invoices: {
     getAll: () => ipcRenderer.invoke('db:getInvoices'),
     generate: (data) => ipcRenderer.invoke('invoice:generate', data),
-    download: (id) => ipcRenderer.invoke('invoice:download', id)
+    download: (id) => ipcRenderer.invoke('invoice:download', id),
+    delete: (id) => ipcRenderer.invoke('db:deleteInvoice', id)
   },
   
   export: {

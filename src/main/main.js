@@ -117,6 +117,24 @@ class MyHoursApp {
       }
     });
 
+    ipcMain.handle('db:updateProject', async (event, id, project) => {
+      try {
+        return await this.database.updateProject(id, project);
+      } catch (error) {
+        console.error('[MAIN] IPC: Error updating project:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('db:deleteProject', async (event, id) => {
+      try {
+        return await this.database.deleteProject(id);
+      } catch (error) {
+        console.error('[MAIN] IPC: Error deleting project:', error);
+        throw error;
+      }
+    });
+
     ipcMain.handle('db:getTasks', async (event, projectId) => {
       try {
         console.log('[MAIN] IPC: Getting tasks for project:', projectId);
@@ -134,6 +152,24 @@ class MyHoursApp {
         return await this.database.createTask(task);
       } catch (error) {
         console.error('[MAIN] IPC: Error creating task:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('db:updateTask', async (event, id, task) => {
+      try {
+        return await this.database.updateTask(id, task);
+      } catch (error) {
+        console.error('[MAIN] IPC: Error updating task:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('db:deleteTask', async (event, id) => {
+      try {
+        return await this.database.deleteTask(id);
+      } catch (error) {
+        console.error('[MAIN] IPC: Error deleting task:', error);
         throw error;
       }
     });
@@ -288,6 +324,28 @@ class MyHoursApp {
         return { success: true };
       } catch (error) {
         console.error('[MAIN] IPC: Error updating settings:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('db:getInvoices', async () => {
+      try {
+        const invoices = await this.database.getInvoices();
+        console.log('[MAIN] IPC: Got invoices:', invoices.length);
+        return invoices;
+      } catch (error) {
+        console.error('[MAIN] IPC: Error getting invoices:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('db:deleteInvoice', async (event, id) => {
+      try {
+        const result = await this.database.deleteInvoice(id);
+        console.log('[MAIN] IPC: Invoice deleted:', id);
+        return result;
+      } catch (error) {
+        console.error('[MAIN] IPC: Error deleting invoice:', error);
         throw error;
       }
     });

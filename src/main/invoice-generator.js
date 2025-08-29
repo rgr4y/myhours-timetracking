@@ -252,13 +252,48 @@ class InvoiceGenerator {
         throw new Error('No uninvoiced time entries found for the specified criteria');
       }
 
+      // Validate that all entries have hourly rates
+      const missingRates = [];
+      let totalAmount = 0;
+      
+      for (const entry of timeEntries) {
+        // Try to get hourly rate from project, then client
+        const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
+        
+        if (!hourlyRate || hourlyRate <= 0) {
+          missingRates.push({
+            entryId: entry.id,
+            clientName: entry.client?.name || 'Unknown Client',
+            projectName: entry.project?.name || 'No Project',
+            date: new Date(entry.startTime).toLocaleDateString()
+          });
+        } else {
+          const hours = (entry.duration || 0) / 60;
+          totalAmount += hours * hourlyRate;
+        }
+      }
+      
+      if (missingRates.length > 0) {
+        const errorDetails = missingRates.map(mr => 
+          `• ${mr.date} - ${mr.clientName}/${mr.projectName}`
+        ).join('\n');
+        
+        throw new Error(`Cannot generate invoice: The following time entries have no hourly rate set:\n\n${errorDetails}\n\nPlease set hourly rates for the client or project before generating an invoice.`);
+      }
+
       // Group entries by day and combine descriptions
       const lineItems = this.groupEntriesByDay(timeEntries);
       
-      // Calculate totals
+      // Calculate totals with proper hourly rates
       const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 60;
-      const hourlyRate = data.hourlyRate || timeEntries[0]?.client?.hourlyRate || 0;
-      const totalAmount = totalHours * hourlyRate;
+      
+      // Get the first entry's client info for the invoice header
+      const clientInfo = timeEntries[0]?.client;
+      
+      // For display, use the most common hourly rate or indicate "varies"
+      const rates = timeEntries.map(entry => entry.project?.hourlyRate || entry.client?.hourlyRate).filter(Boolean);
+      const uniqueRates = [...new Set(rates)];
+      const displayRate = uniqueRates.length === 1 ? uniqueRates[0] : null;
 
       // Prepare template data
       const templateData = {
@@ -270,11 +305,11 @@ class InvoiceGenerator {
         invoiceDate: new Date().toLocaleDateString(),
         periodStart: data.start_date || this.getOldestEntryDate(timeEntries),
         periodEnd: data.end_date || this.getNewestEntryDate(timeEntries),
-        clientName: timeEntries[0]?.client?.name || 'Client',
-        clientEmail: timeEntries[0]?.client?.email || '',
+        clientName: clientInfo?.name || 'Unknown Client',
+        clientEmail: clientInfo?.email || '',
         lineItems: lineItems,
         totalHours: totalHours.toFixed(2),
-        hourlyRate: hourlyRate.toFixed(2),
+        hourlyRate: displayRate ? displayRate.toFixed(2) : 'Varies',
         totalAmount: totalAmount.toFixed(2)
       };
 
@@ -299,18 +334,20 @@ class InvoiceGenerator {
       const entryDate = new Date(entry.startTime);
       const dayKey = entryDate.toISOString().split('T')[0]; // YYYY-MM-DD format
       
+      const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
+      
       if (!days[dayKey]) {
         days[dayKey] = {
           date: entryDate.toLocaleDateString(),
           descriptions: [],
           totalHours: 0,
           totalAmount: 0,
-          hourlyRate: entry.client?.hourlyRate || 0
+          rates: new Set() // Track different rates used
         };
       }
       
       const hours = (entry.duration || 0) / 60;
-      const amount = hours * (entry.client?.hourlyRate || 0);
+      const amount = hours * hourlyRate;
       
       // Add description if it exists and isn't already included
       if (entry.description && entry.description.trim()) {
@@ -322,27 +359,57 @@ class InvoiceGenerator {
       
       days[dayKey].totalHours += hours;
       days[dayKey].totalAmount += amount;
+      days[dayKey].rates.add(hourlyRate);
     });
     
     // Convert to array and format descriptions as combined line items
     return Object.keys(days)
       .sort()
-      .map(dayKey => ({
-        date: days[dayKey].date,
-        description: days[dayKey].descriptions.length > 0 
-          ? days[dayKey].descriptions.join('; ') 
-          : 'General work',
-        hours: days[dayKey].totalHours.toFixed(2),
-        rate: days[dayKey].hourlyRate.toFixed(2),
-        amount: days[dayKey].totalAmount.toFixed(2)
-      }));
+      .map(dayKey => {
+        const day = days[dayKey];
+        const ratesArray = Array.from(day.rates);
+        const displayRate = ratesArray.length === 1 ? ratesArray[0] : 'Varies';
+        
+        return {
+          date: day.date,
+          description: day.descriptions.length > 0 
+            ? day.descriptions.join('; ') 
+            : 'General work',
+          hours: day.totalHours.toFixed(2),
+          rate: typeof displayRate === 'number' ? displayRate.toFixed(2) : displayRate,
+          amount: day.totalAmount.toFixed(2)
+        };
+      });
   }
 
   async generatePDF(templateData) {
     const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
     const html = template(templateData);
     
-    const browser = await puppeteer.launch({ headless: 'new' });
+    // Find Chrome executable path
+    const chromePaths = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      process.env.CHROME_PATH,
+      process.env.CHROMIUM_PATH
+    ].filter(Boolean);
+    
+    let executablePath = null;
+    for (const chromePath of chromePaths) {
+      if (fs.existsSync(chromePath)) {
+        executablePath = chromePath;
+        break;
+      }
+    }
+    
+    if (!executablePath) {
+      throw new Error('Chrome/Chromium not found. Please install Google Chrome or set CHROME_PATH environment variable.');
+    }
+    
+    const browser = await puppeteer.launch({ 
+      headless: 'new',
+      executablePath: executablePath
+    });
     const page = await browser.newPage();
     await page.setContent(html);
     
@@ -382,12 +449,12 @@ class InvoiceGenerator {
   }
 
   getOldestEntryDate(entries) {
-    const dates = entries.map(entry => new Date(entry.start_time));
+    const dates = entries.map(entry => new Date(entry.startTime));
     return new Date(Math.min(...dates)).toLocaleDateString();
   }
 
   getNewestEntryDate(entries) {
-    const dates = entries.map(entry => new Date(entry.start_time));
+    const dates = entries.map(entry => new Date(entry.startTime));
     return new Date(Math.max(...dates)).toLocaleDateString();
   }
 }

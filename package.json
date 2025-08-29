@@ -61,6 +61,9 @@
     "prisma": "^6.15.0",
     "puppeteer-core": "^21.3.6"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "author": "Rob",
   "license": "MIT"
 }

@@ -1,5 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
-const sampleData = require('./sample-data');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+
+const execAsync = promisify(exec);
 
 class DatabaseService {
   constructor() {
@@ -17,62 +20,21 @@ class DatabaseService {
 
   async seedIfEmpty() {
     try {
-      // Check if there are any clients (if empty, assume database needs seeding)
+      // Check if we already have data
       const clientCount = await this.prisma.client.count();
       
       if (clientCount === 0) {
-        console.log('[DATABASE] Database is empty, seeding with sample data...');
-        await this.seedSampleData();
+        console.log('[DATABASE] Starting database seeding...');
+        
+        // Run the Prisma seed script
+        await execAsync('npx prisma db seed', { cwd: process.cwd() });
+        
+        console.log('[DATABASE] Database seeding completed');
       } else {
         console.log('[DATABASE] Database already contains data, skipping seed');
       }
     } catch (error) {
-      console.error('[DATABASE] Error checking/seeding database:', error);
-    }
-  }
-
-  async seedSampleData() {
-    try {
-      // Insert clients
-      for (const clientData of sampleData.clients) {
-        await this.prisma.client.create({
-          data: {
-            name: clientData.name,
-            email: clientData.email,
-            hourlyRate: clientData.hourly_rate
-          }
-        });
-      }
-      console.log('[DATABASE] Seeded', sampleData.clients.length, 'clients');
-
-      // Insert projects
-      for (const projectData of sampleData.projects) {
-        await this.prisma.project.create({
-          data: {
-            name: projectData.name,
-            clientId: projectData.client_id,
-            hourlyRate: projectData.hourly_rate
-          }
-        });
-      }
-      console.log('[DATABASE] Seeded', sampleData.projects.length, 'projects');
-
-      // Insert tasks
-      for (const taskData of sampleData.tasks) {
-        await this.prisma.task.create({
-          data: {
-            name: taskData.name,
-            projectId: taskData.project_id,
-            description: taskData.description
-          }
-        });
-      }
-      console.log('[DATABASE] Seeded', sampleData.tasks.length, 'tasks');
-
-      console.log('[DATABASE] Sample data seeding completed successfully');
-    } catch (error) {
-      console.error('[DATABASE] Error seeding sample data:', error);
-      throw error;
+      console.error('[DATABASE] Error seeding database:', error);
     }
   }
 
@@ -214,6 +176,10 @@ class DatabaseService {
           gte: new Date(filters.startDate),
           lte: new Date(filters.endDate)
         };
+      }
+      
+      if (filters.isInvoiced !== undefined) {
+        where.isInvoiced = filters.isInvoiced;
       }
 
       const timeEntries = await this.prisma.timeEntry.findMany({
@@ -547,6 +513,40 @@ class DatabaseService {
     }
   }
 
+  async updateProject(id, data) {
+    try {
+      const project = await this.prisma.project.update({
+        where: { id: parseInt(id) },
+        data: {
+          name: data.name,
+          hourlyRate: data.hourlyRate || null
+        },
+        include: {
+          client: true,
+          tasks: true
+        }
+      });
+
+      return project;
+    } catch (error) {
+      console.error('Error updating project:', error);
+      throw error;
+    }
+  }
+
+  async deleteProject(id) {
+    try {
+      const project = await this.prisma.project.delete({
+        where: { id: parseInt(id) }
+      });
+
+      return project;
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      throw error;
+    }
+  }
+
   // Task methods
   async getTasks(projectId = null) {
     try {
@@ -600,6 +600,43 @@ class DatabaseService {
     }
   }
 
+  async updateTask(id, data) {
+    try {
+      const task = await this.prisma.task.update({
+        where: { id: parseInt(id) },
+        data: {
+          name: data.name,
+          description: data.description || null
+        },
+        include: {
+          project: {
+            include: {
+              client: true
+            }
+          }
+        }
+      });
+
+      return task;
+    } catch (error) {
+      console.error('Error updating task:', error);
+      throw error;
+    }
+  }
+
+  async deleteTask(id) {
+    try {
+      const task = await this.prisma.task.delete({
+        where: { id: parseInt(id) }
+      });
+
+      return task;
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      throw error;
+    }
+  }
+
   // Settings methods
   async getSetting(key) {
     try {
@@ -634,9 +671,11 @@ class DatabaseService {
     try {
       const invoices = await this.prisma.invoice.findMany({
         include: {
+          client: true,
           timeEntries: {
             include: {
               client: true,
+              project: true,
               task: {
                 include: {
                   project: true
@@ -675,6 +714,30 @@ class DatabaseService {
       return invoice;
     } catch (error) {
       console.error('Error creating invoice:', error);
+      throw error;
+    }
+  }
+
+  async deleteInvoice(id) {
+    try {
+      // First, mark all time entries as not invoiced
+      await this.prisma.timeEntry.updateMany({
+        where: { invoiceId: parseInt(id) },
+        data: {
+          isInvoiced: false,
+          invoiceId: null
+        }
+      });
+
+      // Then delete the invoice
+      const invoice = await this.prisma.invoice.delete({
+        where: { id: parseInt(id) }
+      });
+
+      console.log('[DATABASE] Invoice deleted and time entries unmarked:', id);
+      return invoice;
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
       throw error;
     }
   }

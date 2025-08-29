@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FileText, Download, DollarSign } from 'lucide-react';
+import { FileText, Download, DollarSign, Trash2 } from 'lucide-react';
 import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import {
   Container,
   Grid,
@@ -27,6 +28,7 @@ const Invoice = () => {
   const [timeEntries, setTimeEntries] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const { waitForReady } = useElectronAPI();
 
   const [invoiceForm, setInvoiceForm] = useState({
@@ -83,6 +85,7 @@ const Invoice = () => {
     if (invoiceForm.client_id && invoiceForm.start_date && invoiceForm.end_date) {
       try {
         setIsGenerating(true);
+        setErrorMessage(''); // Clear previous errors
         const api = await waitForReady();
         if (api && api.invoices) {
           const result = await api.invoices.generate(invoiceForm);
@@ -98,15 +101,25 @@ const Invoice = () => {
             await loadInvoices();
           } else {
             console.error('Invoice generation failed:', result.error);
+            setErrorMessage(result.error || 'Invoice generation failed');
           }
         }
       } catch (error) {
         console.error('Error generating invoice:', error);
+        setErrorMessage(error.message || 'An error occurred while generating the invoice');
       } finally {
         setIsGenerating(false);
       }
     }
   };
+
+  // Add keyboard shortcuts to modal
+  useModalKeyboard({
+    isOpen: showModal,
+    onClose: () => setShowModal(false), // Close on Escape
+    onSubmit: handleGenerateInvoice, // Submit on Enter
+    formData: invoiceForm // Pass form data for validation
+  });
 
   const handleDownloadInvoice = async (invoiceId) => {
     try {
@@ -119,9 +132,19 @@ const Invoice = () => {
     }
   };
 
-  const getClientName = (clientId) => {
-    const client = clients.find(c => c.id === clientId);
-    return client ? client.name : 'Unknown Client';
+  const handleDeleteInvoice = async (invoiceId) => {
+    if (window.confirm('Are you sure you want to delete this invoice? All associated time entries will become available for invoicing again.')) {
+      try {
+        const api = await waitForReady();
+        if (api && api.invoices) {
+          await api.invoices.delete(invoiceId);
+          await loadInvoices(); // Reload the invoice list
+        }
+      } catch (error) {
+        console.error('Error deleting invoice:', error);
+        alert('Failed to delete invoice: ' + error.message);
+      }
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -139,7 +162,21 @@ const Invoice = () => {
     <Container padding="40px" style={{ height: '100vh', overflowY: 'auto' }}>
       <FlexBox justify="space-between" align="center" margin="0 0 30px 0">
         <Title>Invoices</Title>
-        <Button variant="primary" onClick={() => setShowModal(true)}>
+        <Button variant="primary" onClick={() => {
+          const today = new Date();
+          const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          
+          setInvoiceForm({
+            client_id: '',
+            start_date: firstOfMonth.toISOString().split('T')[0],
+            end_date: lastOfMonth.toISOString().split('T')[0],
+            invoice_number: '',
+            due_date: ''
+          });
+          setShowModal(true);
+          setErrorMessage(''); // Clear any previous errors
+        }}>
           <FileText size={16} />
           Generate Invoice
         </Button>
@@ -158,9 +195,9 @@ const Invoice = () => {
               <FlexBox justify="space-between" align="flex-start" margin="0 0 15px 0">
                 <div>
                   <Heading size="small" margin="0 0 5px 0">
-                    Invoice #{invoice.invoice_number}
+                    Invoice #{invoice.invoiceNumber}
                   </Heading>
-                  <Text variant="secondary">{getClientName(invoice.client_id)}</Text>
+                  <Text variant="secondary">{invoice.client?.name || 'Unknown Client'}</Text>
                 </div>
                 <Text variant={invoice.status === 'paid' ? 'success' : 'warning'} size="small">
                   {invoice.status || 'pending'}
@@ -170,19 +207,27 @@ const Invoice = () => {
               <FlexBox direction="column" gap="8px" margin="0 0 15px 0">
                 <FlexBox justify="space-between">
                   <Text size="small">Period:</Text>
-                  <Text size="small">{invoice.period_start} - {invoice.period_end}</Text>
+                  <Text size="small">{invoice.periodStart} - {invoice.periodEnd}</Text>
                 </FlexBox>
                 <FlexBox justify="space-between">
                   <Text size="small">Amount:</Text>
-                  <Text size="small" variant="success">{formatCurrency(invoice.total_amount)}</Text>
+                  <Text size="small" variant="success">{formatCurrency(invoice.totalAmount)}</Text>
                 </FlexBox>
                 <FlexBox justify="space-between">
                   <Text size="small">Due Date:</Text>
-                  <Text size="small">{invoice.due_date}</Text>
+                  <Text size="small">{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'N/A'}</Text>
                 </FlexBox>
               </FlexBox>
               
               <FlexBox gap="10px">
+                <Button 
+                  variant="danger" 
+                  size="small" 
+                  onClick={() => handleDeleteInvoice(invoice.id)}
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </Button>
                 <Button 
                   variant="secondary" 
                   size="small" 
@@ -206,6 +251,20 @@ const Invoice = () => {
               <ModalTitle>Generate Invoice</ModalTitle>
               <ModalCloseButton onClick={() => setShowModal(false)}>×</ModalCloseButton>
             </ModalHeader>
+            
+            {errorMessage && (
+              <FlexBox 
+                style={{ 
+                  backgroundColor: '#dc2626', 
+                  color: 'white', 
+                  padding: '12px', 
+                  borderRadius: '6px',
+                  marginBottom: '15px'
+                }}
+              >
+                <Text style={{ whiteSpace: 'pre-line' }}>{errorMessage}</Text>
+              </FlexBox>
+            )}
             
             <FlexBox direction="column" gap="15px">
               <FlexBox direction="column" gap="5px">
