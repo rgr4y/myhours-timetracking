@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FileText, Download, DollarSign } from 'lucide-react';
+import { useElectronAPI } from '../hooks/useElectronAPI';
 import {
   Container,
   Grid,
@@ -26,6 +27,7 @@ const Invoice = () => {
   const [timeEntries, setTimeEntries] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const { waitForReady } = useElectronAPI();
 
   const [invoiceForm, setInvoiceForm] = useState({
     client_id: '',
@@ -35,62 +37,68 @@ const Invoice = () => {
     due_date: ''
   });
 
+  const loadInvoices = useCallback(async () => {
+    try {
+      const api = await waitForReady();
+      if (api && api.invoices) {
+        const invoiceList = await api.invoices.getAll();
+        setInvoices(invoiceList);
+      }
+    } catch (error) {
+      console.error('Error loading invoices:', error);
+    }
+  }, [waitForReady]);
+
+  const loadClients = useCallback(async () => {
+    try {
+      const api = await waitForReady();
+      if (api && api.clients) {
+        const clientList = await api.clients.getAll();
+        setClients(clientList);
+      }
+    } catch (error) {
+      console.error('Error loading clients:', error);
+    }
+  }, [waitForReady]);
+
+  const loadTimeEntries = useCallback(async () => {
+    try {
+      const api = await waitForReady();
+      if (api && api.timeEntries) {
+        const entries = await api.timeEntries.getAll();
+        setTimeEntries(entries);
+      }
+    } catch (error) {
+      console.error('Error loading time entries:', error);
+    }
+  }, [waitForReady]);
+
   useEffect(() => {
     loadInvoices();
     loadClients();
     loadTimeEntries();
-  }, []);
-
-  const loadInvoices = async () => {
-    if (window.electronAPI) {
-      try {
-        const invoiceList = await window.electronAPI.invoices.getAll();
-        setInvoices(invoiceList);
-      } catch (error) {
-        console.error('Error loading invoices:', error);
-      }
-    }
-  };
-
-  const loadClients = async () => {
-    if (window.electronAPI) {
-      try {
-        const clientList = await window.electronAPI.clients.getAll();
-        setClients(clientList);
-      } catch (error) {
-        console.error('Error loading clients:', error);
-      }
-    }
-  };
-
-  const loadTimeEntries = async () => {
-    if (window.electronAPI) {
-      try {
-        const entries = await window.electronAPI.timeEntries.getAll();
-        setTimeEntries(entries);
-      } catch (error) {
-        console.error('Error loading time entries:', error);
-      }
-    }
-  };
+  }, [loadInvoices, loadClients, loadTimeEntries]);
 
   const handleGenerateInvoice = async () => {
-    if (window.electronAPI && invoiceForm.client_id && invoiceForm.start_date && invoiceForm.end_date) {
+    if (invoiceForm.client_id && invoiceForm.start_date && invoiceForm.end_date) {
       try {
         setIsGenerating(true);
-        const result = await window.electronAPI.invoices.generate(invoiceForm);
-        if (result.success) {
-          setInvoiceForm({
-            client_id: '',
-            start_date: '',
-            end_date: '',
-            invoice_number: '',
-            due_date: ''
-          });
-          setShowModal(false);
-          await loadInvoices();
-        } else {
-          console.error('Invoice generation failed:', result.error);
+        const api = await waitForReady();
+        if (api && api.invoices) {
+          const result = await api.invoices.generate(invoiceForm);
+          if (result.success) {
+            setInvoiceForm({
+              client_id: '',
+              start_date: '',
+              end_date: '',
+              invoice_number: '',
+              due_date: ''
+            });
+            setShowModal(false);
+            await loadInvoices();
+          } else {
+            console.error('Invoice generation failed:', result.error);
+          }
         }
       } catch (error) {
         console.error('Error generating invoice:', error);
@@ -101,12 +109,13 @@ const Invoice = () => {
   };
 
   const handleDownloadInvoice = async (invoiceId) => {
-    if (window.electronAPI) {
-      try {
-        await window.electronAPI.invoices.download(invoiceId);
-      } catch (error) {
-        console.error('Error downloading invoice:', error);
+    try {
+      const api = await waitForReady();
+      if (api && api.invoices) {
+        await api.invoices.download(invoiceId);
       }
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
     }
   };
 

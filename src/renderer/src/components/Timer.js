@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
 import { Play, Square, ChevronDown } from 'lucide-react';
 import { useTimer } from '../context/TimerContext';
+import { useElectronAPI } from '../hooks/useElectronAPI';
 import { 
   Card, 
   FlexBox, 
@@ -98,6 +99,9 @@ const Timer = () => {
     formatTime
   } = useTimer();
 
+  // Safe electronAPI access
+  const { waitForReady } = useElectronAPI();
+
   // Local state only for Timer page specific UI
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -149,13 +153,20 @@ const Timer = () => {
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (activeTimer && hasUnsavedChanges) {
+        // Clear the timeout since we're saving immediately
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+        
         isUnloadingRef.current = true;
         
-        // Try to save synchronously (best effort)
-        if (window.electronAPI) {
-          window.electronAPI.timeEntries.update(activeTimer.id, {
+        // Try to save synchronously using the direct invoke method
+        try {
+          window.electronAPI.invoke('db:updateTimeEntry', activeTimer.id, {
             description: localDescription
-          }).catch(err => console.error('Failed to save description on unload:', err));
+          });
+        } catch (err) {
+          console.error('Failed to save description on unload:', err);
         }
         
         // Standard way to show confirmation dialog
@@ -165,10 +176,31 @@ const Timer = () => {
       }
     };
 
+    // Also handle the window close event for Electron
+    const handleWindowClose = () => {
+      if (activeTimer && hasUnsavedChanges) {
+        // Clear the timeout since we're saving immediately
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+        
+        // Save immediately on window close
+        window.electronAPI.timeEntries.update(activeTimer.id, {
+          description: localDescription
+        }).catch(err => console.error('Failed to save description on window close:', err));
+      }
+    };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Listen for Electron-specific window close event if available
+    if (window.electronAPI && window.electronAPI.invoke) {
+      window.addEventListener('beforeunload', handleWindowClose);
+    }
     
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('beforeunload', handleWindowClose);
       // Clear timeout on unmount
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -182,22 +214,25 @@ const Timer = () => {
     
     const loadClients = async () => {
       console.log('Loading clients...');
-      if (window.electronAPI) {
-        try {
-          // Use the same API call as Projects component
-          const clientList = await window.electronAPI.clients.getAll();
-          // console.log('Clients loaded:', clientList);
+      try {
+        const api = await waitForReady();
+        if (api && api.clients) {
+          const clientList = await api.clients.getAll();
+          console.log('Clients loaded:', clientList);
           setClients(clientList);
-        } catch (error) {
-          console.error('Error loading clients:', error);
-          // Fallback to direct IPC call
-          try {
-            const clientList = await window.electronAPI.invoke('db:getClients');
+        }
+      } catch (error) {
+        console.error('Error loading clients:', error);
+        // Fallback to direct IPC call
+        try {
+          const api = await waitForReady();
+          if (api && api.invoke) {
+            const clientList = await api.invoke('db:getClients');
             console.log('Clients loaded via direct IPC:', clientList);
             setClients(clientList);
-          } catch (fallbackError) {
-            console.error('Error loading clients via fallback:', fallbackError);
           }
+        } catch (fallbackError) {
+          console.error('Error loading clients via fallback:', fallbackError);
         }
       }
     };
@@ -209,20 +244,23 @@ const Timer = () => {
     };
     
     initializeData();
-  }, [checkActiveTimer]);
+  }, [checkActiveTimer, waitForReady]);
 
   // Separate effect for loading last used client - only when timer stops
   useEffect(() => {
     const loadLastUsedClient = async () => {
       console.log('Timer stopped, checking if should load last used client...');
       // Only auto-select last used client when timer stops and no client is selected
-      if (window.electronAPI && !activeTimer && !localSelectedClient) {
+      if (!activeTimer && !localSelectedClient) {
         try {
-          const lastClient = await window.electronAPI.invoke('db:getLastUsedClient');
-          
-          if (lastClient) {
-            console.log('Auto-selecting last used client after timer stop:', lastClient);
-            setLocalSelectedClient(lastClient);
+          const api = await waitForReady();
+          if (api && api.invoke) {
+            const lastClient = await api.invoke('db:getLastUsedClient');
+            
+            if (lastClient) {
+              console.log('Auto-selecting last used client after timer stop:', lastClient);
+              setLocalSelectedClient(lastClient);
+            }
           }
         } catch (error) {
           console.error('Error loading last used client:', error);
@@ -413,7 +451,7 @@ const Timer = () => {
     autoResizeTextarea();
   }, [localDescription, autoResizeTextarea]);
 
-  const handleDescriptionChange = (e) => {
+  const handleDescriptionChange = async (e) => {
     const newDescription = e.target.value;
     setLocalDescription(newDescription);
     
@@ -423,21 +461,28 @@ const Timer = () => {
     // Track if there are unsaved changes
     setHasUnsavedChanges(newDescription !== originalDescription);
     
-    // Update context description if timer is running
+    // Update context description if timer is running (now async)
     if (activeTimer) {
-      updateTimerDescription(newDescription);
+      try {
+        await updateTimerDescription(newDescription);
+        // If successful, mark as saved
+        setOriginalDescription(newDescription);
+        setHasUnsavedChanges(false);
+      } catch (error) {
+        console.error('Error updating description in context:', error);
+      }
     }
 
-    // Clear existing timeout
+    // Clear existing timeout since we saved immediately above
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Set new timeout for 5-second auto-save
+    // Still keep the timeout as backup in case the immediate save above failed
     if (activeTimer && newDescription !== originalDescription) {
       saveTimeoutRef.current = setTimeout(() => {
         saveDescriptionToDatabase(newDescription);
-      }, 5000);
+      }, 1000);
     }
   };
 

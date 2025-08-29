@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useElectronAPI } from '../hooks/useElectronAPI';
 
 const TimerContext = createContext();
 
@@ -16,6 +17,7 @@ export const TimerProvider = ({ children }) => {
   const [activeTimer, setActiveTimer] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
   const [description, setDescription] = useState('');
+  const { waitForReady } = useElectronAPI();
 
   // Check for active timer on initialization
   const checkActiveTimer = useCallback(async () => {
@@ -26,9 +28,10 @@ export const TimerProvider = ({ children }) => {
       return;
     }
     
-    if (window.electronAPI && window.electronAPI.invoke) {
-      try {
-        const timer = await window.electronAPI.invoke('db:getActiveTimer');
+    try {
+      const api = await waitForReady();
+      if (api && api.invoke) {
+        const timer = await api.invoke('db:getActiveTimer');
         console.log('[TimerContext] Active timer check result:', timer);
         
         if (timer) {
@@ -66,7 +69,7 @@ export const TimerProvider = ({ children }) => {
               } else if (timer.clientId) {
                 // Need to load client by ID
                 console.log('[TimerContext] Loading client by ID:', timer.clientId);
-                const clients = await window.electronAPI.invoke('db:getClients');
+                const clients = await api.invoke('db:getClients');
                 const client = clients.find(c => c.id === timer.clientId);
                 if (client) {
                   setSelectedClient(client);
@@ -85,11 +88,11 @@ export const TimerProvider = ({ children }) => {
             setActiveTimer(null);
           }
         }
-      } catch (error) {
-        console.error('[TimerContext] Error checking active timer:', error);
       }
+    } catch (error) {
+      console.error('[TimerContext] Error waiting for electronAPI:', error);
     }
-  }, [isRunning, activeTimer]);
+  }, [isRunning, activeTimer, waitForReady]);
 
   // Initialize timer state on component mount
   useEffect(() => {
@@ -109,18 +112,17 @@ export const TimerProvider = ({ children }) => {
 
   const startTimer = async (timerData = {}, timerDescription = '') => {
     console.log('[TimerContext] Starting timer with data:', timerData, 'description:', timerDescription);
-    console.log('[TimerContext] electronAPI available:', !!window.electronAPI);
-    console.log('[TimerContext] electronAPI.invoke available:', !!window.electronAPI?.invoke);
     
-    if (window.electronAPI) {
-      try {
+    try {
+      const api = await waitForReady();
+      if (api && api.invoke) {
         // Extract clientId, projectId, taskId and description from the data object
         const clientId = timerData.clientId || null;
         const projectId = timerData.projectId || null;
         const taskId = timerData.taskId || null;
         const description = timerData.description || timerDescription || '';
         
-        const timer = await window.electronAPI.invoke('db:startTimer', {
+        const timer = await api.invoke('db:startTimer', {
           clientId,
           projectId,
           taskId,
@@ -137,7 +139,7 @@ export const TimerProvider = ({ children }) => {
           // Load and set client if provided
           if (clientId) {
             try {
-              const clients = await window.electronAPI.invoke('db:getClients');
+              const clients = await api.invoke('db:getClients');
               const client = clients.find(c => c.id === clientId);
               if (client) {
                 setSelectedClient(client);
@@ -153,31 +155,32 @@ export const TimerProvider = ({ children }) => {
         } else {
           throw new Error('Failed to start timer - no response from backend');
         }
-      } catch (error) {
-        console.error('[TimerContext] Error starting timer:', error);
-        throw error;
+      } else {
+        throw new Error('electronAPI not available');
       }
-    } else {
-      throw new Error('electronAPI not available');
+    } catch (error) {
+      console.error('[TimerContext] Error starting timer:', error);
+      throw error;
     }
   };
 
   const stopTimer = async (roundTo = 15) => {
     console.log('[TimerContext] Stopping timer:', activeTimer?.id, 'roundTo:', roundTo);
-    console.log('[TimerContext] electronAPI available:', !!window.electronAPI);
-    console.log('[TimerContext] electronAPI.invoke available:', !!window.electronAPI?.invoke);
     
-    if (activeTimer && window.electronAPI) {
+    if (activeTimer) {
       try {
-        const stoppedEntry = await window.electronAPI.invoke('db:stopTimer', activeTimer.id, roundTo);
-        console.log('[TimerContext] Timer stopped successfully:', stoppedEntry);
-        
-        // Only clear state after successful database operation
-        setActiveTimer(null);
-        setIsRunning(false);
-        setTime(0);
-        setDescription('');
-        setSelectedClient(null);
+        const api = await waitForReady();
+        if (api && api.invoke) {
+          const stoppedEntry = await api.invoke('db:stopTimer', activeTimer.id, roundTo);
+          console.log('[TimerContext] Timer stopped successfully:', stoppedEntry);
+          
+          // Only clear state after successful database operation
+          setActiveTimer(null);
+          setIsRunning(false);
+          setTime(0);
+          setDescription('');
+          setSelectedClient(null);
+        }
       } catch (error) {
         console.error('[TimerContext] Error stopping timer:', error);
         throw error;
@@ -185,8 +188,25 @@ export const TimerProvider = ({ children }) => {
     }
   };
 
-  const updateTimerDescription = (newDescription) => {
+  const updateTimerDescription = async (newDescription) => {
     setDescription(newDescription);
+    
+    // If there's an active timer, update it in the database immediately
+    if (activeTimer) {
+      try {
+        const api = await waitForReady();
+        if (api && api.timeEntries) {
+          console.log('[TimerContext] Updating timer description in database:', newDescription);
+          await api.timeEntries.update(activeTimer.id, {
+            description: newDescription
+          });
+          console.log('[TimerContext] Timer description updated successfully');
+        }
+      } catch (error) {
+        console.error('[TimerContext] Error updating timer description:', error);
+        // Don't throw the error to avoid disrupting the UI
+      }
+    }
   };
 
   const updateTimerClient = async (client) => {
@@ -194,19 +214,22 @@ export const TimerProvider = ({ children }) => {
     setSelectedClient(client);
     
     // If there's an active timer, update it in the database
-    if (activeTimer && window.electronAPI) {
+    if (activeTimer) {
       try {
-        const updatedTimer = await window.electronAPI.invoke('db:updateTimeEntry', activeTimer.id, {
-          clientId: client ? client.id : null
-        });
-        console.log('[TimerContext] Timer client updated in database:', updatedTimer);
-        
-        // Update the activeTimer state with the new client info
-        setActiveTimer(prevTimer => ({
-          ...prevTimer,
-          clientId: client ? client.id : null,
-          client: client
-        }));
+        const api = await waitForReady();
+        if (api && api.invoke) {
+          const updatedTimer = await api.invoke('db:updateTimeEntry', activeTimer.id, {
+            clientId: client ? client.id : null
+          });
+          console.log('[TimerContext] Timer client updated in database:', updatedTimer);
+          
+          // Update the activeTimer state with the new client info
+          setActiveTimer(prevTimer => ({
+            ...prevTimer,
+            clientId: client ? client.id : null,
+            client: client
+          }));
+        }
       } catch (error) {
         console.error('[TimerContext] Error updating timer client:', error);
         // If database update fails, revert the client selection
@@ -219,19 +242,22 @@ export const TimerProvider = ({ children }) => {
     console.log('[TimerContext] Updating timer task to:', task);
     
     // If there's an active timer, update it in the database
-    if (activeTimer && window.electronAPI) {
+    if (activeTimer) {
       try {
-        const updatedTimer = await window.electronAPI.invoke('db:updateTimeEntry', activeTimer.id, {
-          taskId: task ? task.id : null
-        });
-        console.log('[TimerContext] Timer task updated in database:', updatedTimer);
-        
-        // Update the activeTimer state with the new task info
-        setActiveTimer(prevTimer => ({
-          ...prevTimer,
-          taskId: task ? task.id : null,
-          task: task
-        }));
+        const api = await waitForReady();
+        if (api && api.invoke) {
+          const updatedTimer = await api.invoke('db:updateTimeEntry', activeTimer.id, {
+            taskId: task ? task.id : null
+          });
+          console.log('[TimerContext] Timer task updated in database:', updatedTimer);
+          
+          // Update the activeTimer state with the new task info
+          setActiveTimer(prevTimer => ({
+            ...prevTimer,
+            taskId: task ? task.id : null,
+            task: task
+          }));
+        }
       } catch (error) {
         console.error('[TimerContext] Error updating timer task:', error);
         throw error;

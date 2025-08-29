@@ -75,7 +75,7 @@ const api = {
       return ipcRenderer.invoke('db:getTimeEntries', filters);
     },
     create: (entry) => ipcRenderer.invoke('db:createTimeEntry', entry),
-    update: (entry) => ipcRenderer.invoke('db:updateTimeEntry', entry),
+    update: (id, data) => ipcRenderer.invoke('db:updateTimeEntry', id, data),
     delete: (id) => ipcRenderer.invoke('db:deleteTimeEntry', id),
     startTimer: (clientId, description) => ipcRenderer.invoke('db:startTimer', clientId, description),
     stopTimer: (entryId, roundTo) => ipcRenderer.invoke('db:stopTimer', entryId, roundTo),
@@ -92,8 +92,10 @@ const api = {
     update: (settings) => ipcRenderer.invoke('db:updateSettings', settings)
   },
   
-  invoice: {
-    generate: (data) => ipcRenderer.invoke('invoice:generate', data)
+  invoices: {
+    getAll: () => ipcRenderer.invoke('db:getInvoices'),
+    generate: (data) => ipcRenderer.invoke('invoice:generate', data),
+    download: (id) => ipcRenderer.invoke('invoice:download', id)
   },
   
   export: {
@@ -111,13 +113,7 @@ console.log('API object:', JSON.stringify(Object.keys(api), null, 2));
 contextBridge.exposeInMainWorld('electronAPI', api);
 console.log('electronAPI exposed successfully');
 
-// Verify the exposure worked
-window.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM loaded, checking if electronAPI is available...');
-  if (window.electronAPI) {
-    console.log('✅ electronAPI is available in renderer');
-    console.log('Available methods:', Object.keys(window.electronAPI));
-  } else {
-    console.error('❌ electronAPI is NOT available in renderer');
-  }
-});
+// Add a small delay and then verify the exposure worked
+setTimeout(() => {
+  console.log('✅ electronAPI exposed and ready');
+}, 10);
