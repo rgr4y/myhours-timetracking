@@ -22,9 +22,9 @@ class MyHoursApp {
   async createWindow() {
     this.mainWindow = new BrowserWindow({
       width: 1200,
-      height: 800,
+      height: 840,
       minWidth: 800,
-      minHeight: 790,
+      minHeight: 820,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -33,6 +33,7 @@ class MyHoursApp {
       },
       titleBarStyle: 'hiddenInset',
       backgroundColor: '#1a1a1a',
+      autoHideMenuBar: true,
       show: false
     });
 
