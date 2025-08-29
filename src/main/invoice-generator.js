@@ -327,6 +327,68 @@ class InvoiceGenerator {
     }
   }
 
+  async generateInvoicePDF(invoice) {
+    try {
+      // Get settings for company info
+      const settings = await this.database.getSettings();
+      
+      // Prepare line items from the invoice's time entries
+      const lineItems = this.groupEntriesByDay(invoice.timeEntries);
+      
+      // Calculate totals
+      let totalHours = 0;
+      let totalAmount = invoice.totalAmount || 0;
+      const ratesUsed = new Set();
+      
+      invoice.timeEntries.forEach(entry => {
+        totalHours += (entry.duration || 0) / 60;
+        const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
+        if (hourlyRate > 0) {
+          ratesUsed.add(hourlyRate);
+        }
+      });
+      
+      const displayRate = ratesUsed.size === 1 ? Array.from(ratesUsed)[0] : null;
+      
+      // Prepare template data
+      const templateData = {
+        // Company info from settings
+        companyName: settings?.companyName || 'Your Company',
+        companyAddress: settings?.companyAddress || 'Your Address',
+        companyPhone: settings?.companyPhone || 'Your Phone',
+        companyEmail: settings?.companyEmail || 'your@email.com',
+        
+        // Invoice info
+        invoiceNumber: invoice.invoiceNumber,
+        invoiceDate: new Date(invoice.createdAt).toLocaleDateString(),
+        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+        
+        // Client info
+        clientName: invoice.client?.name || 'Unknown Client',
+        clientAddress: invoice.client?.address || '',
+        clientEmail: invoice.client?.email || '',
+        
+        // Period info
+        periodStart: invoice.periodStart ? new Date(invoice.periodStart).toLocaleDateString() : '',
+        periodEnd: invoice.periodEnd ? new Date(invoice.periodEnd).toLocaleDateString() : '',
+        
+        // Line items and totals
+        lineItems: lineItems,
+        totalHours: totalHours.toFixed(2),
+        hourlyRate: displayRate ? displayRate.toFixed(2) : 'Varies',
+        totalAmount: totalAmount.toFixed(2)
+      };
+
+      // Generate PDF
+      const pdfPath = await this.generatePDF(templateData);
+      
+      return pdfPath;
+    } catch (error) {
+      console.error('Error generating invoice PDF:', error);
+      throw error;
+    }
+  }
+
   groupEntriesByDay(entries) {
     const days = {};
     
