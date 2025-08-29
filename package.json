@@ -1,6 +1,6 @@
 {
   "name": "myhours",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "description": "Cross-platform time tracking app with invoicing",
   "main": "src/main/main.js",
   "scripts": {
@@ -10,7 +10,7 @@
     "version:bump": "node scripts/bump-version.js",
     "prisma:generate": "prisma generate",
     "prebuild": "npm run version:bump && node scripts/prepare-db.js && npm run prisma:generate && node scripts/prepare-icons.js",
-    "build": "npm run build-renderer && electron-builder",
+    "build": "npm run build-renderer && node scripts/run-builder.js",
     "build-renderer": "cd src/renderer && npm run build",
     "dist": "npm run build",
     "pack": "electron-builder --dir",
