@@ -28,7 +28,6 @@ export const useModalKeyboard = ({ isOpen, onClose, onSubmit = null, formData = 
         const activeElement = document.activeElement;
         const isInputFocused = activeElement && (
           activeElement.tagName === 'INPUT' ||
-          activeElement.tagName === 'TEXTAREA' ||
           activeElement.tagName === 'SELECT'
         );
 

@@ -32,7 +32,6 @@ export const TimerProvider = ({ children }) => {
       const api = await waitForReady();
       if (api && api.invoke) {
         const timer = await api.invoke('db:getActiveTimer');
-        console.log('[TimerContext] Active timer check result:', timer);
         
         if (timer) {
           console.log('[TimerContext] Found active timer:', timer);
