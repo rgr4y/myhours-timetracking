@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Edit, Trash2, Plus, Clock, Play, Square } from 'lucide-react';
+import { Calendar, Edit, Trash2, Plus, Clock, Play, Square, Folder } from 'lucide-react';
 import {
   Container,
   Card,
@@ -353,11 +353,12 @@ const TimeEntries = () => {
               <FlexBox justify="space-between" align="center">
                 <FlexBox direction="column" gap="5px">
                   <FlexBox align="center" gap="10px">
-                    <Heading size="small">{entry.description || 'No description'}</Heading>
+                    <Heading size="small" style={{ marginBottom: '15px' }}>{entry.description || 'No description'}</Heading>
                     {entry.isActive && (
                       <Text size="small" variant="success" style={{ 
                         padding: '2px 8px', 
                         borderRadius: '12px', 
+                        marginBottom: '15px',
                         backgroundColor: '#28a745',
                         color: 'white',
                         fontSize: '10px',
@@ -367,7 +368,16 @@ const TimeEntries = () => {
                       </Text>
                     )}
                   </FlexBox>
-                  <Text variant="secondary">{getClientName(entry.clientId)}</Text>
+                  <Text variant="secondary" size="small">
+                    {getClientName(entry.clientId)}
+                    {entry.project && (
+                      <>
+                        {' '}
+                        <Folder size={14} style={{ margin: '0 4px 0 10px', verticalAlign: 'text-bottom' }} />
+                        {entry.project.name}
+                      </>
+                    )}
+                  </Text>
                   <FlexBox gap="15px">
                     <Text size="small">
                       <Calendar size={14} style={{ marginRight: '5px' }} />

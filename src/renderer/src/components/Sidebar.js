@@ -51,7 +51,7 @@ const Sidebar = () => {
 
   return (
     <SidebarContainer>
-      <SidebarTitle>MyHours</SidebarTitle>
+      <SidebarTitle>myHours</SidebarTitle>
       <nav>
         {menuItems.map(item => {
           const Icon = item.icon;

@@ -1,5 +1,5 @@
 /**
- * Date and time utility functions for the MyHours application
+ * Date and time utility functions for the myHours application
  */
 
 /**

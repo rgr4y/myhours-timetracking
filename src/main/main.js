@@ -236,6 +236,13 @@ class MyHoursApp {
         if (data.clientId) {
           await this.database.setSetting('lastUsedClientId', data.clientId.toString());
         }
+        // Save last used project/task if provided
+        if (data.projectId) {
+          await this.database.setSetting('lastUsedProjectId', data.projectId.toString());
+        }
+        if (data.taskId) {
+          await this.database.setSetting('lastUsedTaskId', data.taskId.toString());
+        }
         
         console.log('[MAIN] IPC: Timer started successfully:', JSON.stringify(timer, null, 2));
         return timer;
@@ -278,6 +285,43 @@ class MyHoursApp {
         return null;
       } catch (error) {
         console.error('[MAIN] IPC: Error getting last used client:', error);
+        return null;
+      }
+    });
+    
+    ipcMain.handle('db:getLastUsedProject', async () => {
+      try {
+        const lastProjectId = await this.database.getSetting('lastUsedProjectId');
+        if (lastProjectId) {
+          // Search across clients' projects
+          const clients = await this.database.getClients();
+          for (const client of clients) {
+            const proj = (client.projects || []).find(p => p.id === parseInt(lastProjectId));
+            if (proj) return proj;
+          }
+        }
+        return null;
+      } catch (error) {
+        console.error('[MAIN] IPC: Error getting last used project:', error);
+        return null;
+      }
+    });
+
+    ipcMain.handle('db:getLastUsedTask', async () => {
+      try {
+        const lastTaskId = await this.database.getSetting('lastUsedTaskId');
+        if (lastTaskId) {
+          const clients = await this.database.getClients();
+          for (const client of clients) {
+            for (const project of client.projects || []) {
+              const task = (project.tasks || []).find(t => t.id === parseInt(lastTaskId));
+              if (task) return task;
+            }
+          }
+        }
+        return null;
+      } catch (error) {
+        console.error('[MAIN] IPC: Error getting last used task:', error);
         return null;
       }
     });
