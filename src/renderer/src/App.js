@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import styled, { createGlobalStyle } from 'styled-components';
 import './App.css';
 import { TimerProvider } from './context/TimerContext';
@@ -137,6 +137,7 @@ function App() {
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/invoice" element={<Invoice />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </MainContent>
           </ContentWrapper>

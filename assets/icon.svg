@@ -14,7 +14,17 @@
     </filter>
   </defs>
 
-  <!-- Transparent background (no base shape) -->
+  <!-- Transparent background, with a subtle translucent halo to avoid "floating" look on docks -->
+  <defs>
+    <radialGradient id="halo" cx="50%" cy="46%" r="50%">
+      <stop offset="0" stop-color="#2A2F88" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#2A2F88" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="12"/>
+    </filter>
+  </defs>
+  <circle cx="512" cy="480" r="360" fill="url(#halo)" filter="url(#soft)"/>
 
   <!-- Clock (time tracking) -->
   <g transform="translate(512, 470)">
@@ -47,7 +57,7 @@
   </g>
 
   <!-- Subtle monogram hint (M·H) integrated into background -->
-  <g opacity="0.14" fill="#FFFFFF">
+  <g opacity="0.10" fill="#FFFFFF">
     <path d="M230 730 v-280 h36 l96 120 l96 -120 h36 v280 h-40 v-198 l-92 114 h-4 l-92 -114 v198z"/>
     <rect x="620" y="450" width="40" height="280" rx="8"/>
   </g>

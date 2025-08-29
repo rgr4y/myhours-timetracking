@@ -264,6 +264,32 @@ export const TimerProvider = ({ children }) => {
     }
   };
 
+  const updateTimerProject = async (project) => {
+    console.log('[TimerContext] Updating timer project to:', project);
+    if (activeTimer) {
+      try {
+        const api = await waitForReady();
+        if (api && api.invoke) {
+          const updatedTimer = await api.invoke('db:updateTimeEntry', activeTimer.id, {
+            projectId: project ? project.id : null,
+            // Ensure task is cleared if project changes
+            taskId: null
+          });
+          console.log('[TimerContext] Timer project updated in database:', updatedTimer);
+          setActiveTimer(prevTimer => ({
+            ...prevTimer,
+            projectId: project ? project.id : null,
+            taskId: null,
+            task: null
+          }));
+        }
+      } catch (error) {
+        console.error('[TimerContext] Error updating timer project:', error);
+        throw error;
+      }
+    }
+  };
+
   const formatTime = (seconds) => {
     // Handle invalid input
     if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) {
@@ -290,6 +316,7 @@ export const TimerProvider = ({ children }) => {
     updateTimerDescription,
     updateTimerClient,
     updateTimerTask,
+    updateTimerProject,
     checkActiveTimer,
     
     // Utilities

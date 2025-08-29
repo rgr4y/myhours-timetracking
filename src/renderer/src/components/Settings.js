@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Save, Building, Trash2 } from 'lucide-react';
 import {
   Container,
   Card,
@@ -14,6 +15,7 @@ import {
 } from './ui';
 
 const Settings = () => {
+  const navigate = useNavigate();
   const [settings, setSettings] = useState({
     company_name: '',
     company_email: '',
@@ -26,6 +28,7 @@ const Settings = () => {
   const [originalSettings, setOriginalSettings] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -177,6 +180,39 @@ const Settings = () => {
                 <option value="detailed">Detailed Template</option>
               </Select>
             </FlexBox>
+          </FlexBox>
+        </Card>
+
+        {/* Danger Zone */}
+        <Card>
+          <Heading margin="0 0 12px 0">Danger Zone</Heading>
+          <Text variant="secondary" size="small" style={{ marginBottom: '12px' }}>
+            Removes all demo data created by the initial seed (clients, projects, tasks, time entries, invoices). Your settings are preserved.
+          </Text>
+          <FlexBox justify="flex-start">
+            <Button
+              variant="danger"
+              onClick={async () => {
+                if (isRemoving) return;
+                const ok = window.confirm('Remove demo data? This will delete all sample clients, projects, tasks, time entries, and invoices. Settings will be kept. This cannot be undone.');
+                if (!ok) return;
+                try {
+                  setIsRemoving(true);
+                  await window.electronAPI.invoke('db:removeDemoData');
+                  alert('Demo data removed.');
+                  navigate('/');
+                } catch (e) {
+                  console.error('Failed to remove demo data:', e);
+                  alert('Failed to remove demo data. See console for details.');
+                } finally {
+                  setIsRemoving(false);
+                }
+              }}
+              disabled={isRemoving}
+            >
+              <Trash2 size={16} />
+              {isRemoving ? 'Removing…' : 'Remove Demo Data'}
+            </Button>
           </FlexBox>
         </Card>
       </FlexBox>

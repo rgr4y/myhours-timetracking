@@ -39,18 +39,30 @@ class MyHoursApp {
     });
 
     // Load the app
-    console.log('[MAIN] Loading app in development mode...');
     if (isDev) {
+      console.log('[MAIN] Loading app in development mode...');
       console.log('[MAIN] Loading URL: http://localhost:3000');
       this.mainWindow.loadURL('http://localhost:3000');
       this.mainWindow.webContents.openDevTools();
     } else {
-      this.mainWindow.loadFile(path.join(__dirname, '../renderer/build/index.html'));
+      const indexPath = path.join(__dirname, '../renderer/build/index.html');
+      console.log('[MAIN] Loading production file:', indexPath);
+      const fs = require('fs');
+      console.log('[MAIN] index.html exists?', fs.existsSync(indexPath));
+      this.mainWindow.loadFile(indexPath);
     }
 
     this.mainWindow.once('ready-to-show', () => {
       console.log('[MAIN] Window ready to show');
       this.mainWindow.show();
+    });
+
+    // Helpful diagnostics if the renderer fails to load
+    this.mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      console.error('[MAIN] did-fail-load:', { errorCode, errorDescription, validatedURL });
+    });
+    this.mainWindow.webContents.on('render-process-gone', (event, details) => {
+      console.error('[MAIN] render-process-gone:', details);
     });
 
     this.mainWindow.on('closed', () => {
@@ -311,6 +323,17 @@ class MyHoursApp {
         return settingsObj;
       } catch (error) {
         console.error('[MAIN] IPC: Error getting settings:', error);
+        throw error;
+      }
+    });
+
+    // Danger ops: remove demo/seed data
+    ipcMain.handle('db:removeDemoData', async () => {
+      try {
+        const result = await this.database.removeDemoData();
+        return result;
+      } catch (error) {
+        console.error('[MAIN] Error removing demo data:', error);
         throw error;
       }
     });
