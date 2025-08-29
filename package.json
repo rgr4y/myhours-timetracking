@@ -1,6 +1,6 @@
 {
   "name": "myhours",
-  "version": "0.0.30",
+  "version": "0.0.34",
   "description": "Cross-platform time tracking app with invoicing",
   "main": "src/main/main.js",
   "scripts": {
@@ -53,6 +53,7 @@
     "files": [
       "src/main/**/*",
       "src/renderer/build/**/*",
+      "assets/**/*",
       "node_modules/**/*",
       "!node_modules/@prisma/engines/**",
       "!node_modules/@prisma/client/**",
@@ -62,6 +63,7 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "assets/icon.png",
       "target": [
         {
           "target": "dmg",
