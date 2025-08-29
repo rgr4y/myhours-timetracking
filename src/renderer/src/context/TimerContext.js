@@ -19,12 +19,24 @@ export const TimerProvider = ({ children }) => {
   const [description, setDescription] = useState('');
   const { waitForReady } = useElectronAPI();
 
+  // Update tray with timer status
+  const updateTrayStatus = useCallback(async (timerData = null) => {
+    try {
+      const api = await waitForReady();
+      if (api && api.tray) {
+        api.tray.updateTimerStatus(timerData);
+      }
+    } catch (error) {
+      console.error('[TimerContext] Error updating tray status:', error);
+    }
+  }, [waitForReady]);
+
   // Check for active timer on initialization
   const checkActiveTimer = useCallback(async () => {
-    console.log('[TimerContext] Checking for active timer...');
+    // console.log('[TimerContext] Checking for active timer...');
     // Don't check if we already have an active timer running
     if (isRunning && activeTimer) {
-      console.log('[TimerContext] Skipping check - timer already running');
+      // console.log('[TimerContext] Skipping check - timer already running');
       return;
     }
     
@@ -177,6 +189,23 @@ export const TimerProvider = ({ children }) => {
             setSelectedClient(null);
           }
           
+          // Update tray with timer info
+          const clientName = clientId ? (await (async () => {
+            try {
+              const clients = await api.invoke('db:getClients');
+              return clients.find(c => c.id === clientId)?.name || 'Unknown Client';
+            } catch {
+              return 'Unknown Client';
+            }
+          })()) : null;
+          
+          updateTrayStatus({
+            id: timer.id,
+            clientName: clientName,
+            description: description,
+            startTime: timer.startTime
+          });
+          
           return timer;
         } else {
           throw new Error('Failed to start timer - no response from backend');
@@ -206,6 +235,9 @@ export const TimerProvider = ({ children }) => {
           setTime(0);
           setDescription('');
           setSelectedClient(null);
+          
+          // Clear tray status
+          updateTrayStatus(null);
         }
       } catch (error) {
         console.error('[TimerContext] Error stopping timer:', error);

@@ -104,6 +104,40 @@ const api = {
     json: (data) => ipcRenderer.invoke('export:json', data)
   },
 
+  // Tray-related methods
+  tray: {
+    updateTimerStatus: (timerData) => ipcRenderer.send('tray:timer-status-changed', timerData)
+  },
+
+  // Event listeners for tray events
+  on: (channel, callback) => {
+    const validChannels = [
+      'tray-start-timer',
+      'tray-stop-timer',
+      'tray-quick-start-timer',
+      'tray-show-timer-setup',
+      'tray-open-settings'
+    ];
+    
+    if (validChannels.includes(channel)) {
+      ipcRenderer.on(channel, callback);
+    }
+  },
+
+  removeListener: (channel, callback) => {
+    const validChannels = [
+      'tray-start-timer',
+      'tray-stop-timer',
+      'tray-quick-start-timer',
+      'tray-show-timer-setup',
+      'tray-open-settings'
+    ];
+    
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeListener(channel, callback);
+    }
+  },
+
   // Direct IPC invoke method for flexibility
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
 };

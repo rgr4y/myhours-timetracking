@@ -45,8 +45,10 @@ export default function BackgroundClockOrbits({
 
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
-    ).matches;
+    ).matches || process.env.NODE_ENV !== 'production';
 
+    if (prefersReducedMotion) return;
+    
     const resize = () => {
       const parent = canvas.parentElement || canvas;
       width = Math.max(1, parent.clientWidth);

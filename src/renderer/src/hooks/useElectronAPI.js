@@ -14,7 +14,7 @@ export const useElectronAPI = () => {
       if (window.electronAPI) {
         setElectronAPI(window.electronAPI);
         setIsReady(true);
-        console.log('[useElectronAPI] electronAPI is immediately available');
+        // console.log('[useElectronAPI] electronAPI is immediately available');
         return;
       }
 

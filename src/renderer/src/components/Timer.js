@@ -215,15 +215,15 @@ const Timer = () => {
 
   // Load data on component mount
   useEffect(() => {
-    console.log('Timer component mounting...');
-    
+    // console.log('Timer component mounting...');
+
     const loadClients = async () => {
-      console.log('Loading clients...');
+      // console.log('Loading clients...');
       try {
         const api = await waitForReady();
         if (api && api.clients) {
           const clientList = await api.clients.getAll();
-          console.log('Clients loaded:', clientList);
+          // console.log('Clients loaded:', clientList);
           setClients(clientList);
         }
       } catch (error) {

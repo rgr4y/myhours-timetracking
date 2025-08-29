@@ -12,11 +12,18 @@ console.log('[MAIN] Development mode:', isDev);
 const DatabaseService = require('./database-service');
 const InvoiceGenerator = require('./invoice-generator');
 
+// Platform-specific tray services
+let TrayService = null;
+if (process.platform === 'darwin') {
+  TrayService = require('./services/tray-macos');
+}
+
 class MyHoursApp {
   constructor() {
     this.mainWindow = null;
     this.database = null;
     this.invoiceGenerator = null;
+    this.trayService = null;
   }
 
   async createWindow() {
@@ -81,6 +88,24 @@ class MyHoursApp {
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
     });
+
+    // macOS-specific window behavior
+    if (process.platform === 'darwin') {
+      // Prevent window from closing, hide instead
+      this.mainWindow.on('close', (event) => {
+        if (this.trayService && this.trayService.preventWindowClose()) {
+          event.preventDefault();
+          this.mainWindow.hide();
+        }
+      });
+
+      // Show window when activated from dock
+      app.on('activate', () => {
+        if (this.mainWindow) {
+          this.mainWindow.show();
+        }
+      });
+    }
   }
 
   setupIPC() {
@@ -626,6 +651,21 @@ class MyHoursApp {
       }
     });
 
+    // Tray-related IPC handlers
+    ipcMain.on('tray:timer-status-changed', (event, timerData) => {
+      console.log('[MAIN] Timer status changed:', timerData);
+      if (this.trayService) {
+        this.trayService.updateTimerStatus(timerData);
+        
+        // Start/stop timer updates
+        if (timerData) {
+          this.trayService.startTimerUpdates();
+        } else {
+          this.trayService.stopTimerUpdates();
+        }
+      }
+    });
+
     // Console forwarding from renderer
     ipcMain.on('console:log', (event, level, ...args) => {
       const prefix = `[RENDERER-${level.toUpperCase()}]`;
@@ -654,6 +694,17 @@ class MyHoursApp {
     await this.createWindow();
     console.log('[MAIN] Window created');
 
+    // Initialize tray service (macOS only for now)
+    if (process.platform === 'darwin' && TrayService) {
+      this.trayService = new TrayService(this.mainWindow, this.database);
+      const trayInitialized = this.trayService.initialize();
+      if (trayInitialized) {
+        console.log('[MAIN] Tray service initialized');
+      } else {
+        console.warn('[MAIN] Failed to initialize tray service');
+      }
+    }
+
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') {
         app.quit();
@@ -663,6 +714,19 @@ class MyHoursApp {
     app.on('activate', async () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         await this.createWindow();
+      }
+    });
+
+    // Handle app quit
+    app.on('before-quit', () => {
+      if (this.trayService) {
+        this.trayService.isQuitting = true;
+      }
+    });
+
+    app.on('will-quit', () => {
+      if (this.trayService) {
+        this.trayService.destroy();
       }
     });
   }
