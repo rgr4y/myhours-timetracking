@@ -28,6 +28,7 @@ const Invoice = () => {
   const [timeEntries, setTimeEntries] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [downloadingIds, setDownloadingIds] = useState(new Set());
   const [errorMessage, setErrorMessage] = useState('');
   const { waitForReady } = useElectronAPI();
 
@@ -122,13 +123,30 @@ const Invoice = () => {
   });
 
   const handleDownloadInvoice = async (invoiceId) => {
+    console.log('[FRONTEND] handleDownloadInvoice called with invoiceId:', invoiceId);
+    
+    // Prevent multiple simultaneous downloads of the same invoice
+    if (downloadingIds.has(invoiceId)) {
+      console.log('[FRONTEND] Download already in progress for invoice:', invoiceId);
+      return;
+    }
+
     try {
+      setDownloadingIds(prev => new Set(prev).add(invoiceId));
+      console.log('[FRONTEND] Starting download for invoice:', invoiceId);
       const api = await waitForReady();
       if (api && api.invoices) {
         await api.invoices.download(invoiceId);
+        console.log('[FRONTEND] Download completed for invoice:', invoiceId);
       }
     } catch (error) {
-      console.error('Error downloading invoice:', error);
+      console.error('[FRONTEND] Error downloading invoice:', error);
+    } finally {
+      setDownloadingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(invoiceId);
+        return newSet;
+      });
     }
   };
 
@@ -232,10 +250,11 @@ const Invoice = () => {
                   variant="secondary" 
                   size="small" 
                   style={{ flex: 1 }}
+                  disabled={downloadingIds.has(invoice.id)}
                   onClick={() => handleDownloadInvoice(invoice.id)}
                 >
                   <Download size={14} />
-                  Download
+                  {downloadingIds.has(invoice.id) ? 'Downloading...' : 'Download'}
                 </Button>
               </FlexBox>
             </Card>

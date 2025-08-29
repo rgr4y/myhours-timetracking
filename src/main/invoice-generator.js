@@ -2,6 +2,7 @@ const handlebars = require('handlebars');
 const puppeteer = require('puppeteer-core');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { dialog } = require('electron');
 
 class InvoiceGenerator {
@@ -379,14 +380,63 @@ class InvoiceGenerator {
         totalAmount: totalAmount.toFixed(2)
       };
 
-      // Generate PDF
-      const pdfPath = await this.generatePDF(templateData);
+      // Generate PDF directly to temp file without showing save dialog
+      const filePath = await this.generatePDFToFile(templateData);
       
-      return pdfPath;
+      return filePath;
     } catch (error) {
       console.error('Error generating invoice PDF:', error);
       throw error;
     }
+  }
+
+  async generatePDFToFile(templateData) {
+    const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
+    const html = template(templateData);
+    
+    // Find Chrome executable path
+    const chromePaths = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      process.env.CHROME_PATH,
+      process.env.CHROMIUM_PATH
+    ].filter(Boolean);
+    
+    let executablePath = null;
+    for (const chromePath of chromePaths) {
+      if (fs.existsSync(chromePath)) {
+        executablePath = chromePath;
+        break;
+      }
+    }
+    
+    if (!executablePath) {
+      throw new Error('Chrome/Chromium not found. Please install Chrome or set CHROME_PATH environment variable.');
+    }
+    
+    const browser = await puppeteer.launch({ 
+      headless: 'new',
+      executablePath: executablePath
+    });
+    const page = await browser.newPage();
+    await page.setContent(html);
+    
+    // Generate to temp file without save dialog
+    const tempPath = path.join(os.tmpdir(), `invoice-${templateData.invoiceNumber}-${Date.now()}.pdf`);
+    
+    await page.pdf({
+      path: tempPath,
+      format: 'A4',
+      margin: {
+        top: '20mm',
+        right: '15mm',
+        bottom: '20mm',
+        left: '15mm'
+      }
+    });
+    
+    await browser.close();
+    return tempPath;
   }
 
   groupEntriesByDay(entries) {
