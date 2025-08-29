@@ -25,6 +25,7 @@ class MyHoursApp {
       height: 840,
       minWidth: 800,
       minHeight: 820,
+      title: 'myHours',
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -54,7 +55,19 @@ class MyHoursApp {
 
     this.mainWindow.once('ready-to-show', () => {
       console.log('[MAIN] Window ready to show');
+      // Ensure the window title stays consistent regardless of document.title
+      try {
+        this.mainWindow.setTitle('myHours');
+      } catch (e) {}
       this.mainWindow.show();
+    });
+
+    // Prevent renderer from overriding the window title
+    this.mainWindow.on('page-title-updated', (event) => {
+      event.preventDefault();
+      try {
+        this.mainWindow.setTitle('myHours');
+      } catch (e) {}
     });
 
     // Helpful diagnostics if the renderer fails to load
@@ -71,6 +84,15 @@ class MyHoursApp {
   }
 
   setupIPC() {
+    // Database operations
+    ipcMain.handle('app:getVersion', async () => {
+      try {
+        return app.getVersion();
+      } catch (e) {
+        return '0.0.0';
+      }
+    });
+
     // Database operations
     ipcMain.handle('db:getClients', async () => {
       try {

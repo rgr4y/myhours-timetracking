@@ -843,30 +843,60 @@ class DatabaseService {
 
   async markAsInvoiced(entryIds, invoiceNumber) {
     try {
-      // First create the invoice record
+      // Load the entries to determine client and amount
+      const entries = await this.prisma.timeEntry.findMany({
+        where: {
+          id: { in: entryIds }
+        },
+        include: {
+          client: true,
+          project: true
+        }
+      });
+
+      if (!entries || entries.length === 0) {
+        throw new Error('No time entries provided to mark as invoiced');
+      }
+
+      // Ensure all entries are for the same client
+      const clientId = entries[0].clientId;
+      const multipleClients = entries.some(e => e.clientId !== clientId);
+      if (multipleClients) {
+        throw new Error('Cannot create invoice for multiple clients at once');
+      }
+
+      // Calculate total amount using project rate fallback to client rate
+      const totalAmount = entries.reduce((sum, e) => {
+        const hours = (e.duration || 0) / 60;
+        const rate = e.project?.hourlyRate || e.client?.hourlyRate || 0;
+        return sum + hours * rate;
+      }, 0);
+
+      // Determine billing period from entries
+      const dates = entries.map(e => new Date(e.startTime));
+      const minDate = new Date(Math.min.apply(null, dates));
+      const maxDate = new Date(Math.max.apply(null, dates));
+      const toYMD = d => d.toISOString().split('T')[0];
+
+      // Create invoice
       const invoice = await this.prisma.invoice.create({
         data: {
-          invoiceNumber: invoiceNumber,
-          clientId: 1, // This should be properly determined
-          totalAmount: 0, // This should be calculated
+          invoiceNumber,
+          clientId,
+          totalAmount: parseFloat(totalAmount.toFixed(2)),
+          periodStart: toYMD(minDate),
+          periodEnd: toYMD(maxDate),
           status: 'generated'
         }
       });
 
-      // Then update the time entries to mark them as invoiced
-      const updatedEntries = await this.prisma.timeEntry.updateMany({
-        where: {
-          id: {
-            in: entryIds
-          }
-        },
-        data: {
-          isInvoiced: true,
-          invoiceId: invoice.id
-        }
+      // Mark entries as invoiced and associate invoiceId
+      await this.prisma.timeEntry.updateMany({
+        where: { id: { in: entryIds } },
+        data: { isInvoiced: true, invoiceId: invoice.id }
       });
 
-      return updatedEntries;
+      return invoice;
     } catch (error) {
       console.error('Error marking entries as invoiced:', error);
       throw error;

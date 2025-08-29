@@ -1,9 +1,8 @@
 const handlebars = require('handlebars');
-const puppeteer = require('puppeteer-core');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { dialog } = require('electron');
+const { dialog, BrowserWindow } = require('electron');
 
 class InvoiceGenerator {
   constructor(database) {
@@ -393,49 +392,9 @@ class InvoiceGenerator {
   async generatePDFToFile(templateData) {
     const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
     const html = template(templateData);
-    
-    // Find Chrome executable path
-    const chromePaths = [
-      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-      process.env.CHROME_PATH,
-      process.env.CHROMIUM_PATH
-    ].filter(Boolean);
-    
-    let executablePath = null;
-    for (const chromePath of chromePaths) {
-      if (fs.existsSync(chromePath)) {
-        executablePath = chromePath;
-        break;
-      }
-    }
-    
-    if (!executablePath) {
-      throw new Error('Chrome/Chromium not found. Please install Chrome or set CHROME_PATH environment variable.');
-    }
-    
-    const browser = await puppeteer.launch({ 
-      headless: 'new',
-      executablePath: executablePath
-    });
-    const page = await browser.newPage();
-    await page.setContent(html);
-    
-    // Generate to temp file without save dialog
+    const buffer = await this.renderHtmlToPdf(html);
     const tempPath = path.join(os.tmpdir(), `invoice-${templateData.invoiceNumber}-${Date.now()}.pdf`);
-    
-    await page.pdf({
-      path: tempPath,
-      format: 'A4',
-      margin: {
-        top: '20mm',
-        right: '15mm',
-        bottom: '20mm',
-        left: '15mm'
-      }
-    });
-    
-    await browser.close();
+    fs.writeFileSync(tempPath, buffer);
     return tempPath;
   }
 
@@ -497,58 +456,25 @@ class InvoiceGenerator {
   async generatePDF(templateData) {
     const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
     const html = template(templateData);
-    
-    // Find Chrome executable path
-    const chromePaths = [
-      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-      process.env.CHROME_PATH,
-      process.env.CHROMIUM_PATH
-    ].filter(Boolean);
-    
-    let executablePath = null;
-    for (const chromePath of chromePaths) {
-      if (fs.existsSync(chromePath)) {
-        executablePath = chromePath;
-        break;
-      }
-    }
-    
-    if (!executablePath) {
-      throw new Error('Chrome/Chromium not found. Please install Google Chrome or set CHROME_PATH environment variable.');
-    }
-    
-    const browser = await puppeteer.launch({ 
-      headless: 'new',
-      executablePath: executablePath
-    });
-    const page = await browser.newPage();
-    await page.setContent(html);
-    
-    // Show save dialog
     const result = await dialog.showSaveDialog({
       defaultPath: `Invoice-${templateData.invoiceNumber}.pdf`,
       filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
     });
-    
-    if (result.canceled) {
-      await browser.close();
+    if (result.canceled || !result.filePath) {
       throw new Error('PDF generation canceled by user');
     }
-    
-    await page.pdf({
-      path: result.filePath,
-      format: 'A4',
-      margin: {
-        top: '20mm',
-        right: '15mm',
-        bottom: '20mm',
-        left: '15mm'
-      }
-    });
-    
-    await browser.close();
+    const buffer = await this.renderHtmlToPdf(html);
+    fs.writeFileSync(result.filePath, buffer);
     return result.filePath;
+  }
+
+  async renderHtmlToPdf(html) {
+    const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    await new Promise(r => setTimeout(r, 50));
+    const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4', landscape: false });
+    win.destroy();
+    return pdf;
   }
 
   generateInvoiceNumber() {
