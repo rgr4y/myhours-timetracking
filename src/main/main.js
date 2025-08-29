@@ -31,7 +31,8 @@ class MyHoursApp {
         enableRemoteModule: false,
         preload: path.join(__dirname, 'preload.js')
       },
-      titleBarStyle: 'hiddenInset',
+      // Use the default title bar on macOS to ensure traffic lights and window title are visible
+      titleBarStyle: 'default',
       backgroundColor: '#1a1a1a',
       autoHideMenuBar: true,
       show: false
