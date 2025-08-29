@@ -2,6 +2,15 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 console.log('Preload script executing...');
 
+// Constants
+const VALID_TRAY_CHANNELS = [
+  'tray-start-timer',
+  'tray-stop-timer',
+  'tray-quick-start-timer',
+  'tray-show-timer-setup',
+  'tray-open-settings'
+];
+
 // Forward console logs to main process using proper one-way IPC
 const originalConsole = {
   log: console.log,
@@ -111,29 +120,13 @@ const api = {
 
   // Event listeners for tray events
   on: (channel, callback) => {
-    const validChannels = [
-      'tray-start-timer',
-      'tray-stop-timer',
-      'tray-quick-start-timer',
-      'tray-show-timer-setup',
-      'tray-open-settings'
-    ];
-    
-    if (validChannels.includes(channel)) {
+    if (VALID_TRAY_CHANNELS.includes(channel)) {
       ipcRenderer.on(channel, callback);
     }
   },
 
   removeListener: (channel, callback) => {
-    const validChannels = [
-      'tray-start-timer',
-      'tray-stop-timer',
-      'tray-quick-start-timer',
-      'tray-show-timer-setup',
-      'tray-open-settings'
-    ];
-    
-    if (validChannels.includes(channel)) {
+    if (VALID_TRAY_CHANNELS.includes(channel)) {
       ipcRenderer.removeListener(channel, callback);
     }
   },
