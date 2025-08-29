@@ -25,7 +25,7 @@ export default function BackgroundClockOrbits({
   saturation = 70,
   lightness = 60,
   trail = 0.08,
-  count = 10,
+  count = 20,
   paused = false,
   className = "",
 }) {
@@ -79,26 +79,7 @@ export default function BackgroundClockOrbits({
     ro.observe(canvas.parentElement || canvas);
     document.addEventListener("visibilitychange", onVis);
 
-    // ===== Aurora field (curl noise approximation) =====
-    function aurora(t) {
-      const g = ctx.createLinearGradient(0, 0, width, height);
-      const l1 = Math.max(0, lightness - 48);
-      const l2 = Math.min(100, lightness + 6);
-      g.addColorStop(0, `hsl(${hue}, ${saturation}%, ${l1}%)`);
-      g.addColorStop(1, `hsl(${(hue + 30) % 360}, ${Math.max(40, saturation - 20)}%, ${l2}%)`);
-      ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = 0.06;
-      ctx.fillStyle = g;
-      const bandH = Math.max(120, height * 0.25);
-      const y = height * 0.4 + Math.sin(t * 0.00025) * height * 0.08;
-      const skew = 40 + Math.cos(t * 0.00018) * 30;
-      ctx.save();
-      ctx.transform(1, 0, Math.tan((skew * Math.PI) / 180), 1, 0, 0);
-      ctx.fillRect(-width, y - bandH / 2, width * 3, bandH);
-      ctx.restore();
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = "source-over";
-    }
+    // (removed aurora/gradient band to keep only clocks)
 
     // ===== Orbiters =====
     const orbiters = new Array(count).fill(0).map(() => {
@@ -128,17 +109,7 @@ export default function BackgroundClockOrbits({
       ctx.fillStyle = "#0b0f14";
       ctx.fillRect(0, 0, width, height);
       ctx.globalAlpha = 1;
-
-      aurora(ts);
-
-      ctx.globalAlpha = 0.04;
-      for (let i = 0; i < 60; i++) {
-        const x = (Math.random() * width) | 0;
-        const y = (Math.random() * height) | 0;
-        ctx.fillStyle = `hsl(${hue}, ${Math.max(30, saturation - 20)}%, ${Math.min(90, lightness + 20)}%)`;
-        ctx.fillRect(x, y, 1, 1);
-      }
-      ctx.globalAlpha = 1;
+      // removed aurora band and sparkle noise
 
       for (const o of orbiters) {
         o.phase += o.speed * dt;
@@ -199,18 +170,7 @@ export default function BackgroundClockOrbits({
         ref={canvasRef}
         style={{ opacity, filter: "saturate(1.08)", mixBlendMode: "normal" }}
       />
-      {/* micro-texture */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          opacity: Math.min(0.05, opacity * 0.22),
-          backgroundImage:
-            "radial-gradient(rgba(255,255,255,0.05) 0.5px, rgba(0,0,0,0) 0.5px)",
-          backgroundSize: "3px 3px",
-          mixBlendMode: "overlay",
-        }}
-      />
+      {/* micro-texture removed to avoid banding/overlay */}
     </div>
   );
 }
