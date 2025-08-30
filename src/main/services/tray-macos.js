@@ -1,20 +1,12 @@
 const { Tray, Menu, nativeImage, app } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const TrayService = require('./tray-service');
 
-class MacOSTrayService {
+class MacOSTrayService extends TrayService {
   constructor(mainWindow, databaseService) {
-    this.mainWindow = mainWindow;
-    this.database = databaseService;
-    this.tray = null;
-    this.contextMenu = null;
-    this.isQuitting = false;
-    this.currentTimer = null;
+    super(mainWindow, databaseService);
     this.iconPath = path.join(__dirname, '../../../assets/tray-icon.png');
-    
-    // Bind methods to maintain context
-    this.updateTimerStatus = this.updateTimerStatus.bind(this);
-    this.handleTrayClick = this.handleTrayClick.bind(this);
   }
 
   // Centralized icon loading method with cache busting
@@ -60,7 +52,7 @@ class MacOSTrayService {
       this.tray.setToolTip('myHours Time Tracker');
       
       // Set up tray interactions
-      this.setupTrayMenu();
+      this.createContextMenu();
       this.setupTrayEvents();
       
       // Set up file watcher for development (hot reload icons)
@@ -134,7 +126,7 @@ class MacOSTrayService {
     }
   }
 
-  async setupTrayMenu() {
+  async createContextMenu() {
     // Early return if tray is not initialized
     if (!this.tray) {
       console.warn('[TRAY-MACOS] Tray not initialized, cannot setup menu');
@@ -151,7 +143,10 @@ class MacOSTrayService {
         recentClients.forEach(client => {
           quickStartSubmenu.push({
             label: client.name,
-            click: () => this.startQuickTimer(client)
+            click: () => this.quickStartTimer({
+              clientId: client.id,
+              clientName: client.name
+            })
           });
         });
         quickStartSubmenu.push({ type: 'separator' });
@@ -160,8 +155,8 @@ class MacOSTrayService {
       quickStartSubmenu.push({
         label: 'Choose Client...',
         click: () => {
-          this.showMainWindow();
-          this.mainWindow.webContents.send('tray-show-timer-setup');
+          this.showWindow();
+          this.showTimerSetup();
         }
       });
     } catch (error) {
@@ -170,8 +165,8 @@ class MacOSTrayService {
         {
           label: 'Choose Client...',
           click: () => {
-            this.showMainWindow();
-            this.mainWindow.webContents.send('tray-show-timer-setup');
+            this.showWindow();
+            this.showTimerSetup();
           }
         }
       ];
@@ -186,7 +181,7 @@ class MacOSTrayService {
       { type: 'separator' },
       {
         label: 'Show myHours',
-        click: () => this.showMainWindow(),
+        click: () => this.showWindow(),
         accelerator: 'Cmd+Shift+M'
       },
       { type: 'separator' },
@@ -222,7 +217,7 @@ class MacOSTrayService {
       { type: 'separator' },
       {
         label: 'Quit myHours',
-        click: () => this.quitApp(),
+        click: () => this.quitApplication(),
         accelerator: 'Cmd+Q'
       }
     ]);
@@ -249,22 +244,7 @@ class MacOSTrayService {
       if (this.mainWindow.isVisible() && this.mainWindow.isFocused()) {
         this.mainWindow.hide();
       } else {
-        this.showMainWindow();
-      }
-    }
-  }
-
-  showMainWindow() {
-    if (this.mainWindow) {
-      if (this.mainWindow.isMinimized()) {
-        this.mainWindow.restore();
-      }
-      this.mainWindow.show();
-      this.mainWindow.focus();
-      
-      // Bring to front on macOS
-      if (process.platform === 'darwin') {
-        app.focus();
+        this.showWindow();
       }
     }
   }
@@ -274,12 +254,11 @@ class MacOSTrayService {
       if (this.currentTimer) {
         // Stop the current timer
         console.log('[TRAY-MACOS] Stopping timer from tray');
-        this.mainWindow.webContents.send('tray-stop-timer');
+        await this.stopTimer();
       } else {
         // Show quick start dialog or start with last used settings
         console.log('[TRAY-MACOS] Starting timer from tray');
-        this.mainWindow.webContents.send('tray-start-timer');
-        this.showMainWindow(); // Show window for timer setup
+        await this.startTimer();
       }
     } catch (error) {
       console.error('[TRAY-MACOS] Error toggling timer:', error);
@@ -298,7 +277,10 @@ class MacOSTrayService {
         recentClients.forEach(client => {
           submenu.push({
             label: client.name,
-            click: () => this.startQuickTimer(client)
+            click: () => this.quickStartTimer({
+              clientId: client.id,
+              clientName: client.name
+            })
           });
         });
         
@@ -308,8 +290,8 @@ class MacOSTrayService {
       submenu.push({
         label: 'Choose Client...',
         click: () => {
-          this.showMainWindow();
-          this.mainWindow.webContents.send('tray-show-timer-setup');
+          this.showWindow();
+          this.showTimerSetup();
         }
       });
       
@@ -320,29 +302,17 @@ class MacOSTrayService {
         {
           label: 'Choose Client...',
           click: () => {
-            this.showMainWindow();
-            this.mainWindow.webContents.send('tray-show-timer-setup');
+            this.showWindow();
+            this.showTimerSetup();
           }
         }
       ];
     }
   }
 
-  async startQuickTimer(client) {
-    try {
-      console.log('[TRAY-MACOS] Starting quick timer for client:', client.name);
-      this.mainWindow.webContents.send('tray-quick-start-timer', {
-        clientId: client.id,
-        clientName: client.name
-      });
-    } catch (error) {
-      console.error('[TRAY-MACOS] Error starting quick timer:', error);
-    }
-  }
-
   async openSettings() {
     console.log('[TRAY-MACOS] Opening settings...');
-    this.showMainWindow();
+    this.showWindow();
     
     // Wait for the window to be ready before sending the navigation event
     await new Promise(resolve => {
@@ -351,17 +321,23 @@ class MacOSTrayService {
         console.log('[TRAY-MACOS] Window already ready, proceeding...');
         resolve();
       } else {
-        // Wait for the window to be shown and focused
-        console.log('[TRAY-MACOS] Waiting for window to be ready...');
-        const onReady = () => {
-          console.log('[TRAY-MACOS] Window focused, ready to navigate');
-          this.mainWindow.removeListener('focus', onReady);
-          resolve();
+        // Wait for the window to show and focus
+        let resolved = false;
+        const onShow = () => {
+          console.log('[TRAY-MACOS] Window shown, sending settings event');
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
         };
-        this.mainWindow.once('focus', onReady);
+        this.mainWindow.once('show', onShow);
         
-        // Fallback timeout in case focus event doesn't fire
+        // Fallback timeout
         setTimeout(() => {
+          this.mainWindow.removeListener('show', onShow);
+          if (!resolved) {
+            resolved = true;
+          }
           console.log('[TRAY-MACOS] Timeout reached, proceeding anyway');
           resolve();
         }, 200);
@@ -372,13 +348,10 @@ class MacOSTrayService {
     this.mainWindow.webContents.send('tray-open-settings');
   }
 
-  quitApp() {
-    this.isQuitting = true;
-    app.quit();
-  }
-
-  updateTimerStatus(timerData) {
-    this.currentTimer = timerData;
+  // Override updateTimerStatus to add macOS-specific behavior
+  updateTimerStatus(timerData = null) {
+    // Call the base class method first
+    super.updateTimerStatus(timerData);
     
     // Early return if tray is not initialized
     if (!this.tray) {
@@ -413,7 +386,7 @@ class MacOSTrayService {
     }
     
     // Refresh the menu to update timer-related items
-    this.setupTrayMenu();
+    this.createContextMenu();
   }
 
   getTimerStatusText() {
@@ -463,7 +436,7 @@ class MacOSTrayService {
     this.timerUpdateInterval = setInterval(() => {
       if (this.currentTimer) {
         // Update the menu with current elapsed time
-        this.setupTrayMenu();
+        this.createContextMenu();
       }
     }, 60000); // Update every minute
   }
