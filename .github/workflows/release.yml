@@ -18,8 +18,12 @@ jobs:
     
     strategy:
       matrix:
-        os: [macos-latest]
-        # Future: add windows-latest, ubuntu-latest when ready
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+        # Future: add ubuntu-latest when ready
     
     steps:
       - name: Checkout code
@@ -32,7 +36,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
         
@@ -44,18 +48,36 @@ jobs:
       - name: Create .env file for builds
         run: |
           echo "NODE_ENV=production" > .env
+        shell: bash
+
+      - name: Add macOS-specific build vars
+        if: matrix.platform == 'mac'
+        run: |
           echo "BUILD_ARM64=1" >> .env
           echo "MAC_TARGET=dmg" >> .env
+          echo "BUILD_LINUX=1" >> .env
+          echo "LINUX_TARGET=AppImage" >> .env
+        shell: bash
+
+      - name: Add Windows-specific build vars  
+        if: matrix.platform == 'win'
+        run: |
           echo "BUILD_WIN=1" >> .env
+          echo "WIN_TARGET=nsis" >> .env
+        shell: bash
 
       - name: Build and publish
         run: npm run dist
         env:
           # GitHub token for publishing releases
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Code signing (add these secrets when ready)
+          # Ensure electron-builder uses the same cache as electron-download
+          # Code signing (add these secrets when ready for production)
           # CSC_LINK: ${{ secrets.CSC_LINK }}
           # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Windows code signing  
+          # WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           # Notarization (add these secrets when ready)
           # APPLE_ID: ${{ secrets.APPLE_ID }}
           # APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}

@@ -86,7 +86,7 @@ const Footer = styled.div`
   font-size: 12px;
 `;
 
-// Lightweight confetti animation. Plays for ~4s on mount and whenever the
+// Lightweight confetti animation. Plays for exactly 2 cycles on mount and whenever the
 // document becomes visible while this page is active.
 function useConfetti(ref) {
   useEffect(() => {
@@ -151,7 +151,7 @@ function useConfetti(ref) {
           ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
           ctx.restore();
         }
-        if (elapsed < 4000 && running) {
+        if (elapsed < 2400 && running) { // ~2 complete cycles
           rafId = requestAnimationFrame(draw);
         } else {
           running = false;
