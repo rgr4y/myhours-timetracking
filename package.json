@@ -15,6 +15,10 @@
     "start": "electron .",
     "dev": "concurrently \"npm run start-renderer\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development ELECTRON_ENABLE_LOGGING=true ELECTRON_ENABLE_STACK_DUMPING=true DEBUG=electron* electronmon .\"",
     "start-renderer": "cd src/renderer && npm start",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
     "version:bump": "node scripts/bump-version.js",
     "version:set": "node scripts/set-version.js",
     "prisma:generate": "prisma generate",
@@ -116,12 +120,17 @@
     "buildDependenciesFromSource": true
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "concurrently": "^8.2.2",
     "cross-env": "^10.0.0",
     "electron": "^26.2.1",
     "electron-builder": "^24.6.4",
     "electron-devtools-installer": "^4.0.0",
     "electronmon": "^2.0.3",
+    "jsdom": "^26.1.0",
+    "vitest": "^3.2.4",
     "wait-on": "^7.0.1"
   },
   "dependencies": {
