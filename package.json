@@ -105,5 +105,5 @@
     "seed": "node prisma/seed.js"
   },
   "author": "Rob Vella <me@robvella.com>",
-  "license": "MIT"
+  "license": "GPL-3.0-only"
 }

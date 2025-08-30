@@ -9,6 +9,7 @@ import TimeEntries from './components/TimeEntries';
 import Clients from './components/Clients';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
+import About from './components/About';
 import Invoice from './components/Invoice';
 import BackgroundClockOrbits from './components/BackgroundClockOrbits';
 
@@ -159,6 +160,7 @@ function App() {
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/invoice" element={<Invoice />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/about" element={<About />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </MainContent>
