@@ -104,10 +104,20 @@ Seeding options:
 - If PDFs are blank, confirm `printBackground: true` is set (it is) and try re‑seeding.
 - Icon transparency: place `assets/icon.png` (1024×1024, RGBA). Build prefers it over SVG rasterization.
 
+## About
+
+Author: Rob Vella
+
+Repository: github.com/rgr4y/myhours-timetracking
+
+Issues: Once the repository is public, please open issues on GitHub for bugs and feature requests. I triage and respond as time permits; responses and fixes are best‑effort.
+
+Disclaimer: This software is provided “as is,” without any warranty of any kind. No support is guaranteed. Use at your own risk.
+
 ## Contributing
 
-PRs and suggestions welcome. This is an experimental project; issues/PRs that improve stability, DX, or polish are appreciated.
+PRs and suggestions are welcome. This is an experimental project; issues/PRs that improve stability, DX, or polish are appreciated.
 
 ## License
 
-MIT
+GPLv3
