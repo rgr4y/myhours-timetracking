@@ -1,4 +1,7 @@
 .env
+*.log
 prisma/myhours.db
 build/
 dist/
+node_modules/
+src/renderer/node_modules/
