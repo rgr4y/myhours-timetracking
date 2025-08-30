@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-console.log('Preload script executing...');
+console.log('[PRELOAD] Script executing...');
 
 // Constants
 const VALID_TRAY_CHANNELS = [
@@ -10,6 +10,8 @@ const VALID_TRAY_CHANNELS = [
   'tray-show-timer-setup',
   'tray-open-settings'
 ];
+
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 // Forward console logs to main process using proper one-way IPC
 const originalConsole = {
@@ -51,9 +53,6 @@ console.info = (...args) => {
   ).join(' ');
   ipcRenderer.send('console:log', 'info', message);
 };
-
-// Test console forwarding
-console.log('Testing console forwarding from preload...');
 
 const api = {
   // Database operations
@@ -137,12 +136,18 @@ const api = {
 };
 
 // Expose the API to the renderer process
-console.log('Exposing electronAPI to main world...');
-console.log('API object:', JSON.stringify(Object.keys(api), null, 2));
+if (!isDev) {
+  console.log('Exposing electronAPI to main world...');
+  console.log('API object:', JSON.stringify(Object.keys(api), null, 2));
+}
+
 contextBridge.exposeInMainWorld('electronAPI', api);
-console.log('electronAPI exposed successfully');
+
+if (isDev) console.log('[PRELOAD] electronAPI exposed successfully');
 
 // Add a small delay and then verify the exposure worked
-setTimeout(() => {
-  console.log('✅ electronAPI exposed and ready');
-}, 10);
+if (isDev) {
+  setTimeout(() => {
+    console.log("[PRELOAD] ✅ electronAPI exposed and ready");
+  }, 10);
+}
