@@ -7,8 +7,13 @@ on:
       - 'v*.*.*'
 
 jobs:
-  build-and-release:
-    runs-on: macos-latest
+  release:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [macos-latest]
+        # Future: add windows-latest, ubuntu-latest when ready
     
     steps:
       - name: Checkout code
@@ -35,30 +40,15 @@ jobs:
           echo "BUILD_ARM64=1" > .env
           echo "MAC_TARGET=dmg" >> .env
       
-      - name: Build for macOS (both architectures)
-        run: npm run build
-      
-      - name: Get commit message
-        id: commit_message
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-      
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body: |
-            ## Changes
-            ${{ steps.commit_message.outputs.message }}
-            
-            ## Downloads
-            - ARM64 DMG (Apple Silicon Macs - M1/M2/M3)
-            - x86 DMG (Intel Macs)
-          files: |
-            dist/*.dmg
-          draft: false
-          prerelease: false
+      - name: Build and publish
+        run: npm run dist
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GitHub token for publishing releases
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Code signing (add these secrets when ready)
+          # CSC_LINK: ${{ secrets.CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Notarization (add these secrets when ready)
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
