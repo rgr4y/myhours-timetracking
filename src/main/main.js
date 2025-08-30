@@ -104,6 +104,19 @@ class MyHoursApp {
       this.mainWindow.show();
     });
 
+    // Broadcast content size to renderer on window size changes
+    const sendSize = () => {
+      try {
+        const { width, height } = this.mainWindow.getContentBounds();
+        this.mainWindow.webContents.send('app:window-resize', { width, height });
+      } catch (_) {}
+    };
+    this.mainWindow.on('resize', sendSize);
+    this.mainWindow.on('maximize', sendSize);
+    this.mainWindow.on('unmaximize', sendSize);
+    this.mainWindow.on('enter-full-screen', sendSize);
+    this.mainWindow.on('leave-full-screen', sendSize);
+
     // Prevent renderer from overriding the window title
     this.mainWindow.on('page-title-updated', (event) => {
       event.preventDefault();
@@ -804,4 +817,15 @@ myHoursApp.initialize().catch((error) => {
         console.error('[MAIN] Error opening external URL:', url, error);
         return false;
       }
+    });
+
+    // Window helpers
+    ipcMain.handle('app:getWindowSize', async () => {
+      try {
+        if (this.mainWindow) {
+          const { width, height } = this.mainWindow.getContentBounds();
+          return { width, height };
+        }
+      } catch (e) {}
+      return { width: 1200, height: 840 };
     });

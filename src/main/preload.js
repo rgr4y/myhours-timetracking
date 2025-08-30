@@ -121,6 +121,19 @@ const api = {
 
   // App helpers
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
+  window: {
+    getSize: () => ipcRenderer.invoke('app:getWindowSize'),
+    onResize: (callback) => {
+      if (typeof callback === 'function') {
+        ipcRenderer.on('app:window-resize', callback);
+      }
+    },
+    removeResizeListener: (callback) => {
+      if (typeof callback === 'function') {
+        ipcRenderer.removeListener('app:window-resize', callback);
+      }
+    }
+  },
 
   // Tray-related methods
   tray: {
