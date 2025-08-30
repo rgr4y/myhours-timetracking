@@ -1,6 +1,6 @@
 {
   "name": "myhours",
-  "version": "0.0.48",
+  "version": "0.0.49",
   "description": "Cross-platform time tracking app with invoicing",
   "main": "src/main/main.js",
   "repository": {
@@ -16,18 +16,25 @@
     "dev": "concurrently \"npm run start-renderer\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development ELECTRON_ENABLE_LOGGING=true ELECTRON_ENABLE_STACK_DUMPING=true DEBUG=electron* electronmon .\"",
     "start-renderer": "cd src/renderer && npm start",
     "version:bump": "node scripts/bump-version.js",
+    "version:set": "node scripts/set-version.js",
     "prisma:generate": "prisma generate",
-    "prebuild": "npm run version:bump && node scripts/prepare-db.js && npm run prisma:generate && node scripts/prepare-icons.js",
+    "prebuild": "node scripts/set-version.js --build && node scripts/prepare-db.js && npm run prisma:generate && node scripts/prepare-icons.js",
     "build": "cross-env NODE_ENV=production npm run build-renderer && node scripts/run-builder.js",
     "build:mac": "npm run build && pkill -f \"myHours\" ; cp -a dist/mac/myHours.app /Applications ; open /Applications/myHours.app",
     "build-renderer": "cd src/renderer && npm run build",
-    "dist": "npm run build",
+    "dist": "npm run prebuild && electron-builder --publish=always",
+    "dist:local": "npm run prebuild && electron-builder --publish=never",
     "pack": "electron-builder --dir",
     "postinstall": "electron-builder install-app-deps"
   },
   "build": {
     "appId": "com.rgv.myhours.app",
     "productName": "myHours",
+    "publish": {
+      "provider": "github",
+      "owner": "rgr4y",
+      "repo": "myhours-timetracking"
+    },
     "asarUnpack": [
       "node_modules/@prisma/client/**",
       "node_modules/.prisma/**",
@@ -83,9 +90,22 @@
       ]
     },
     "win": {
+      "icon": "assets/icon.png",
       "target": [
         {
           "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "category": "Office",
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "AppImage",
           "arch": [
             "x64"
           ]

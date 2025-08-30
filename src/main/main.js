@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 console.log('[MAIN] === MAIN PROCESS STARTING ===');
@@ -44,6 +45,46 @@ class MyHoursApp {
     this.database = null;
     this.invoiceGenerator = null;
     this.trayService = null;
+    this.setupAutoUpdater();
+  }
+
+  setupAutoUpdater() {
+    // Configure auto-updater
+    autoUpdater.logger = console;
+    autoUpdater.logger.transports.file.level = 'info';
+    
+    // Only check for updates in production
+    if (!isDev) {
+      console.log('[UPDATER] Setting up auto-updater...');
+      
+      autoUpdater.on('checking-for-update', () => {
+        console.log('[UPDATER] Checking for update...');
+      });
+      
+      autoUpdater.on('update-available', (info) => {
+        console.log('[UPDATER] Update available:', info.version);
+      });
+      
+      autoUpdater.on('update-not-available', (info) => {
+        console.log('[UPDATER] Update not available:', info.version);
+      });
+      
+      autoUpdater.on('error', (err) => {
+        console.log('[UPDATER] Error in auto-updater:', err);
+      });
+      
+      autoUpdater.on('download-progress', (progressObj) => {
+        let log_message = "Download speed: " + progressObj.bytesPerSecond;
+        log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+        log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+        console.log('[UPDATER]', log_message);
+      });
+      
+      autoUpdater.on('update-downloaded', (info) => {
+        console.log('[UPDATER] Update downloaded:', info.version);
+        autoUpdater.quitAndInstall();
+      });
+    }
   }
 
   async createWindow() {
@@ -737,6 +778,13 @@ class MyHoursApp {
     console.log('[MAIN] App initializing...');
     await app.whenReady();
     console.log('[MAIN] App ready');
+    
+    // Check for updates in production
+    if (!isDev) {
+      setTimeout(() => {
+        autoUpdater.checkForUpdatesAndNotify();
+      }, 3000); // Wait 3 seconds after startup
+    }
     
     // Initialize database
     this.database = new DatabaseService();
