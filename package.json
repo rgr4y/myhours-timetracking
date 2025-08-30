@@ -3,6 +3,14 @@
   "version": "0.0.43",
   "description": "Cross-platform time tracking app with invoicing",
   "main": "src/main/main.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rgr4y/myhours-timetracking.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rgr4y/myhours-timetracking/issues"
+  },
+  "homepage": "https://github.com/rgr4y/myhours-timetracking#readme",
   "scripts": {
     "start": "electron .",
     "dev": "concurrently \"npm run start-renderer\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development ELECTRON_ENABLE_LOGGING=true ELECTRON_ENABLE_STACK_DUMPING=true DEBUG=electron* electronmon .\"",

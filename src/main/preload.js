@@ -119,6 +119,9 @@ const api = {
     json: (data) => ipcRenderer.invoke('export:json', data)
   },
 
+  // App helpers
+  openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
+
   // Tray-related methods
   tray: {
     updateTimerStatus: (timerData) => ipcRenderer.send('tray:timer-status-changed', timerData)

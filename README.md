@@ -2,13 +2,15 @@
 
 # myHours ⏱️
 
-Cross‑platform time tracking with invoices. Electron + React + Prisma (SQLite).
+No‑frills, no‑strings‑attached time logger and invoice generator.
+Electron + React + Prisma (SQLite).
 
 </div>
 
 ## Features
 
 - Time tracking with rounding (5/10/15/30/60m) and manual edits
+- No accounts, no cloud sync — your data stays local
 - Clients → Projects → Tasks hierarchy with per‑client/project rates
 - Reports with exports (CSV/JSON)
 - Professional PDF invoices (Puppeteer + Handlebars)
@@ -109,6 +111,8 @@ Seeding options:
 Author: Rob Vella
 
 Repository: github.com/rgr4y/myhours-timetracking
+
+Issues: github.com/rgr4y/myhours-timetracking/issues
 
 Issues: Once the repository is public, please open issues on GitHub for bugs and feature requests. I triage and respond as time permits; responses and fixes are best‑effort.
 

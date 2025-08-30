@@ -58,6 +58,21 @@ const VersionLink = styled.span`
   color: inherit;
 `;
 
+const FooterRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-right: 20px;
+`;
+
+const FooterLink = styled.a`
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  &:hover { text-decoration: underline; }
+`;
+
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -110,6 +125,7 @@ const Sidebar = () => {
         </nav>
       </NavScroll>
       <VersionFooter>
+        <FooterRow>
         <VersionLink
           onClick={() => {
             if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
@@ -126,6 +142,22 @@ const Sidebar = () => {
         >
           v{appVersion || '—'}
         </VersionLink>
+        <span>•</span>
+        <FooterLink
+          href="https://github.com/rgr4y/myhours-timetracking"
+          onClick={(e) => {
+            e.preventDefault();
+            const url = 'https://github.com/rgr4y/myhours-timetracking';
+            if (window.electronAPI?.openExternal) window.electronAPI.openExternal(url);
+            else window.open(url, '_blank', 'noopener');
+          }}
+          rel="noreferrer"
+        >
+          Github
+        </FooterLink>
+        <span>•</span>
+        <span>(C) 2025 Rob Vella</span>
+        </FooterRow>
       </VersionFooter>
 
       {showYay && (
