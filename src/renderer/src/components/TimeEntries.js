@@ -180,7 +180,7 @@ const TimeEntries = () => {
     }
   }, [stopTimer, settings.timer_rounding, loadTimeEntries]);
 
-  // Listen for tray events to show modal (events now handled in TimerContext)
+  // Listen for tray events to show modal and timer events for refresh (events now handled in TimerContext)
   useEffect(() => {
     const handleShowTimerModal = () => {
       console.log('[TimeEntries] Show timer modal requested from tray');
@@ -192,12 +192,26 @@ const TimeEntries = () => {
       loadTimeEntries();
     };
 
+    const handleTimerStarted = () => {
+      console.log('[TimeEntries] Timer started - refreshing time entries');
+      loadTimeEntries();
+    };
+
+    const handleTimerStopped = () => {
+      console.log('[TimeEntries] Timer stopped - refreshing time entries');
+      loadTimeEntries();
+    };
+
     window.addEventListener('show-timer-modal', handleShowTimerModal);
     window.addEventListener('refresh-time-entries', handleRefreshTimeEntries);
+    window.addEventListener('timer-started', handleTimerStarted);
+    window.addEventListener('timer-stopped', handleTimerStopped);
     
     return () => {
       window.removeEventListener('show-timer-modal', handleShowTimerModal);
       window.removeEventListener('refresh-time-entries', handleRefreshTimeEntries);
+      window.removeEventListener('timer-started', handleTimerStarted);
+      window.removeEventListener('timer-stopped', handleTimerStopped);
     };
   }, [loadTimeEntries]);
 
@@ -354,6 +368,10 @@ const TimeEntries = () => {
         });
         setShowModal(false);
         await loadTimeEntries();
+        
+        // Emit time-entries-updated event for other components
+        const updateEvent = new CustomEvent('time-entries-updated');
+        window.dispatchEvent(updateEvent);
       } catch (error) {
         console.error('Error creating time entry:', error);
       }
@@ -386,6 +404,10 @@ const TimeEntries = () => {
         setEditingEntry(null);
         setShowModal(false);
         await loadTimeEntries();
+        
+        // Emit time-entries-updated event for other components
+        const updateEvent = new CustomEvent('time-entries-updated');
+        window.dispatchEvent(updateEvent);
       } catch (error) {
         console.error('Error updating time entry:', error);
       }
@@ -407,6 +429,10 @@ const TimeEntries = () => {
         const api = await waitForReady();
         await api.timeEntries.delete(entryId);
         await loadTimeEntries();
+        
+        // Emit time-entries-updated event for other components
+        const updateEvent = new CustomEvent('time-entries-updated');
+        window.dispatchEvent(updateEvent);
       } catch (error) {
         console.error('Error deleting time entry:', error);
       }

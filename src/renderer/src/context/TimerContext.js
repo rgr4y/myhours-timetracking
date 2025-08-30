@@ -231,6 +231,10 @@ export const TimerProvider = ({ children }) => {
             startTime: timer.startTime
           });
           
+          // Emit timer-started event to notify other components
+          const startEvent = new CustomEvent('timer-started', { detail: timer });
+          window.dispatchEvent(startEvent);
+          
           return timer;
         } else {
           throw new Error('Failed to start timer - no response from backend');
@@ -275,6 +279,10 @@ export const TimerProvider = ({ children }) => {
         
         // Clear tray status
         updateTrayStatus(null);
+        
+        // Emit timer-stopped event to notify other components
+        const stopEvent = new CustomEvent('timer-stopped', { detail: stoppedEntry });
+        window.dispatchEvent(stopEvent);
       }
     } catch (error) {
       console.error('[TimerContext] Error stopping timer:', error);

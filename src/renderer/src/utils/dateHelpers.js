@@ -117,7 +117,15 @@ export const parseTimeWithDate = (timeString, dateString) => {
   
   try {
     const [hours, minutes] = timeString.split(':').map(num => parseInt(num, 10));
-    const date = new Date(dateString);
+    
+    // Parse YYYY-MM-DD dates explicitly using local time constructor to avoid timezone issues
+    let date;
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = dateString.split('-').map(num => parseInt(num, 10));
+      date = new Date(year, month - 1, day); // month is 0-indexed
+    } else {
+      date = new Date(dateString);
+    }
     
     if (isNaN(date.getTime()) || isNaN(hours) || isNaN(minutes)) {
       return null;
