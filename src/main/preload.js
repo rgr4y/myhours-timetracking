@@ -88,6 +88,7 @@ const api = {
     delete: (id) => ipcRenderer.invoke('db:deleteTimeEntry', id),
     startTimer: (clientId, description) => ipcRenderer.invoke('db:startTimer', clientId, description),
     stopTimer: (entryId, roundTo) => ipcRenderer.invoke('db:stopTimer', entryId, roundTo),
+    resumeTimer: (entryId) => ipcRenderer.invoke('db:resumeTimer', entryId),
     getActiveTimer: () => ipcRenderer.invoke('db:getActiveTimer'),
     markAsInvoiced: (entryIds, invoiceId) => ipcRenderer.invoke('db:markAsInvoiced', entryIds, invoiceId)
   },

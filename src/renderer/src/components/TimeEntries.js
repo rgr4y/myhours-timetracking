@@ -21,10 +21,12 @@ import {
   LoadingOverlay
 } from './ui';
 import { useTimer } from '../context/TimerContext';
+import { useElectronAPI } from '../hooks/useElectronAPI';
 import { formatDurationHumanFriendly, formatTime, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
 
 const TimeEntries = () => {
   const { activeTimer, startTimer, stopTimer } = useTimer();
+  const { waitForReady } = useElectronAPI();
   const [timeEntries, setTimeEntries] = useState([]);
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -49,41 +51,44 @@ const TimeEntries = () => {
   // Load functions
   const loadTimeEntries = useCallback(async () => {
     console.log('Loading time entries...');
-    if (window.electronAPI) {
+    const api = await waitForReady();
+    if (api) {
       try {
-        const entries = await window.electronAPI.timeEntries.getAll();
+        const entries = await api.timeEntries.getAll();
         console.log('Time entries loaded:', entries.length, 'entries');
         setTimeEntries(entries);
       } catch (error) {
         console.error('Error loading time entries:', error);
       }
     }
-  }, []);
+  }, [waitForReady]);
 
   const loadClients = useCallback(async () => {
-    if (window.electronAPI) {
+    const api = await waitForReady();
+    if (api) {
       try {
-        const clientList = await window.electronAPI.clients.getAll();
+        const clientList = await api.clients.getAll();
         setClients(clientList);
       } catch (error) {
         console.error('Error loading clients:', error);
       }
     }
-  }, []);
+  }, [waitForReady]);
 
   const loadAllTasks = useCallback(async () => {
-    if (window.electronAPI) {
+    const api = await waitForReady();
+    if (api) {
       try {
         // Load tasks from all projects to be able to resolve task names
         const allTasks = [];
-        const clientList = await window.electronAPI.clients.getAll();
+        const clientList = await api.clients.getAll();
         
-        for (const client of clientList) {
+  for (const client of (clientList || [])) {
           try {
-            const projects = await window.electronAPI.projects.getAll(client.id);
-            for (const project of projects) {
+            const projects = await api.projects.getAll(client.id);
+            for (const project of (projects || [])) {
               try {
-                const projectTasks = await window.electronAPI.tasks.getAll(project.id);
+                const projectTasks = await api.tasks.getAll(project.id);
                 allTasks.push(...(projectTasks || []));
               } catch (error) {
                 console.error(`Error loading tasks for project ${project.id}:`, error);
@@ -100,18 +105,19 @@ const TimeEntries = () => {
         console.error('Error loading all tasks:', error);
       }
     }
-  }, []);
+  }, [waitForReady]);
 
   const loadSettings = useCallback(async () => {
-    if (window.electronAPI) {
+    const api = await waitForReady();
+    if (api) {
       try {
-        const settingsData = await window.electronAPI.settings.get();
+        const settingsData = await api.settings.get();
         setSettings(settingsData || { timer_rounding: '15' });
       } catch (error) {
         console.error('Error loading settings:', error);
       }
     }
-  }, []);
+  }, [waitForReady]);
 
   useEffect(() => {
     console.log('TimeEntries component mounting, loading data...');
@@ -174,64 +180,34 @@ const TimeEntries = () => {
     }
   }, [stopTimer, settings.timer_rounding, loadTimeEntries]);
 
-  // Handle tray events
+  // Listen for tray events to show modal (events now handled in TimerContext)
   useEffect(() => {
-    if (window.electronAPI && window.electronAPI.on) {
-      const handleTrayStartTimer = () => {
-        console.log('[TimeEntries] Start timer requested from tray');
-        setShowModal(true);
-      };
-      
-      const handleTrayStopTimer = async () => {
-        console.log('[TimeEntries] Stop timer requested from tray');
-        if (activeTimer) {
-          try {
-            const roundingMinutes = parseInt(settings.timer_rounding || '15');
-            await stopTimer(roundingMinutes);
-            // Note: We'll rely on timer state changes to refresh the UI
-          } catch (error) {
-            console.error('Error stopping timer from tray:', error);
-          }
-        }
-      };
-      
-      const handleTrayQuickStartTimer = (event, data) => {
-        console.log('[TimeEntries] Quick start timer from tray:', data);
-        if (data && data.clientId) {
-          startTimer({
-            clientId: data.clientId,
-            description: `Quick timer for ${data.clientName}`
-          });
-        }
-      };
-      
-      const handleTrayShowTimerSetup = () => {
-        console.log('[TimeEntries] Show timer setup from tray');
-        setShowModal(true);
-      };
-      
-      // Register event listeners
-      window.electronAPI.on('tray-start-timer', handleTrayStartTimer);
-      window.electronAPI.on('tray-stop-timer', handleTrayStopTimer);
-      window.electronAPI.on('tray-quick-start-timer', handleTrayQuickStartTimer);
-      window.electronAPI.on('tray-show-timer-setup', handleTrayShowTimerSetup);
-      
-      // Cleanup listeners on unmount
-      return () => {
-        window.electronAPI.removeListener('tray-start-timer', handleTrayStartTimer);
-        window.electronAPI.removeListener('tray-stop-timer', handleTrayStopTimer);
-        window.electronAPI.removeListener('tray-quick-start-timer', handleTrayQuickStartTimer);
-        window.electronAPI.removeListener('tray-show-timer-setup', handleTrayShowTimerSetup);
-      };
-    }
-  }, [activeTimer, stopTimer, startTimer, settings.timer_rounding]);
+    const handleShowTimerModal = () => {
+      console.log('[TimeEntries] Show timer modal requested from tray');
+      setShowModal(true);
+    };
+
+    const handleRefreshTimeEntries = () => {
+      console.log('[TimeEntries] Refresh time entries requested');
+      loadTimeEntries();
+    };
+
+    window.addEventListener('show-timer-modal', handleShowTimerModal);
+    window.addEventListener('refresh-time-entries', handleRefreshTimeEntries);
+    
+    return () => {
+      window.removeEventListener('show-timer-modal', handleShowTimerModal);
+      window.removeEventListener('refresh-time-entries', handleRefreshTimeEntries);
+    };
+  }, [loadTimeEntries]);
 
   // Load projects when client changes
   useEffect(() => {
     const loadProjects = async () => {
-      if (entryForm.clientId && window.electronAPI) {
+      if (entryForm.clientId) {
         try {
-          const projectList = await window.electronAPI.projects.getAll(parseInt(entryForm.clientId));
+          const api = await waitForReady();
+          const projectList = await api.projects.getAll(parseInt(entryForm.clientId));
           console.log('Projects loaded for client', entryForm.clientId, ':', projectList);
           setProjects(projectList);
         } catch (error) {
@@ -246,7 +222,7 @@ const TimeEntries = () => {
     };
 
     loadProjects();
-  }, [entryForm.clientId]);
+  }, [entryForm.clientId, waitForReady]);
 
   // Load tasks when project changes  
   useEffect(() => {
@@ -254,16 +230,15 @@ const TimeEntries = () => {
       if (entryForm.projectId) {
         try {
           console.log('Attempting to load tasks for project:', entryForm.projectId);
-          console.log('electronAPI available:', !!window.electronAPI);
-          console.log('electronAPI.tasks available:', !!window.electronAPI?.tasks);
+          const api = await waitForReady();
           
-          if (!window.electronAPI?.tasks?.getAll) {
+          if (!api?.tasks?.getAll) {
             console.error('electronAPI.tasks.getAll is not available');
             setTasks([]);
             return;
           }
           
-          const taskList = await window.electronAPI.tasks.getAll(parseInt(entryForm.projectId));
+          const taskList = await api.tasks.getAll(parseInt(entryForm.projectId));
           console.log('Tasks loaded for project', entryForm.projectId, ':', taskList);
           setTasks(taskList || []);
         } catch (error) {
@@ -277,7 +252,7 @@ const TimeEntries = () => {
     };
 
     loadTasks();
-  }, [entryForm.projectId]);
+  }, [entryForm.projectId, waitForReady]);
 
   // Helper function to calculate elapsed time for active entries
   const getElapsedTime = (startTime) => {
@@ -291,8 +266,25 @@ const TimeEntries = () => {
   const handlePlayEntry = async (entry) => {
     try {
       await loadSettings(); // Ensure we have current settings
+      const api = await waitForReady();
+      if (!api) return;
       
       const roundingMinutes = parseInt(settings.timer_rounding || '15');
+      
+      // Check if this entry was stopped recently and can be resumed
+      const canResume = entry.endTime && !entry.isActive;
+      const timeSinceStop = canResume ? Math.floor((new Date() - new Date(entry.endTime)) / (1000 * 60)) : null;
+      
+      if (canResume && timeSinceStop <= roundingMinutes) {
+        // Entry was stopped within rounding window - resume it
+        console.log(`Resuming entry ${entry.id} (stopped ${timeSinceStop} minutes ago)`);
+        
+        const resumedEntry = await api.timeEntries.resumeTimer(entry.id);
+        console.log('Timer resumed:', resumedEntry);
+        
+        await loadTimeEntries(); // Refresh the time entries list
+        return;
+      }
       
       if (activeTimer) {
         // Calculate elapsed time for active timer
@@ -339,8 +331,9 @@ const TimeEntries = () => {
   };
 
   const handleCreateEntry = async () => {
-    if (window.electronAPI && entryForm.clientId && entryForm.startTime && entryForm.endTime) {
+    if (entryForm.clientId && entryForm.startTime && entryForm.endTime) {
       try {
+        const api = await waitForReady();
         // Prepare data with proper type conversion
         const createData = {
           ...entryForm,
@@ -349,7 +342,7 @@ const TimeEntries = () => {
           taskId: entryForm.taskId ? parseInt(entryForm.taskId) : null
         };
         
-        await window.electronAPI.invoke('db:createTimeEntry', createData);
+        await api.invoke('db:createTimeEntry', createData);
         setEntryForm({
           clientId: '',
           projectId: '',
@@ -368,8 +361,9 @@ const TimeEntries = () => {
   };
 
   const handleUpdateEntry = async () => {
-    if (window.electronAPI && editingEntry && entryForm.clientId && entryForm.startTime && entryForm.endTime) {
+    if (editingEntry && entryForm.clientId && entryForm.startTime && entryForm.endTime) {
       try {
+        const api = await waitForReady();
         // Prepare data with proper type conversion
         const updateData = {
           ...entryForm,
@@ -378,7 +372,7 @@ const TimeEntries = () => {
           taskId: entryForm.taskId ? parseInt(entryForm.taskId) : null
         };
         
-        await window.electronAPI.invoke('db:updateTimeEntry', editingEntry.id, updateData);
+        await api.invoke('db:updateTimeEntry', editingEntry.id, updateData);
         
         setEntryForm({
           clientId: '',
@@ -408,9 +402,10 @@ const TimeEntries = () => {
       return;
     }
 
-    if (window.electronAPI && window.confirm('Are you sure you want to delete this time entry?')) {
+    if (window.confirm('Are you sure you want to delete this time entry?')) {
       try {
-        await window.electronAPI.timeEntries.delete(entryId);
+        const api = await waitForReady();
+        await api.timeEntries.delete(entryId);
         await loadTimeEntries();
       } catch (error) {
         console.error('Error deleting time entry:', error);
@@ -529,7 +524,7 @@ const TimeEntries = () => {
         </EmptyState>
       ) : (
         <FlexBox direction="column" gap="0">
-          {Object.entries(groupEntriesByDate(timeEntries)).map(([date, entries], groupIndex) => {
+          {Object.entries(groupEntriesByDate(timeEntries) || {}).map(([date, entries], groupIndex) => {
             // Check if any entry in this day group is active
             const hasActiveEntry = entries.some(entry => entry.isActive);
             
@@ -573,7 +568,7 @@ const TimeEntries = () => {
               {/* Day Entries */}
               {!collapsedDays.has(date) && (
                 <FlexBox direction="column" gap="0">
-                  {entries.map((entry, index) => (
+                  {(entries || []).map((entry, index) => (
                     <Card 
                       key={entry.id} 
                       padding="15px"
@@ -718,7 +713,7 @@ const TimeEntries = () => {
                   }}
                 >
                   <option value="">Select a client</option>
-                  {clients.map(client => (
+                  {(clients || []).map(client => (
                     <option key={client.id} value={client.id}>{client.name}</option>
                   ))}
                 </Select>
@@ -734,7 +729,7 @@ const TimeEntries = () => {
                   disabled={!entryForm.clientId}
                 >
                   <option value="">Select a project (optional)</option>
-                  {projects.map(project => (
+                  {(projects || []).map(project => (
                     <option key={project.id} value={project.id}>{project.name}</option>
                   ))}
                 </Select>
@@ -750,7 +745,7 @@ const TimeEntries = () => {
                   disabled={!entryForm.projectId}
                 >
                   <option value="">Select a task (optional)</option>
-                  {tasks.map(task => (
+                  {(tasks || []).map(task => (
                     <option key={task.id} value={task.id}>{task.name}</option>
                   ))}
                 </Select>

@@ -9,6 +9,40 @@ console.log('[MAIN] Working directory:', process.cwd());
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 console.log('[MAIN] Development mode:', isDev);
 
+// Enhanced logging for development
+if (isDev) {
+  // Enable more verbose logging
+  if (process.env.ELECTRON_ENABLE_LOGGING) {
+    console.log('[MAIN] Enhanced logging enabled');
+    
+    // Log unhandled errors
+    process.on('uncaughtException', (error) => {
+      console.error('[MAIN] Uncaught Exception:', error);
+    });
+    
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('[MAIN] Unhandled Rejection at:', promise, 'reason:', reason);
+    });
+  }
+  
+  // Safe React DevTools injection (dev only, with try/catch)
+  try {
+    const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
+    app.whenReady().then(() => {
+      // Only inject if not sandboxed (Electron 20+)
+      if (process.env.ELECTRON_DISABLE_SANDBOX || process.env.ELECTRON_RUN_AS_NODE) {
+        installExtension(REACT_DEVELOPER_TOOLS)
+          .then((name) => console.log('[MAIN] Added Extension:', name))
+          .catch((err) => console.log('[MAIN] An error occurred adding extension:', err));
+      } else {
+        console.warn('[MAIN] React DevTools not injected: Electron sandbox is enabled.');
+      }
+    });
+  } catch (err) {
+    console.warn('[MAIN] React DevTools injection failed:', err);
+  }
+}
+
 const DatabaseService = require('./database-service');
 const InvoiceGenerator = require('./invoice-generator');
 
@@ -16,6 +50,8 @@ const InvoiceGenerator = require('./invoice-generator');
 let TrayService = null;
 if (process.platform === 'darwin') {
   TrayService = require('./services/tray-macos');
+} else if (process.platform === 'win32') {
+  TrayService = require('./services/tray-windows');
 }
 
 class MyHoursApp {
@@ -197,9 +233,9 @@ class MyHoursApp {
 
     ipcMain.handle('db:getTasks', async (event, projectId) => {
       try {
-        console.log('[MAIN] IPC: Getting tasks for project:', projectId);
+        // console.log('[MAIN] IPC: Getting tasks for project:', projectId);
         const tasks = await this.database.getTasks(projectId);
-        console.log('[MAIN] IPC: Returning', tasks.length, 'tasks');
+        // console.log('[MAIN] IPC: Returning', tasks.length, 'tasks');
         return tasks;
       } catch (error) {
         console.error('[MAIN] IPC: Error getting tasks:', error);
@@ -235,10 +271,10 @@ class MyHoursApp {
     });
 
     ipcMain.handle('db:getTimeEntries', async (event, filters) => {
-      console.log('[MAIN] IPC: Getting time entries with filters:', filters);
+      // console.log('[MAIN] IPC: Getting time entries with filters:', filters);
       try {
         const entries = await this.database.getTimeEntries(filters);
-        console.log('[MAIN] IPC: Returning', entries.length, 'time entries');
+        // console.log('[MAIN] IPC: Returning', entries.length, 'time entries');
         return entries;
       } catch (error) {
         console.error('[MAIN] IPC: Error getting time entries:', error);
@@ -307,6 +343,18 @@ class MyHoursApp {
         return entry;
       } catch (error) {
         console.error('[MAIN] IPC: Error stopping timer:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('db:resumeTimer', async (event, entryId) => {
+      console.log('[MAIN] IPC: Resuming timer with ID:', entryId);
+      try {
+        const entry = await this.database.resumeTimer(entryId);
+        console.log('[MAIN] IPC: Timer resumed successfully:', JSON.stringify(entry, null, 2));
+        return entry;
+      } catch (error) {
+        console.error('[MAIN] IPC: Error resuming timer:', error);
         throw error;
       }
     });
@@ -694,15 +742,17 @@ class MyHoursApp {
     await this.createWindow();
     console.log('[MAIN] Window created');
 
-    // Initialize tray service (macOS only for now)
-    if (process.platform === 'darwin' && TrayService) {
+    // Initialize tray service (cross-platform)
+    if (TrayService) {
       this.trayService = new TrayService(this.mainWindow, this.database);
       const trayInitialized = this.trayService.initialize();
       if (trayInitialized) {
-        console.log('[MAIN] Tray service initialized');
+        console.log(`[MAIN] Tray service initialized for ${process.platform}`);
       } else {
-        console.warn('[MAIN] Failed to initialize tray service');
+        console.warn(`[MAIN] Failed to initialize tray service for ${process.platform}`);
       }
+    } else {
+      console.log(`[MAIN] No tray service available for platform: ${process.platform}`);
     }
 
     app.on('window-all-closed', () => {

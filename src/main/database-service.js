@@ -140,20 +140,71 @@ class DatabaseService {
     }
   }
 
+  // Ensure only one active timer exists - use this for critical operations
+  async ensureOnlyOneActiveTimer() {
+    try {
+      const activeTimers = await this.prisma.timeEntry.findMany({
+        where: { isActive: true },
+        orderBy: { startTime: 'desc' } // Keep the most recent one
+      });
+
+      if (activeTimers.length > 1) {
+        console.warn(`[DATABASE] Found ${activeTimers.length} active timers, stopping older ones`);
+        
+        // Keep the first (most recent) timer, stop the rest
+        const keepTimer = activeTimers[0];
+        const stopTimers = activeTimers.slice(1);
+        
+        for (const timer of stopTimers) {
+          const endTime = new Date();
+          const duration = Math.floor((endTime - timer.startTime) / 1000 / 60);
+          
+          await this.prisma.timeEntry.update({
+            where: { id: timer.id },
+            data: {
+              isActive: false,
+              endTime: endTime,
+              duration: duration
+            }
+          });
+          
+          console.log(`[DATABASE] Auto-stopped duplicate active timer ${timer.id} with duration ${duration} minutes`);
+        }
+        
+        return keepTimer;
+      }
+      
+      return activeTimers[0] || null;
+    } catch (error) {
+      console.error('[DATABASE] Error ensuring single active timer:', error);
+      throw error;
+    }
+  }
+
   // Time Entry methods
   async startTimer(data = {}) {
     try {
-      // Stop any currently active timers first
-      await this.prisma.timeEntry.updateMany({
-        where: { isActive: true },
-        data: { 
-          isActive: false,
-          endTime: new Date(),
-          duration: {
-            increment: Math.floor((new Date() - new Date()) / 1000 / 60) // This will be calculated properly in the actual implementation
-          }
-        }
+      // Stop any currently active timers first by properly calculating their durations
+      const activeTimers = await this.prisma.timeEntry.findMany({
+        where: { isActive: true }
       });
+
+      // Stop each active timer with proper duration calculation
+      for (const timer of activeTimers) {
+        const endTime = new Date();
+        const duration = Math.floor((endTime - timer.startTime) / 1000 / 60); // duration in minutes
+        
+        await this.prisma.timeEntry.update({
+          where: { id: timer.id },
+          data: {
+            isActive: false,
+            endTime: endTime,
+            duration: duration
+          }
+        });
+        
+        console.log(`[DATABASE] Stopped active timer ${timer.id} with duration ${duration} minutes`);
+      }
 
       // Create new time entry
       const timeEntry = await this.prisma.timeEntry.create({
@@ -190,8 +241,26 @@ class DatabaseService {
         where: { id: parseInt(timeEntryId) }
       });
 
-      if (!timeEntry || !timeEntry.isActive) {
-        throw new Error('No active timer found');
+      if (!timeEntry) {
+        console.warn(`[DATABASE] Timer with ID ${timeEntryId} not found`);
+        // Check if there's any active timer we can stop instead
+        const anyActiveTimer = await this.prisma.timeEntry.findFirst({
+          where: { isActive: true }
+        });
+        
+        if (!anyActiveTimer) {
+          console.warn('[DATABASE] No active timer found to stop');
+          return null; // Return null instead of throwing error
+        }
+        
+        // Use the found active timer instead
+        console.log(`[DATABASE] Using active timer ${anyActiveTimer.id} instead of ${timeEntryId}`);
+        return this.stopTimer(anyActiveTimer.id);
+      }
+
+      if (!timeEntry.isActive) {
+        console.warn(`[DATABASE] Timer ${timeEntryId} is not active`);
+        return timeEntry; // Return the existing entry
       }
 
       const endTime = new Date();
@@ -221,10 +290,38 @@ class DatabaseService {
     }
   }
 
-  async getActiveTimer() {
+  async resumeTimer(timeEntryId) {
     try {
-      const activeTimer = await this.prisma.timeEntry.findFirst({
+      // Stop any currently active timers first
+      await this.prisma.timeEntry.updateMany({
         where: { isActive: true },
+        data: { 
+          isActive: false,
+          endTime: new Date()
+        }
+      });
+
+      // Calculate duration for currently active timers before stopping
+      const activeTimers = await this.prisma.timeEntry.findMany({
+        where: { isActive: true }
+      });
+      
+      for (const timer of activeTimers) {
+        const duration = Math.floor((new Date() - timer.startTime) / 1000 / 60);
+        await this.prisma.timeEntry.update({
+          where: { id: timer.id },
+          data: { duration }
+        });
+      }
+
+      // Resume the specified time entry
+      const resumedTimeEntry = await this.prisma.timeEntry.update({
+        where: { id: parseInt(timeEntryId) },
+        data: {
+          isActive: true,
+          startTime: new Date(), // Reset start time to now
+          endTime: null // Clear end time
+        },
         include: {
           client: true,
           project: true,
@@ -236,7 +333,35 @@ class DatabaseService {
         }
       });
 
-      return activeTimer;
+      return resumedTimeEntry;
+    } catch (error) {
+      console.error('Error resuming timer:', error);
+      throw error;
+    }
+  }
+
+  async getActiveTimer() {
+    try {
+      // Ensure only one active timer exists before returning
+      const activeTimer = await this.ensureOnlyOneActiveTimer();
+      
+      if (activeTimer) {
+        // Get the full timer data with relations
+        return await this.prisma.timeEntry.findUnique({
+          where: { id: activeTimer.id },
+          include: {
+            client: true,
+            project: true,
+            task: {
+              include: {
+                project: true
+              }
+            }
+          }
+        });
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error getting active timer:', error);
       throw error;
@@ -630,9 +755,9 @@ class DatabaseService {
   // Task methods
   async getTasks(projectId = null) {
     try {
-      console.log('[DATABASE] getTasks called with projectId:', projectId);
+      // console.log('[DATABASE] getTasks called with projectId:', projectId);
       const where = projectId ? { projectId: parseInt(projectId) } : {};
-      console.log('[DATABASE] Query where clause:', where);
+      // console.log('[DATABASE] Query where clause:', where);
       
       const tasks = await this.prisma.task.findMany({
         where,
@@ -648,7 +773,7 @@ class DatabaseService {
         }
       });
 
-      console.log('[DATABASE] Found', tasks.length, 'tasks');
+      // console.log('[DATABASE] Found', tasks.length, 'tasks');
       return tasks;
     } catch (error) {
       console.error('Error getting tasks:', error);

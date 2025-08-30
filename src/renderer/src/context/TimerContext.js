@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useElectronAPI } from '../hooks/useElectronAPI';
 
 const TimerContext = createContext();
@@ -17,7 +17,22 @@ export const TimerProvider = ({ children }) => {
   const [activeTimer, setActiveTimer] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
   const [description, setDescription] = useState('');
+  const [isStoppingTimer, setIsStoppingTimer] = useState(false); // Prevent multiple stop operations
   const { waitForReady } = useElectronAPI();
+  const trayListenersSetup = useRef(false); // Track if listeners are already setup
+  
+  // Refs to avoid stale closures in event handlers
+  const activeTimerRef = useRef(activeTimer);
+  const isStoppingTimerRef = useRef(isStoppingTimer);
+
+  // Update refs when state changes
+  useEffect(() => {
+    activeTimerRef.current = activeTimer;
+  }, [activeTimer]);
+
+  useEffect(() => {
+    isStoppingTimerRef.current = isStoppingTimer;
+  }, [isStoppingTimer]);
 
   // Update tray with timer status
   const updateTrayStatus = useCallback(async (timerData = null) => {
@@ -158,7 +173,7 @@ export const TimerProvider = ({ children }) => {
     };
   }, [recalcElapsed]);
 
-  const startTimer = async (timerData = {}, timerDescription = '') => {
+  const startTimer = useCallback(async (timerData = {}, timerDescription = '') => {
     console.log('[TimerContext] Starting timer with data:', timerData, 'description:', timerDescription);
     
     try {
@@ -227,34 +242,54 @@ export const TimerProvider = ({ children }) => {
       console.error('[TimerContext] Error starting timer:', error);
       throw error;
     }
-  };
+  }, [waitForReady, updateTrayStatus]);
 
-  const stopTimer = async (roundTo = 15) => {
+  const stopTimer = useCallback(async (roundTo = 15) => {
     console.log('[TimerContext] Stopping timer:', activeTimer?.id, 'roundTo:', roundTo);
     
-    if (activeTimer) {
-      try {
-        const api = await waitForReady();
-        if (api && api.invoke) {
-          const stoppedEntry = await api.invoke('db:stopTimer', activeTimer.id, roundTo);
-          console.log('[TimerContext] Timer stopped successfully:', stoppedEntry);
-          
-          // Only clear state after successful database operation
-          setActiveTimer(null);
-          setIsRunning(false);
-          setTime(0);
-          setDescription('');
-          setSelectedClient(null);
-          
-          // Clear tray status
-          updateTrayStatus(null);
-        }
-      } catch (error) {
-        console.error('[TimerContext] Error stopping timer:', error);
-        throw error;
-      }
+    // Prevent multiple simultaneous stop operations
+    if (isStoppingTimer) {
+      console.log('[TimerContext] Timer stop already in progress, skipping');
+      return;
     }
-  };
+    
+    if (!activeTimer) {
+      console.log('[TimerContext] No active timer to stop');
+      return;
+    }
+    
+    setIsStoppingTimer(true);
+    try {
+      const api = await waitForReady();
+      if (api && api.invoke) {
+        const stoppedEntry = await api.invoke('db:stopTimer', activeTimer.id, roundTo);
+        console.log('[TimerContext] Timer stopped successfully:', stoppedEntry);
+        
+        // Only clear state after successful database operation
+        // (stopTimer now returns null if no timer was found, but that's ok)
+        setActiveTimer(null);
+        setIsRunning(false);
+        setTime(0);
+        setDescription('');
+        setSelectedClient(null);
+        
+        // Clear tray status
+        updateTrayStatus(null);
+      }
+    } catch (error) {
+      console.error('[TimerContext] Error stopping timer:', error);
+      // Don't throw error anymore since we made stopTimer more forgiving
+      // Just clear the state to prevent UI inconsistencies
+      setActiveTimer(null);
+      setIsRunning(false);
+      setTime(0);
+      setDescription('');
+      setSelectedClient(null);
+      updateTrayStatus(null);
+    } finally {
+      setIsStoppingTimer(false);
+    }
+  }, [activeTimer, waitForReady, updateTrayStatus, isStoppingTimer]);
 
   const updateTimerDescription = async (newDescription) => {
     setDescription(newDescription);
@@ -391,6 +426,87 @@ export const TimerProvider = ({ children }) => {
     // Utilities
     formatTime
   };
+
+  // Set up tray event listeners - these belong in TimerContext not individual components
+  useEffect(() => {
+    // Only setup listeners once
+    if (trayListenersSetup.current) {
+      return;
+    }
+
+    const setupTrayEventListeners = async () => {
+      const api = await waitForReady();
+      if (api && api.on) {
+        const handleTrayStartTimer = () => {
+          console.log('[TimerContext] Start timer requested from tray');
+          // Emit event that components can listen to show timer modal
+          const event = new CustomEvent('show-timer-modal');
+          window.dispatchEvent(event);
+        };
+        
+        const handleTrayStopTimer = async () => {
+          console.log('[TimerContext] Stop timer requested from tray');
+          // Use current values via refs instead of stale closure values
+          const currentActiveTimer = activeTimerRef.current;
+          const currentIsStoppingTimer = isStoppingTimerRef.current;
+          
+          if (currentActiveTimer && !currentIsStoppingTimer) {
+            try {
+              await stopTimer(15); // Use default rounding
+              // Emit event to refresh time entries
+              const refreshEvent = new CustomEvent('refresh-time-entries');
+              window.dispatchEvent(refreshEvent);
+            } catch (error) {
+              console.error('[TimerContext] Error stopping timer from tray:', error);
+            }
+          } else {
+            console.log('[TimerContext] No active timer to stop or stop already in progress');
+          }
+        };
+        
+        const handleTrayQuickStartTimer = async (event, data) => {
+          console.log('[TimerContext] Quick start timer from tray:', data);
+          if (data && data.clientId) {
+            try {
+              await startTimer({
+                clientId: data.clientId,
+                description: `Quick timer for ${data.clientName}`
+              });
+            } catch (error) {
+              console.error('[TimerContext] Error quick starting timer:', error);
+            }
+          }
+        };
+        
+        const handleTrayShowTimerSetup = () => {
+          console.log('[TimerContext] Show timer setup from tray');
+          const event = new CustomEvent('show-timer-modal');
+          window.dispatchEvent(event);
+        };
+        
+        // Register event listeners only once
+        api.on('tray-start-timer', handleTrayStartTimer);
+        api.on('tray-stop-timer', handleTrayStopTimer);
+        api.on('tray-quick-start-timer', handleTrayQuickStartTimer);
+        api.on('tray-show-timer-setup', handleTrayShowTimerSetup);
+        
+        trayListenersSetup.current = true;
+        console.log('[TimerContext] Tray event listeners setup complete');
+        
+        // Cleanup listeners on unmount
+        return () => {
+          console.log('[TimerContext] Cleaning up tray event listeners');
+          api.removeListener('tray-start-timer', handleTrayStartTimer);
+          api.removeListener('tray-stop-timer', handleTrayStopTimer);
+          api.removeListener('tray-quick-start-timer', handleTrayQuickStartTimer);
+          api.removeListener('tray-show-timer-setup', handleTrayShowTimerSetup);
+          trayListenersSetup.current = false;
+        };
+      }
+    };
+
+    setupTrayEventListeners();
+  }, [waitForReady, startTimer, stopTimer]); // Include the functions we now use directly
 
   return (
     <TimerContext.Provider value={value}>
