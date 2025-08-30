@@ -45,46 +45,53 @@ class MyHoursApp {
     this.database = null;
     this.invoiceGenerator = null;
     this.trayService = null;
-    this.setupAutoUpdater();
+    // this.setupAutoUpdater();
   }
 
   setupAutoUpdater() {
+    // Skip auto-updater setup to avoid Windows compatibility issues during development
+    if (isDev) {
+      console.log('[UPDATER] Skipping auto-updater setup in development mode');
+      return;
+    }
+    
     // Configure auto-updater
     autoUpdater.logger = console;
-    autoUpdater.logger.transports.file.level = 'info';
     
-    // Only check for updates in production
-    if (!isDev) {
-      console.log('[UPDATER] Setting up auto-updater...');
-      
-      autoUpdater.on('checking-for-update', () => {
-        console.log('[UPDATER] Checking for update...');
-      });
-      
-      autoUpdater.on('update-available', (info) => {
-        console.log('[UPDATER] Update available:', info.version);
-      });
-      
-      autoUpdater.on('update-not-available', (info) => {
-        console.log('[UPDATER] Update not available:', info.version);
-      });
-      
-      autoUpdater.on('error', (err) => {
-        console.log('[UPDATER] Error in auto-updater:', err);
-      });
-      
-      autoUpdater.on('download-progress', (progressObj) => {
-        let log_message = "Download speed: " + progressObj.bytesPerSecond;
-        log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-        log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-        console.log('[UPDATER]', log_message);
-      });
-      
-      autoUpdater.on('update-downloaded', (info) => {
-        console.log('[UPDATER] Update downloaded:', info.version);
-        autoUpdater.quitAndInstall();
-      });
+    // Only set file transport level if it exists (not available on all platforms)
+    if (autoUpdater.logger.transports && autoUpdater.logger.transports.file) {
+      autoUpdater.logger.transports.file.level = 'info';
     }
+    
+    console.log('[UPDATER] Setting up auto-updater...');
+    
+    autoUpdater.on('checking-for-update', () => {
+      console.log('[UPDATER] Checking for update...');
+    });
+    
+    autoUpdater.on('update-available', (info) => {
+      console.log('[UPDATER] Update available:', info.version);
+    });
+    
+    autoUpdater.on('update-not-available', (info) => {
+      console.log('[UPDATER] Update not available:', info.version);
+    });
+    
+    autoUpdater.on('error', (err) => {
+      console.log('[UPDATER] Error in auto-updater:', err);
+    });
+    
+    autoUpdater.on('download-progress', (progressObj) => {
+      let log_message = "Download speed: " + progressObj.bytesPerSecond;
+      log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+      log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+      console.log('[UPDATER]', log_message);
+    });
+    
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('[UPDATER] Update downloaded:', info.version);
+      autoUpdater.quitAndInstall();
+    });
   }
 
   async createWindow() {
