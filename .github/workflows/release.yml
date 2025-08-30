@@ -43,7 +43,8 @@ jobs:
 
       - name: Create .env file for builds
         run: |
-          echo "BUILD_ARM64=1" > .env
+          echo "NODE_ENV=production" > .env
+          echo "BUILD_ARM64=1" >> .env
           echo "MAC_TARGET=dmg" >> .env
           echo "BUILD_WIN=1" >> .env
 
