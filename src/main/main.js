@@ -25,22 +25,6 @@ if (isDev) {
     });
   }
   
-  // Safe React DevTools injection (dev only, with try/catch)
-  try {
-    const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
-    app.whenReady().then(() => {
-      // Only inject if not sandboxed (Electron 20+)
-      if (process.env.ELECTRON_DISABLE_SANDBOX || process.env.ELECTRON_RUN_AS_NODE) {
-        installExtension(REACT_DEVELOPER_TOOLS)
-          .then((name) => console.log('[MAIN] Added Extension:', name))
-          .catch((err) => console.log('[MAIN] An error occurred adding extension:', err));
-      } else {
-        console.warn('[MAIN] React DevTools not injected: Electron sandbox is enabled.');
-      }
-    });
-  } catch (err) {
-    console.warn('[MAIN] React DevTools injection failed:', err);
-  }
 }
 
 const DatabaseService = require('./database-service');

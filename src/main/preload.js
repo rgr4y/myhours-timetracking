@@ -11,7 +11,13 @@ const VALID_TRAY_CHANNELS = [
   'tray-open-settings'
 ];
 
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+// Determine dev mode without relying on main-process `app` (not available here)
+// Works in both dev and packaged builds
+const isDev = (
+  process.env.ELECTRON_IS_DEV === '1' ||
+  process.env.NODE_ENV === 'development' ||
+  Boolean(process.defaultApp)
+);
 
 // Forward console logs to main process using proper one-way IPC
 const originalConsole = {
@@ -143,10 +149,9 @@ if (!isDev) {
 
 contextBridge.exposeInMainWorld('electronAPI', api);
 
-if (isDev) console.log('[PRELOAD] electronAPI exposed successfully');
-
-// Add a small delay and then verify the exposure worked
 if (isDev) {
+  console.log('[PRELOAD] electronAPI exposed successfully');
+
   setTimeout(() => {
     console.log("[PRELOAD] ✅ electronAPI exposed and ready");
   }, 10);
