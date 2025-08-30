@@ -24,7 +24,12 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
-      
+        
+      - name: Install renderer dependencies
+        run: |
+          cd src/renderer
+          npm install
+
       - name: Create .env file for builds
         run: |
           echo "BUILD_ARM64=1" > .env
