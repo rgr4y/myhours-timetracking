@@ -46,6 +46,73 @@ const TimeEntries = () => {
     date: new Date().toISOString().split('T')[0]
   });
 
+  // Load functions
+  const loadTimeEntries = useCallback(async () => {
+    console.log('Loading time entries...');
+    if (window.electronAPI) {
+      try {
+        const entries = await window.electronAPI.timeEntries.getAll();
+        console.log('Time entries loaded:', entries.length, 'entries');
+        setTimeEntries(entries);
+      } catch (error) {
+        console.error('Error loading time entries:', error);
+      }
+    }
+  }, []);
+
+  const loadClients = useCallback(async () => {
+    if (window.electronAPI) {
+      try {
+        const clientList = await window.electronAPI.clients.getAll();
+        setClients(clientList);
+      } catch (error) {
+        console.error('Error loading clients:', error);
+      }
+    }
+  }, []);
+
+  const loadAllTasks = useCallback(async () => {
+    if (window.electronAPI) {
+      try {
+        // Load tasks from all projects to be able to resolve task names
+        const allTasks = [];
+        const clientList = await window.electronAPI.clients.getAll();
+        
+        for (const client of clientList) {
+          try {
+            const projects = await window.electronAPI.projects.getAll(client.id);
+            for (const project of projects) {
+              try {
+                const projectTasks = await window.electronAPI.tasks.getAll(project.id);
+                allTasks.push(...(projectTasks || []));
+              } catch (error) {
+                console.error(`Error loading tasks for project ${project.id}:`, error);
+              }
+            }
+          } catch (error) {
+            console.error(`Error loading projects for client ${client.id}:`, error);
+          }
+        }
+        
+        setTasks(allTasks);
+        console.log('All tasks loaded:', allTasks.length, 'tasks');
+      } catch (error) {
+        console.error('Error loading all tasks:', error);
+      }
+    }
+  }, []);
+
+  const loadSettings = useCallback(async () => {
+    if (window.electronAPI) {
+      try {
+        const settingsData = await window.electronAPI.settings.get();
+        setSettings(settingsData || { timer_rounding: '15' });
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     console.log('TimeEntries component mounting, loading data...');
     const loadAllData = async () => {
@@ -68,7 +135,7 @@ const TimeEntries = () => {
     };
     
     loadAllData();
-  }, []);
+  }, [loadTimeEntries, loadClients, loadAllTasks, loadSettings]);
 
   // Set up initial collapsed state: all days collapsed except the most recent
   useEffect(() => {
@@ -101,11 +168,11 @@ const TimeEntries = () => {
     try {
       const roundingMinutes = parseInt(settings.timer_rounding || '15');
       await stopTimer(roundingMinutes);
-      // Note: We'll rely on timer state changes to refresh the UI
+      await loadTimeEntries(); // Refresh the time entries list
     } catch (error) {
       console.error('Error stopping timer:', error);
     }
-  }, [stopTimer, settings.timer_rounding]);
+  }, [stopTimer, settings.timer_rounding, loadTimeEntries]);
 
   // Handle tray events
   useEffect(() => {
@@ -219,72 +286,6 @@ const TimeEntries = () => {
     const diffMs = now.getTime() - start.getTime();
     const minutes = Math.floor(diffMs / (1000 * 60));
     return formatDurationHumanFriendly(minutes);
-  };
-
-  const loadTimeEntries = async () => {
-    console.log('Loading time entries...');
-    if (window.electronAPI) {
-      try {
-        const entries = await window.electronAPI.timeEntries.getAll();
-        console.log('Time entries loaded:', entries.length, 'entries');
-        setTimeEntries(entries);
-      } catch (error) {
-        console.error('Error loading time entries:', error);
-      }
-    }
-  };
-
-  const loadClients = async () => {
-    if (window.electronAPI) {
-      try {
-        const clientList = await window.electronAPI.clients.getAll();
-        setClients(clientList);
-      } catch (error) {
-        console.error('Error loading clients:', error);
-      }
-    }
-  };
-
-  const loadAllTasks = async () => {
-    if (window.electronAPI) {
-      try {
-        // Load tasks from all projects to be able to resolve task names
-        const allTasks = [];
-        const clientList = await window.electronAPI.clients.getAll();
-        
-        for (const client of clientList) {
-          try {
-            const projects = await window.electronAPI.projects.getAll(client.id);
-            for (const project of projects) {
-              try {
-                const projectTasks = await window.electronAPI.tasks.getAll(project.id);
-                allTasks.push(...(projectTasks || []));
-              } catch (error) {
-                console.error(`Error loading tasks for project ${project.id}:`, error);
-              }
-            }
-          } catch (error) {
-            console.error(`Error loading projects for client ${client.id}:`, error);
-          }
-        }
-        
-        setTasks(allTasks);
-        console.log('All tasks loaded:', allTasks.length, 'tasks');
-      } catch (error) {
-        console.error('Error loading all tasks:', error);
-      }
-    }
-  };
-
-  const loadSettings = async () => {
-    if (window.electronAPI) {
-      try {
-        const settingsData = await window.electronAPI.settings.get();
-        setSettings(settingsData || { timer_rounding: '15' });
-      } catch (error) {
-        console.error('Error loading settings:', error);
-      }
-    }
   };
 
   const handlePlayEntry = async (entry) => {
