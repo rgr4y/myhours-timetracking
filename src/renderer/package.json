@@ -1,6 +1,6 @@
 {
   "name": "renderer",
-  "version": "0.0.0-07e4bb",
+  "version": "0.0.50",
   "private": true,
   "homepage": ".",
   "dependencies": {
