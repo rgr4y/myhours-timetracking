@@ -31,6 +31,8 @@ export default function BackgroundClockOrbits({
 }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(0);
+  const winSizeRef = useRef({ width: 0, height: 0 });
+  // no height locking; rely on CSS (100% of container)
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -43,20 +45,26 @@ export default function BackgroundClockOrbits({
       running = true,
       t0 = performance.now();
 
+    /*
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches || process.env.NODE_ENV !== 'production';
 
-    if (prefersReducedMotion) return;
-    
+    // if (prefersReducedMotion) return;
+    */
+     
+    const prefersReducedMotion = false;
     const resize = () => {
       const parent = canvas.parentElement || canvas;
-      width = Math.max(1, parent.clientWidth);
-      height = Math.max(1, parent.clientHeight);
+      const fallbackH = winSizeRef.current.height || (typeof window !== 'undefined' ? window.innerHeight : 820);
+      const fallbackW = winSizeRef.current.width || (typeof window !== 'undefined' ? window.innerWidth : 1200);
+      width = Math.max(1, parent.clientWidth || fallbackW);
+      height = Math.max(1, parent.clientHeight || fallbackH);
+      // Set bitmap size AND element size to match parent
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
-      canvas.style.width = width + "px";
-      canvas.style.height = height + "px";
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // prefill background
       ctx.fillStyle = "#0b0f14";
@@ -85,9 +93,39 @@ export default function BackgroundClockOrbits({
     };
 
     resize();
-    const ro = new ResizeObserver(debouncedResize);
+    const ro = new ResizeObserver(() => debouncedResize());
     ro.observe(canvas.parentElement || canvas);
     document.addEventListener("visibilitychange", onVis);
+    const cleanupFns = [];
+    // Browser resize fallback
+    const onBrowserResize = () => debouncedResize();
+    window.addEventListener('resize', onBrowserResize);
+    cleanupFns.push(() => window.removeEventListener('resize', onBrowserResize));
+    // Ask Electron for initial window size and subscribe to changes
+    try {
+      if (window.electronAPI && window.electronAPI.window) {
+        window.electronAPI.window.getSize().then((sz) => {
+          if (sz && sz.width && sz.height) {
+            winSizeRef.current = sz;
+            debouncedResize();
+          }
+        });
+        const onWinResize = (_event, _sz) => {
+          if (_sz && _sz.width && _sz.height) {
+            winSizeRef.current = _sz;
+            debouncedResize();
+          }
+        };
+        window.electronAPI.window.onResize(onWinResize);
+        // Keep a reference to remove later
+        cleanupFns.push(() => {
+          // removeListener requires the same function reference; use ipc removeListener directly
+          if (window.electronAPI?.window?.removeResizeListener) {
+            window.electronAPI.window.removeResizeListener(onWinResize);
+          }
+        });
+      }
+    } catch (_) {}
 
     // (removed aurora/gradient band to keep only clocks)
 
@@ -195,19 +233,34 @@ export default function BackgroundClockOrbits({
       if (resizeTimeout) {
         clearTimeout(resizeTimeout);
       }
+      for (const fn of cleanupFns) try { fn(); } catch (_) {}
     };
   }, [count, hue, saturation, lightness, trail, paused, opacity]);
 
   return (
     <div
-      className={
-        "pointer-events-none absolute inset-0 -z-10 overflow-hidden " + className
-      }
+      style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        pointerEvents: 'none',
+        overflow: 'hidden',
+      }}
+      className={className}
       aria-hidden="true"
     >
       <canvas
         ref={canvasRef}
-        style={{ opacity, filter: "saturate(1.08)", mixBlendMode: "normal" }}
+        style={{
+          opacity,
+          filter: "saturate(1.08)",
+          mixBlendMode: "normal",
+          display: "block",
+          width: "100%",
+          height: "800px",
+        }}
       />
       {/* micro-texture removed to avoid banding/overlay */}
     </div>

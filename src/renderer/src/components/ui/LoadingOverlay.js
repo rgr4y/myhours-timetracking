@@ -53,9 +53,9 @@ const Overlay = styled.div`
   justify-content: center;
   z-index: 1000;
   animation: ${props => {
-    if (props.isHiding) {
+    if (props.$isHiding) {
       return fadeOut;
-    } else if (props.noFadeIn) {
+    } else if (props.$noFadeIn) {
       return 'none';
     } else {
       return fadeIn;
@@ -91,7 +91,7 @@ const HourMarker = styled.div`
   top: 6px;
   left: 50%;
   transform-origin: 50% 33px;
-  transform: translateX(-50%) rotate(${props => props.hour * 30}deg);
+  transform: translateX(-50%) rotate(${props => props.$hour * 30}deg);
 `;
 
 // Clock hands
@@ -169,13 +169,13 @@ const LoadingOverlay = ({ isVisible, onHide, text = "Loading...", noFadeIn = fal
   }
 
   return (
-    <Overlay isHiding={isAnimatingOut} noFadeIn={noFadeIn}>
+    <Overlay $isHiding={isAnimatingOut} $noFadeIn={noFadeIn}>
       <LoadingContainer>
         <ClockContainer>
           <ClockFace>
             {/* Hour markers */}
             {[...Array(12)].map((_, i) => (
-              <HourMarker key={i} hour={i} />
+              <HourMarker key={i} $hour={i} />
             ))}
             
             {/* Clock hands */}

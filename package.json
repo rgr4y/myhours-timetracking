@@ -1,6 +1,6 @@
 {
   "name": "myhours",
-  "version": "0.0.45",
+  "version": "0.0.47",
   "description": "Cross-platform time tracking app with invoicing",
   "main": "src/main/main.js",
   "repository": {

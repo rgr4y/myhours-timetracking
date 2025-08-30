@@ -5,6 +5,30 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed...');
 
+  // ---- Date helpers (relative to today) ----
+  const today = new Date();
+  const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+  const endOfMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
+  const ymd = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+  const atHour = (d, hour = 9) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, 0, 0, 0);
+  const clampDay = (d, monthInfo) => Math.min(d, monthInfo.end.getDate());
+  const monthInfo = (offset = 0) => {
+    const base = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    const start = startOfMonth(base);
+    const end = endOfMonth(base);
+    return { start, end };
+  };
+  const lastMonth = monthInfo(-1);
+  const thisMonth = monthInfo(0);
+  const dayOf = (mi, day) => new Date(mi.start.getFullYear(), mi.start.getMonth(), clampDay(day, mi));
+  const invNum = (d, seq) => `INV-${ymd(d).replace(/-/g, '')}-${String(seq).padStart(3, '0')}`;
+
   // Clear existing data (in reverse order of dependencies)
   await prisma.timeEntry.deleteMany();
   await prisma.invoice.deleteMany();
@@ -238,49 +262,50 @@ async function main() {
   console.log('📋 Created tasks');
 
   // Create sample invoices
+  // Invoices for last month (entries from last month will be marked invoiced)
   const invoices = await Promise.all([
     prisma.invoice.create({
       data: {
-        invoiceNumber: 'INV-20250701-001',
+        invoiceNumber: invNum(lastMonth.start, 1),
         clientId: clients[0].id,
-        totalAmount: 8750.00,
-        periodStart: '2025-07-01',
-        periodEnd: '2025-07-31',
+        totalAmount: 8750.0,
+        periodStart: ymd(lastMonth.start),
+        periodEnd: ymd(lastMonth.end),
         status: 'generated',
-        dueDate: new Date('2025-07-31'),
-        createdAt: new Date('2025-07-01')
-      }
+        dueDate: addDays(lastMonth.end, 14),
+        createdAt: lastMonth.start,
+      },
     }),
     prisma.invoice.create({
       data: {
-        invoiceNumber: 'INV-20250715-002',
+        invoiceNumber: invNum(addDays(lastMonth.start, 14), 2),
         clientId: clients[1].id,
-        totalAmount: 5250.00,
-        periodStart: '2025-07-01',
-        periodEnd: '2025-07-31',
+        totalAmount: 5250.0,
+        periodStart: ymd(lastMonth.start),
+        periodEnd: ymd(lastMonth.end),
         status: 'generated',
-        dueDate: new Date('2025-08-14'),
-        createdAt: new Date('2025-07-15')
-      }
+        dueDate: addDays(lastMonth.end, 14),
+        createdAt: addDays(lastMonth.start, 14),
+      },
     }),
     prisma.invoice.create({
       data: {
-        invoiceNumber: 'INV-20250801-003',
+        invoiceNumber: invNum(addDays(lastMonth.start, 1), 3),
         clientId: clients[2].id,
-        totalAmount: 3600.00,
-        periodStart: '2025-08-01',
-        periodEnd: '2025-08-31',
+        totalAmount: 3600.0,
+        periodStart: ymd(lastMonth.start),
+        periodEnd: ymd(lastMonth.end),
         status: 'generated',
-        dueDate: new Date('2025-08-31'),
-        createdAt: new Date('2025-08-01')
-      }
-    })
+        dueDate: addDays(lastMonth.end, 14),
+        createdAt: addDays(lastMonth.start, 1),
+      },
+    }),
   ]);
   console.log('🧾 Created invoices');
 
   // Helper function to create time entries
-  const createTimeEntry = (clientId, projectId, taskId, startDate, hours, description, isInvoiced = false, invoiceId = null) => {
-    const startTime = new Date(startDate);
+  const createTimeEntry = (clientId, projectId, taskId, when, hours, description, isInvoiced = false, invoiceId = null) => {
+    const startTime = atHour(when, 9);
     const endTime = new Date(startTime.getTime() + (hours * 60 * 60 * 1000));
     
     return {
@@ -299,55 +324,55 @@ async function main() {
 
   // Create time entries - mix of invoiced and uninvoiced
   const timeEntries = [
-    // July entries (already invoiced)
-    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, '2025-07-01T09:00:00Z', 8, 'Frontend component development', true, invoices[0].id),
-    createTimeEntry(clients[0].id, projects[0].id, tasks[1].id, '2025-07-02T09:00:00Z', 6, 'API endpoint creation', true, invoices[0].id),
-    createTimeEntry(clients[0].id, projects[0].id, tasks[2].id, '2025-07-03T09:00:00Z', 4, 'Database schema design', true, invoices[0].id),
-    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, '2025-07-05T09:00:00Z', 8, 'iOS app development', true, invoices[0].id),
-    createTimeEntry(clients[0].id, projects[1].id, tasks[4].id, '2025-07-08T09:00:00Z', 7.5, 'Android app development', true, invoices[0].id),
+    // Last month entries (already invoiced)
+    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(lastMonth, 1), 8, 'Frontend component development', true, invoices[0].id),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[1].id, dayOf(lastMonth, 2), 6, 'API endpoint creation', true, invoices[0].id),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[2].id, dayOf(lastMonth, 3), 4, 'Database schema design', true, invoices[0].id),
+    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, dayOf(lastMonth, 5), 8, 'iOS app development', true, invoices[0].id),
+    createTimeEntry(clients[0].id, projects[1].id, tasks[4].id, dayOf(lastMonth, 8), 7.5, 'Android app development', true, invoices[0].id),
 
-    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, '2025-07-10T09:00:00Z', 6, 'Dashboard layout design', true, invoices[1].id),
-    createTimeEntry(clients[1].id, projects[2].id, tasks[6].id, '2025-07-12T09:00:00Z', 4, 'Analytics setup', true, invoices[1].id),
-    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, '2025-07-15T09:00:00Z', 8, 'Payment API integration', true, invoices[1].id),
-    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, '2025-07-18T09:00:00Z', 6, 'Shipping API integration', true, invoices[1].id),
-    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, '2025-07-20T09:00:00Z', 6, 'Dashboard refinements', true, invoices[1].id),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(lastMonth, 10), 6, 'Dashboard layout design', true, invoices[1].id),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[6].id, dayOf(lastMonth, 12), 4, 'Analytics setup', true, invoices[1].id),
+    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, dayOf(lastMonth, 15), 8, 'Payment API integration', true, invoices[1].id),
+    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, dayOf(lastMonth, 18), 6, 'Shipping API integration', true, invoices[1].id),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(lastMonth, 20), 6, 'Dashboard refinements', true, invoices[1].id),
 
-    createTimeEntry(clients[2].id, projects[4].id, tasks[8].id, '2025-07-22T09:00:00Z', 4, 'Logo concepts', true, invoices[2].id),
-    createTimeEntry(clients[2].id, projects[4].id, tasks[9].id, '2025-07-25T09:00:00Z', 3, 'Brand guidelines draft', true, invoices[2].id),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, '2025-07-28T09:00:00Z', 6, 'Website mockups', true, invoices[2].id),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, '2025-07-30T09:00:00Z', 8, 'Frontend implementation', true, invoices[2].id),
+    createTimeEntry(clients[2].id, projects[4].id, tasks[8].id, dayOf(lastMonth, 22), 4, 'Logo concepts', true, invoices[2].id),
+    createTimeEntry(clients[2].id, projects[4].id, tasks[9].id, dayOf(lastMonth, 25), 3, 'Brand guidelines draft', true, invoices[2].id),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOf(lastMonth, 28), 6, 'Website mockups', true, invoices[2].id),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, dayOf(lastMonth, 30), 8, 'Frontend implementation', true, invoices[2].id),
 
-    // August entries (NOT invoiced yet - available for new invoices)
-    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, '2025-08-01T09:00:00Z', 7, 'React component optimization'),
-    createTimeEntry(clients[0].id, projects[0].id, tasks[1].id, '2025-08-02T09:00:00Z', 6.5, 'API performance tuning'),
-    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, '2025-08-05T09:00:00Z', 8, 'iOS bug fixes'),
-    createTimeEntry(clients[0].id, projects[1].id, tasks[4].id, '2025-08-06T09:00:00Z', 7, 'Android testing'),
-    createTimeEntry(clients[0].id, projects[0].id, tasks[2].id, '2025-08-08T09:00:00Z', 5, 'Database optimization'),
-    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, '2025-08-12T09:00:00Z', 8, 'Frontend testing'),
-    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, '2025-08-15T09:00:00Z', 6, 'iOS app store preparation'),
+    // This month entries (NOT invoiced yet - available for new invoices)
+    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(thisMonth, 1), 7, 'React component optimization'),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[1].id, dayOf(thisMonth, 2), 6.5, 'API performance tuning'),
+    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, dayOf(thisMonth, 5), 8, 'iOS bug fixes'),
+    createTimeEntry(clients[0].id, projects[1].id, tasks[4].id, dayOf(thisMonth, 6), 7, 'Android testing'),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[2].id, dayOf(thisMonth, 8), 5, 'Database optimization'),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(thisMonth, 12), 8, 'Frontend testing'),
+    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, dayOf(thisMonth, 15), 6, 'iOS app store preparation'),
 
-    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, '2025-08-03T09:00:00Z', 7, 'Dashboard feature additions'),
-    createTimeEntry(clients[1].id, projects[2].id, tasks[6].id, '2025-08-07T09:00:00Z', 5, 'Advanced analytics'),
-    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, '2025-08-10T09:00:00Z', 6, 'API documentation'),
-    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, '2025-08-14T09:00:00Z', 8, 'User management system'),
-    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, '2025-08-18T09:00:00Z', 4, 'API testing'),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(thisMonth, 3), 7, 'Dashboard feature additions'),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[6].id, dayOf(thisMonth, 7), 5, 'Advanced analytics'),
+    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, dayOf(thisMonth, 10), 6, 'API documentation'),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(thisMonth, 14), 8, 'User management system'),
+    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, dayOf(thisMonth, 18), 4, 'API testing'),
 
-    createTimeEntry(clients[2].id, projects[4].id, tasks[8].id, '2025-08-04T09:00:00Z', 3, 'Logo refinements'),
-    createTimeEntry(clients[2].id, projects[4].id, tasks[9].id, '2025-08-09T09:00:00Z', 4, 'Brand guidelines finalization'),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, '2025-08-11T09:00:00Z', 5, 'Responsive design'),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, '2025-08-16T09:00:00Z', 7, 'Performance optimization'),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, '2025-08-20T09:00:00Z', 4, 'Mobile optimization'),
+    createTimeEntry(clients[2].id, projects[4].id, tasks[8].id, dayOf(thisMonth, 4), 3, 'Logo refinements'),
+    createTimeEntry(clients[2].id, projects[4].id, tasks[9].id, dayOf(thisMonth, 9), 4, 'Brand guidelines finalization'),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOf(thisMonth, 11), 5, 'Responsive design'),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, dayOf(thisMonth, 16), 7, 'Performance optimization'),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOf(thisMonth, 20), 4, 'Mobile optimization'),
 
-    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, '2025-08-05T09:00:00Z', 4, 'WordPress setup and configuration'),
-    createTimeEntry(clients[3].id, projects[6].id, tasks[13].id, '2025-08-12T09:00:00Z', 6, 'Custom theme development'),
-    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, '2025-08-19T09:00:00Z', 3, 'Plugin installation'),
-    createTimeEntry(clients[3].id, projects[6].id, tasks[13].id, '2025-08-22T09:00:00Z', 5, 'Theme customization'),
-    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, '2025-08-26T09:00:00Z', 2, 'Final testing'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOf(thisMonth, 5), 4, 'WordPress setup and configuration'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[13].id, dayOf(thisMonth, 12), 6, 'Custom theme development'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOf(thisMonth, 19), 3, 'Plugin installation'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[13].id, dayOf(thisMonth, 22), 5, 'Theme customization'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOf(thisMonth, 26), 2, 'Final testing'),
 
-    // Recent entries (last few days)
-    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, '2025-08-26T09:00:00Z', 4, 'Code review and cleanup'),
-    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, '2025-08-27T09:00:00Z', 6, 'Dashboard final touches'),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, '2025-08-27T14:00:00Z', 3, 'Launch preparation'),
+    // Recent entries (last few days of this month)
+    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(thisMonth, Math.max(1, today.getDate() - 2)), 4, 'Code review and cleanup'),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(thisMonth, Math.max(1, today.getDate() - 1)), 6, 'Dashboard final touches'),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, dayOf(thisMonth, today.getDate()), 3, 'Launch preparation'),
   ];
 
   await prisma.timeEntry.createMany({
