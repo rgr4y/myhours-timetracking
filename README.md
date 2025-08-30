@@ -2,8 +2,7 @@
 
 # myHours ⏱️
 
-No‑frills, no‑strings‑attached time logger and invoice generator.
-Electron + React + Prisma (SQLite).
+No‑frills, no‑strings‑attached time logger and invoice generator for macOS, Windows, and Linux.
 
 </div>
 
