@@ -45,7 +45,8 @@ jobs:
         run: |
           echo "BUILD_ARM64=1" > .env
           echo "MAC_TARGET=dmg" >> .env
-      
+          echo "BUILD_WIN=1" >> .env
+
       - name: Build and publish
         run: npm run dist
         env:
