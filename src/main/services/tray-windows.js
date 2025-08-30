@@ -6,7 +6,8 @@ const TrayService = require('./tray-service');
 class WindowsTrayService extends TrayService {
   constructor(mainWindow, databaseService) {
     super(mainWindow, databaseService);
-    this.iconPath = path.join(__dirname, '../../../assets/tray-icon.png');
+    // Use the main app icon instead of the tray-specific icon
+    this.iconPath = path.join(__dirname, '../../../assets/icon.png');
   }
 
   // Windows-specific icon loading

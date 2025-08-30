@@ -6,6 +6,12 @@ on:
     tags:
       - 'v*.*.*'
 
+# Add explicit permissions for the GITHUB_TOKEN
+permissions:
+  contents: write    # Required to create releases and upload assets
+  actions: read      # Required for workflow execution
+  pull-requests: read # Required for some actions
+
 jobs:
   release:
     runs-on: ${{ matrix.os }}
