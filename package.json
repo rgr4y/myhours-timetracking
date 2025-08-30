@@ -1,6 +1,6 @@
 {
   "name": "myhours",
-  "version": "0.0.35",
+  "version": "0.0.43",
   "description": "Cross-platform time tracking app with invoicing",
   "main": "src/main/main.js",
   "scripts": {
@@ -10,7 +10,7 @@
     "version:bump": "node scripts/bump-version.js",
     "prisma:generate": "prisma generate",
     "prebuild": "npm run version:bump && node scripts/prepare-db.js && npm run prisma:generate && node scripts/prepare-icons.js",
-    "build": "cross-env NODE_ENV=production dotenv -e .env.production -- npm run build-renderer && node scripts/run-builder.js",
+    "build": "cross-env NODE_ENV=production npm run build-renderer && node scripts/run-builder.js",
     "build:mac": "npm run build && pkill -f \"myHours\" ; cp -a dist/mac/myHours.app /Applications ; open /Applications/myHours.app",
     "build-renderer": "cd src/renderer && npm run build",
     "dist": "npm run build",

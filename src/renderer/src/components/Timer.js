@@ -364,7 +364,7 @@ const Timer = () => {
     };
 
     loadProjects();
-  }, [localSelectedClient]);
+  }, [localSelectedClient, localSelectedProject]);
 
   // Load tasks when project changes (or when active timer has a project)
   useEffect(() => {
