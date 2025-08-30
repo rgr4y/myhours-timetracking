@@ -170,6 +170,7 @@ const TimeEntries = () => {
   }, []);
 
   // Handle stopping timer (used by tray and UI)
+  // eslint-disable-next-line no-unused-vars
   const handleStopTimer = useCallback(async () => {
     try {
       const roundingMinutes = parseInt(settings.timer_rounding || '15');
@@ -179,6 +180,20 @@ const TimeEntries = () => {
       console.error('Error stopping timer:', error);
     }
   }, [stopTimer, settings.timer_rounding, loadTimeEntries]);
+
+  // Handle stopping specific entry timer
+  const handleStopEntry = useCallback(async (entry) => {
+    try {
+      const api = await waitForReady();
+      if (!api) return;
+      
+      console.log(`Stopping specific timer entry ${entry.id}`);
+      await api.timeEntries.stopTimer(entry.id);
+      await loadTimeEntries(); // Refresh the time entries list
+    } catch (error) {
+      console.error('Error stopping entry timer:', error);
+    }
+  }, [waitForReady, loadTimeEntries]);
 
   // Listen for tray events to show modal and timer events for refresh (events now handled in TimerContext)
   useEffect(() => {
@@ -290,12 +305,26 @@ const TimeEntries = () => {
       const timeSinceStop = canResume ? Math.floor((new Date() - new Date(entry.endTime)) / (1000 * 60)) : null;
       
       if (canResume && timeSinceStop <= roundingMinutes) {
-        // Entry was stopped within rounding window - resume it
+        // Entry was stopped within rounding window - resume it (modify existing entry)
         console.log(`Resuming entry ${entry.id} (stopped ${timeSinceStop} minutes ago)`);
         
         const resumedEntry = await api.timeEntries.resumeTimer(entry.id);
         console.log('Timer resumed:', resumedEntry);
         
+        await loadTimeEntries(); // Refresh the time entries list
+        return;
+      }
+      
+      if (canResume && timeSinceStop > roundingMinutes) {
+        // Entry was stopped outside rounding window - create new entry instead of overwriting
+        console.log(`Creating new entry from ${entry.id} (stopped ${timeSinceStop} minutes ago, > ${roundingMinutes} rounding time)`);
+        
+        await startTimer({
+          clientId: entry.clientId,
+          projectId: entry.projectId,
+          taskId: entry.taskId,
+          description: entry.description
+        });
         await loadTimeEntries(); // Refresh the time entries list
         return;
       }
@@ -676,8 +705,8 @@ const TimeEntries = () => {
                             <IconButton 
                               variant="danger" 
                               size="small" 
-                              onClick={handleStopTimer}
-                              title="Stop the active timer"
+                              onClick={() => handleStopEntry(entry)}
+                              title="Stop this timer"
                             >
                               <Square size={14} />
                             </IconButton>
