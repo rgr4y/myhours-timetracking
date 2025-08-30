@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 
 console.log('[MAIN] === MAIN PROCESS STARTING ===');
@@ -64,6 +64,21 @@ class MyHoursApp {
       backgroundColor: '#1a1a1a',
       autoHideMenuBar: true,
       show: false
+    });
+
+    // Open external links in the user's default browser
+    this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) {
+        try { shell.openExternal(url); } catch (_) {}
+        return { action: 'deny' };
+      }
+      return { action: 'allow' };
+    });
+    this.mainWindow.webContents.on('will-navigate', (event, url) => {
+      if (/^https?:\/\//i.test(url)) {
+        event.preventDefault();
+        try { shell.openExternal(url); } catch (_) {}
+      }
     });
 
     // Load the app
@@ -781,3 +796,12 @@ myHoursApp.initialize().catch((error) => {
   
   process.exit(1);
 });
+    ipcMain.handle('app:openExternal', async (_event, url) => {
+      try {
+        await shell.openExternal(url);
+        return true;
+      } catch (error) {
+        console.error('[MAIN] Error opening external URL:', url, error);
+        return false;
+      }
+    });
