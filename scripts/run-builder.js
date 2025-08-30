@@ -20,13 +20,37 @@ function loadDotEnvIntoProcess(dotenvPath) {
 }
 
 function run(cmd, args) {
-  const r = spawnSync(cmd, args, { stdio: 'inherit' });
+  console.log('Executing:', cmd, args.join(' '));
+  
+  let spawnCmd = cmd;
+  let spawnArgs = args;
+  
+  // On Windows, we need to run .cmd files through cmd.exe
+  if (process.platform === 'win32' && cmd.endsWith('.cmd')) {
+    spawnCmd = 'cmd.exe';
+    spawnArgs = ['/c', cmd, ...args];
+    console.log('Windows detected, using cmd.exe wrapper');
+    console.log('Final command:', spawnCmd, spawnArgs.join(' '));
+  }
+  
+  const r = spawnSync(spawnCmd, spawnArgs, { stdio: 'inherit' });
+  console.log('Exit code:', r.status);
+  if (r.error) {
+    console.error('Error executing command:', r.error);
+  }
   if (r.status !== 0) process.exit(r.status || 1);
 }
 
 (function main() {
-  // Load .env (optional) so we can read flags
-  loadDotEnvIntoProcess(join(process.cwd(), '.env'));
+  try {
+    console.log('Starting run-builder.js...');
+    console.log('Current working directory:', process.cwd());
+    console.log('Platform:', process.platform);
+    
+    // Load .env (optional) so we can read flags
+    const envPath = join(process.cwd(), '.env');
+    console.log('Looking for .env at:', envPath);
+    loadDotEnvIntoProcess(envPath);
 
   const truthy = (v) => /^(1|true|yes|on)$/i.test(String(v || ''));
   const enableArm = truthy(process.env.BUILD_ARM64);
@@ -36,27 +60,49 @@ function run(cmd, args) {
 
   // Build args per platform. By default, only build for the current OS.
   const args = [];
+  
   if (buildMac) {
-    const macTarget = (process.env.MAC_TARGET || 'dir') // default: only .app bundle
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean)
-      .join(',');
+    const macTarget = process.env.MAC_TARGET || 'dir'; // default: only .app bundle
+    const targets = macTarget.split(',').map(s => s.trim()).filter(Boolean);
     args.push('--mac');
-    args.push(macTarget); // e.g., 'dir' or 'dmg' or 'dir,dmg'
-    args.push('--x64');
-    if (enableArm) args.push('--arm64');
+    for (const target of targets) {
+      args.push(target);
+    }
   }
   if (buildWin) {
+    const winTarget = process.env.WIN_TARGET || 'dir'; // default: only unpacked folder
+    const targets = winTarget.split(',').map(s => s.trim()).filter(Boolean);
     args.push('--win');
-    args.push('--x64');
+    for (const target of targets) {
+      args.push(target);
+    }
   }
   if (buildLinux) {
+    const linuxTarget = process.env.LINUX_TARGET || 'dir'; // default: only unpacked folder
+    const targets = linuxTarget.split(',').map(s => s.trim()).filter(Boolean);
     args.push('--linux');
-    args.push('--x64');
+    for (const target of targets) {
+      args.push(target);
+    }
   }
+  
+  // Add architecture flags once at the end
+  args.push('--x64');
+  if (enableArm && buildMac) args.push('--arm64');  // Only add ARM64 for macOS
+
+  // Pass through any additional arguments (like --publish=always)
+  const additionalArgs = process.argv.slice(2);
+  args.push(...additionalArgs);
 
   // Use local electron-builder binary
   const bin = join(process.cwd(), 'node_modules', '.bin', process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder');
+  console.log('Electron-builder binary path:', bin);
+  console.log('Binary exists:', existsSync(bin));
+  
   run(bin, args);
+  
+  } catch (error) {
+    console.error('Fatal error in run-builder.js:', error);
+    process.exit(1);
+  }
 })();
