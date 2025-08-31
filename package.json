@@ -22,7 +22,7 @@
     "version:bump": "node scripts/bump-version.js",
     "cleanup:branches": "node scripts/cleanup-copilot-branches.js",
     "prisma:generate": "prisma generate",
-    "prebuild": "node scripts/prepare-db.js && npm run prisma:generate && node scripts/prepare-icons.js && npm run build-renderer",
+    "prebuild": "node scripts/prepare-db.js && node scripts/prepare-icons.js && npm run build-renderer",
     "build": "cross-env NODE_ENV=production npm run build-renderer && node scripts/run-builder.js",
     "build:mac": "npm run prebuild && npm run build && pkill -f \"myHours\" ; cp -a dist/mac/myHours.app /Applications ; open /Applications/myHours.app",
     "build-renderer": "cd src/renderer && npm run build",
