@@ -71,7 +71,7 @@ module.exports = function(app) {
     const channel = req.params.channel;
     const args = req.body?.args || [];
     
-    console.log('[SETUP-PROXY] IPC request:', channel);
+    // console.log('[SETUP-PROXY] IPC request:', channel);
 
     // Try to ensure WebSocket connection
     try {

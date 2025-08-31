@@ -41,12 +41,13 @@ import {
   IconButton,
   LoadingOverlay
 } from './ui';
+import { colors, COLORS } from '../styles/theme';
 import { formatDurationHumanFriendly, formatTime, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
 
 // Styled components for Timer section (horizontal layout)
 const TimerSection = styled.div`
   margin-bottom: 40px;
-  border-bottom: 2px solid #404040;
+  border-bottom: 2px solid ${colors.timerBorder};
   padding-bottom: 30px;
 `;
 
@@ -102,7 +103,7 @@ const ControlsContainer = styled(FlexBox)`
 
 const ControlButton = styled(Button)`
   border-radius: 8px;
-  padding: 12px 24px;
+  padding: 12px 12px;
   font-size: 14px;
   min-width: 120px;
 `;
@@ -133,7 +134,7 @@ const SelectorHeader = styled(Text)`
   margin-bottom: 8px;
   display: block;
   font-weight: 500;
-  color: #888;
+  color: ${colors.selectorLabel};
 `;
 
 const ExpandingTextArea = styled(TextArea)`
@@ -149,13 +150,13 @@ const RoundingSelector = styled(FlexBox)`
 `;
 
 const RoundingButton = styled(Button)`
-  background: ${props => props.$active ? '#007AFF' : '#404040'};
+  background: ${props => props.$active ? colors.primary : colors.secondary};
   font-size: 12px;
   padding: 6px 10px;
   min-width: 40px;
   
   &:hover {
-    background: ${props => props.$active ? '#0056CC' : '#505050'};
+    background: ${props => props.$active ? colors.primaryHover : colors.secondaryHover};
   }
 `;
 
@@ -164,15 +165,6 @@ const TimeEntriesSection = styled.div`
   max-width: 1200px;
   margin: 0 auto;
 `;
-
-// Color constants for time entries
-const COLORS = {
-  PRIMARY: '#007AFF',
-  BORDER_DEFAULT: '#404040',
-  BG_ACTIVE: '#1a1a2e',
-  BG_INACTIVE: '#2a2a2a',
-  SUCCESS: '#28a745'
-};
 
 // Additional styled components for inline style replacements
 const MainContainer = styled(Container)`
@@ -187,15 +179,15 @@ const DisabledDropdownButton = styled(DropdownButton)`
 
 const DayGroupContainer = styled.div`
   margin-bottom: ${props => props.$isLast ? '0' : '20px'};
-  border: ${props => props.$hasActiveEntry ? `2px solid ${COLORS.PRIMARY}` : 'none'};
+  border: ${props => props.$hasActiveEntry ? `2px solid ${colors.primary}` : 'none'};
   border-radius: 8px;
   padding: ${props => props.$hasActiveEntry ? '2px' : '0'};
 `;
 
 const DayHeaderCard = styled(Card)`
   cursor: pointer;
-  background-color: ${props => props.$hasActiveEntry ? COLORS.BG_ACTIVE : COLORS.BG_INACTIVE};
-  border: ${props => props.$hasActiveEntry ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`};
+  background-color: ${props => props.$hasActiveEntry ? colors.bgActive : colors.bgInactive};
+  border: ${props => props.$hasActiveEntry ? 'none' : `1px solid ${colors.borderDefault}`};
   border-radius: ${props => props.$collapsed ? '8px' : '8px 8px 0 0'};
 `;
 
@@ -216,7 +208,7 @@ const ActiveBadge = styled(Text)`
   padding: 2px 8px;
   border-radius: 12px;
   margin-bottom: 15px;
-  background-color: ${COLORS.SUCCESS};
+  background-color: ${colors.success};
   color: white;
   font-size: 10px;
   font-weight: bold;
@@ -245,18 +237,14 @@ const FlexForm = styled(FlexBox)`
   flex: 1;
 `;
 
-const ModalFooter = styled(FlexBox)`
-  margin-top: 20px;
-`;
-
 const TimeEntries = () => {
 
   // Helper functions for styling time entries (memoized)
   const getBorderStyle = useCallback((entry, hasActiveEntry) => {
     if (hasActiveEntry) {
-      return entry.isActive ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`;
+      return entry.isActive ? 'none' : `1px solid ${colors.borderDefault}`;
     }
-    return entry.isActive ? `2px solid ${COLORS.PRIMARY}` : `1px solid ${COLORS.BORDER_DEFAULT}`;
+    return entry.isActive ? `2px solid ${colors.primary}` : `1px solid ${colors.borderDefault}`;
   }, []);
 
   const getEntryCardStyle = useCallback((entry, index, entries, hasActiveEntry) => ({
@@ -265,7 +253,7 @@ const TimeEntries = () => {
     borderBottom: getBorderStyle(entry, hasActiveEntry),
     borderTop: index === 0 ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`,
     borderRadius: index === entries.length - 1 ? '0 0 8px 8px' : '0',
-    backgroundColor: entry.isActive ? COLORS.BG_ACTIVE : undefined
+    backgroundColor: entry.isActive ? colors.bgActive : undefined
   }), [getBorderStyle]);
 
   // Timer context and hooks
@@ -274,6 +262,8 @@ const TimeEntries = () => {
     time,
     activeTimer,
     selectedClient,
+    selectedProject,
+    selectedTask,
     description,
     startTimer,
     stopTimer,
@@ -306,6 +296,7 @@ const TimeEntries = () => {
   const saveTimeoutRef = useRef(null);
   const isUnloadingRef = useRef(false);
   const textAreaRef = useRef(null);
+  const hasRestoredRef = useRef(false); // Track if we've already restored once
 
   // Time entries state
   const [timeEntries, setTimeEntries] = useState([]);
@@ -422,31 +413,54 @@ const TimeEntries = () => {
     return sortedGroups;
   }, [timeEntries]);
 
-  // Timer sync with context
+  // Timer sync with context - only when timer becomes active
   useEffect(() => {
     if (activeTimer) {
+      // Only set values when available; avoid clearing existing selections
       setLocalDescription(description);
       setOriginalDescription(description);
-      setLocalSelectedClient(selectedClient);
-      
-      // Restore project and task from active timer
-      if (activeTimer.task) {
-        setLocalSelectedTask(activeTimer.task);
-      } else {
-        setLocalSelectedTask(null);
+      if (selectedClient) {
+        setLocalSelectedClient(selectedClient);
       }
 
-      if (activeTimer.project) {
-        setLocalSelectedProject(activeTimer.project);
-      } else if (activeTimer.task && activeTimer.task.project) {
-        setLocalSelectedProject(activeTimer.task.project);
-      } else {
-        setLocalSelectedProject(null);
-      }
-      
+      // Do not force project/task from activeTimer; handlers manage them to avoid overwrites
+
       setHasUnsavedChanges(false);
     }
-  }, [activeTimer, description, selectedClient]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTimer]); // Only depend on activeTimer to avoid conflicts with sync effects
+
+  // Sync with TimerContext when timer stops (preserve selectedClient/description)
+  useEffect(() => {
+    if (!activeTimer && selectedClient) {
+      console.log('[TimeEntries] Timer stopped, syncing preserved client:', selectedClient);
+      setLocalSelectedClient(selectedClient);
+    }
+  }, [activeTimer, selectedClient]);
+
+  // Sync description when timer stops
+  useEffect(() => {
+    if (!activeTimer && description) {
+      console.log('[TimeEntries] Timer stopped, syncing preserved description:', description);
+      setLocalDescription(description);
+    }
+  }, [activeTimer, description]);
+
+  // Sync project when timer stops
+  useEffect(() => {
+    if (!activeTimer && selectedProject) {
+      console.log('[TimeEntries] Timer stopped, syncing preserved project:', selectedProject);
+      setLocalSelectedProject(selectedProject);
+    }
+  }, [activeTimer, selectedProject]);
+
+  // Sync task when timer stops  
+  useEffect(() => {
+    if (!activeTimer && selectedTask) {
+      console.log('[TimeEntries] Timer stopped, syncing preserved task:', selectedTask);
+      setLocalSelectedTask(selectedTask);
+    }
+  }, [activeTimer, selectedTask]);
 
   // Initialize data on mount (only run once)
   useEffect(() => {
@@ -474,8 +488,17 @@ const TimeEntries = () => {
   // Restore last used client/project/task using pre-loaded data
   useEffect(() => {
     const restoreLastUsed = async () => {
-      // Only restore if we have loaded the data and are not in initial loading state
-      if (clients.length > 0 && projects.length > 0 && tasks.length > 0 && !isInitialLoading && !activeTimer) {
+      // Only restore once on initial page load when there's no active timer and no selections
+      // Don't restore when timer stops because dropdowns should keep their current values
+      if (clients.length > 0 && 
+          projects.length > 0 && 
+          tasks.length > 0 && 
+          isInitialLoading === false && // Data has finished loading
+          !activeTimer &&
+          !localSelectedClient &&
+          !localSelectedProject &&
+          !localSelectedTask &&
+          !hasRestoredRef.current) { // Only restore once per component lifecycle
         try {
           const api = await waitForReady();
           if (api) {
@@ -520,6 +543,8 @@ const TimeEntries = () => {
               }
             }
           }
+          // Mark that we've completed restoration
+          hasRestoredRef.current = true;
         } catch (error) {
           console.error('Error loading last used settings:', error);
         }
@@ -527,7 +552,7 @@ const TimeEntries = () => {
     };
     
     restoreLastUsed();
-  }, [clients, projects, tasks, activeTimer, isInitialLoading, waitForReady]);
+  }, [clients, projects, tasks, activeTimer, isInitialLoading, localSelectedClient, localSelectedProject, localSelectedTask, waitForReady]);
 
   // Set up initial collapsed state for time entries
   useEffect(() => {
@@ -616,18 +641,26 @@ const TimeEntries = () => {
       setLocalSelectedProject(null);
       setLocalSelectedTask(null);
     } else if (localSelectedProject && !availableProjects.some(p => p.id === localSelectedProject.id)) {
-      setLocalSelectedProject(null);
-      setLocalSelectedTask(null);
+      // Don't clear project immediately after timer stops while sync effects are running
+      const isRestoringAfterTimerStop = !activeTimer && (selectedClient || selectedProject || selectedTask);
+      if (!isRestoringAfterTimerStop) {
+        setLocalSelectedProject(null);
+        setLocalSelectedTask(null);
+      }
     }
-  }, [localSelectedClient, availableProjects, localSelectedProject]);
+  }, [localSelectedClient, availableProjects, localSelectedProject, activeTimer, selectedClient, selectedProject, selectedTask]);
 
   useEffect(() => {
     if (!localSelectedProject) {
       setLocalSelectedTask(null);
     } else if (localSelectedTask && !availableTasks.some(t => t.id === localSelectedTask.id)) {
-      setLocalSelectedTask(null);
+      // Don't clear task immediately after timer stops while sync effects are running
+      const isRestoringAfterTimerStop = !activeTimer && (selectedClient || selectedProject || selectedTask);
+      if (!isRestoringAfterTimerStop) {
+        setLocalSelectedTask(null);
+      }
     }
-  }, [localSelectedProject, availableTasks, localSelectedTask]);
+  }, [localSelectedProject, availableTasks, localSelectedTask, activeTimer, selectedClient, selectedProject, selectedTask]);
 
   // Filter projects and tasks for modal (using already loaded data)
   const modalProjects = useMemo(() => {
@@ -669,8 +702,7 @@ const TimeEntries = () => {
     console.log('Stopping timer with roundTo:', roundTo);
     try {
       await stopTimer(roundTo);
-      setLocalDescription('');
-      setLocalSelectedClient(null);
+      // Preserve local selections and description on stop to avoid flicker
       await loadTimeEntries(); // Refresh time entries after stopping
     } catch (error) {
       console.error('Error stopping timer:', error);
@@ -684,8 +716,7 @@ const TimeEntries = () => {
     setDropdownOpen(false);
     setLocalSelectedProject(null);
     setLocalSelectedTask(null);
-    setProjects([]);
-    setTasks([]);
+    // Do not clear preloaded projects/tasks; we filter from cached lists
     
     if (isRunning && activeTimer) {
       try {
@@ -1029,13 +1060,22 @@ const TimeEntries = () => {
           <TimerTopRow>
             <TimerDisplay>
               <TimeText>{formatTimerTime(time)}</TimeText>
-              {activeTimer && (
-                <TaskInfo>
-                  {selectedClient ? selectedClient.name : 'No Client'}
-                  {(activeTimer.project || activeTimer.task?.project) && ` • ${(activeTimer.project?.name || activeTimer.task?.project?.name)}`}
-                  {activeTimer.task && ` • ${activeTimer.task.name}`}
-                </TaskInfo>
-              )}
+              <TaskInfo style={{ 
+                opacity: activeTimer ? 1 : 0, 
+                transition: 'opacity 0.3s ease-in-out',
+                height: '20px', // Pre-allocate height
+                minHeight: '20px' // Ensure consistent height
+              }}>
+                {activeTimer ? (
+                  <>
+                    {selectedClient ? selectedClient.name : 'No Client'}
+                    {(activeTimer.project || activeTimer.task?.project) && ` • ${(activeTimer.project?.name || activeTimer.task?.project?.name)}`}
+                    {activeTimer.task && ` • ${activeTimer.task.name}`}
+                  </>
+                ) : (
+                  '\u00A0' // Non-breaking space to maintain height
+                )}
+              </TaskInfo>
             </TimerDisplay>
 
             <ControlsContainer gap="20px">
@@ -1053,6 +1093,7 @@ const TimeEntries = () => {
             </ControlsContainer>
           </TimerTopRow>
 
+          {/* Timer Settings Row - always visible with consistent layout */}
           <TimerSettingsRow>
             <SettingsGroup>
               <SelectorHeader>Description (Optional):</SelectorHeader>
@@ -1128,7 +1169,7 @@ const TimeEntries = () => {
                     || 'No Task Selected'}
                   <ChevronDown size={16} />
                 </DisabledDropdownButton>
-                {taskDropdownOpen && localSelectedProject && (
+                {taskDropdownOpen && (localSelectedProject || activeTimer?.project || activeTimer?.task?.project) && (
                   <DropdownMenu>
                     <DropdownItem onClick={() => handleTaskSelect(null)}>
                       No Task
@@ -1143,24 +1184,24 @@ const TimeEntries = () => {
               </Dropdown>
             </SettingsGroup>
 
-            {!isRunning && (
-              <SettingsGroup>
-                <SelectorHeader>Round to nearest:</SelectorHeader>
-                <RoundingSelector>
-                  {[5, 10, 15, 30, 60].map(minutes => (
-                    <RoundingButton
-                      key={minutes}
-                      $active={roundTo === minutes}
-                      variant={roundTo === minutes ? "primary" : "secondary"}
-                      size="small"
-                      onClick={() => setRoundTo(minutes)}
-                    >
-                      {minutes}m
-                    </RoundingButton>
-                  ))}
-                </RoundingSelector>
-              </SettingsGroup>
-            )}
+            <SettingsGroup>
+              <SelectorHeader>Round to nearest:</SelectorHeader>
+              <RoundingSelector>
+                {[5, 10, 15, 30, 60].map(minutes => (
+                  <RoundingButton
+                    key={minutes}
+                    $active={roundTo === minutes}
+                    variant={roundTo === minutes ? "primary" : "secondary"}
+                    size="small"
+                    onClick={() => setRoundTo(minutes)}
+                    disabled={isRunning}
+                    style={{ opacity: isRunning ? 0.5 : 1 }}
+                  >
+                    {minutes}m
+                  </RoundingButton>
+                ))}
+              </RoundingSelector>
+            </SettingsGroup>
           </TimerSettingsRow>
         </TimerContainer>
       </TimerSection>
@@ -1408,7 +1449,7 @@ const TimeEntries = () => {
                 />
               </FlexBox>
               
-              <ModalFooter gap="10px" justify="flex-end">
+              <FlexBox gap="10px" justify="flex-end" style={{ marginTop: '20px' }}>
                 <Button variant="secondary" onClick={() => setShowModal(false)}>
                   Cancel
                 </Button>
@@ -1419,7 +1460,7 @@ const TimeEntries = () => {
                 >
                   {editingEntry ? 'Update' : 'Create'} Entry
                 </Button>
-              </ModalFooter>
+              </FlexBox>
             </FlexBox>
           </ModalContent>
         </Modal>

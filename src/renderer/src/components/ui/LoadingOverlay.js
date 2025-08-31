@@ -1,5 +1,6 @@
 import React from 'react';
 import styled, { keyframes } from 'styled-components';
+import { colors } from '../../styles/theme';
 
 // Animation for the hour hand (slower)
 const hourHandRotation = keyframes`
@@ -46,7 +47,7 @@ const Overlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: ${colors.bgOverlay};
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -67,9 +68,9 @@ const ClockContainer = styled.div`
   position: relative;
   width: 80px;
   height: 80px;
-  border: 3px solid #007AFF;
+  border: 3px solid ${colors.loadingBorder};
   border-radius: 50%;
-  background: #1a1a1a;
+  background: ${colors.loadingBg};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -87,7 +88,7 @@ const HourMarker = styled.div`
   position: absolute;
   width: 2px;
   height: 8px;
-  background: #007AFF;
+  background: ${colors.loadingSpinner};
   top: 6px;
   left: 50%;
   transform-origin: 50% 33px;
@@ -97,7 +98,7 @@ const HourMarker = styled.div`
 // Clock hands
 const ClockHand = styled.div`
   position: absolute;
-  background: #007AFF;
+  background: ${colors.loadingSpinner};
   transform-origin: bottom center;
   border-radius: 2px;
   left: 50%;
@@ -122,7 +123,7 @@ const CenterDot = styled.div`
   position: absolute;
   width: 6px;
   height: 6px;
-  background: #007AFF;
+  background: ${colors.loadingSpinner};
   border-radius: 50%;
   top: 50%;
   left: 50%;
@@ -132,7 +133,7 @@ const CenterDot = styled.div`
 
 const LoadingText = styled.div`
   margin-top: 24px;
-  color: #ffffff;
+  color: ${colors.textPrimary};
   font-size: 16px;
   font-weight: 500;
   text-align: center;
