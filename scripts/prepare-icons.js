@@ -21,7 +21,11 @@ function generateIcnsFromPng(pngPath) {
 
 function qlThumbSvgToPng(svgPath, outDir) {
   // Uses QuickLook to render a 1024px PNG thumbnail of the SVG
-  const ql = spawnSync('qlmanage', ['-t', '-s', '1024', '-o', outDir, svgPath], { stdio: 'inherit' });
+  const ql = spawnSync(
+    'qlmanage',
+    ['-t', '-s', '1024', '-o', outDir, svgPath],
+    { stdio: 'inherit' },
+  );
   if (ql.status !== 0) return null;
   const produced = join(outDir, `${svgPath.split('/').pop()}.png`);
   return existsSync(produced) ? produced : null;
@@ -64,12 +68,16 @@ function qlThumbSvgToPng(svgPath, outDir) {
     const produced = qlThumbSvgToPng(svgPath, buildDir);
     if (produced && existsSync(produced)) {
       const targetPng = join(buildDir, 'icon-1024.png');
-      try { renameSync(produced, targetPng); } catch (_) {}
+      try {
+        renameSync(produced, targetPng);
+      } catch (_) {}
       log('Generating ICNS from QuickLook PNG...');
       generateIcnsFromPng(targetPng);
       return;
     }
   }
 
-  log('Warning: Could not generate macOS icon. Provide assets/icon-1024.png or run scripts/generate-mac-icns.sh manually.');
+  log(
+    'Warning: Could not generate macOS icon. Provide assets/icon-1024.png or run scripts/generate-mac-icns.sh manually.',
+  );
 })();
