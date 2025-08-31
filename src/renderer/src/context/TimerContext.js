@@ -16,6 +16,8 @@ export const TimerProvider = ({ children }) => {
   const [time, setTime] = useState(0);
   const [activeTimer, setActiveTimer] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null);
   const [description, setDescription] = useState('');
   const [isStoppingTimer, setIsStoppingTimer] = useState(false); // Prevent multiple stop operations
   const { waitForReady } = useElectronAPI();
@@ -214,6 +216,36 @@ export const TimerProvider = ({ children }) => {
             setSelectedClient(null);
           }
           
+          // Load and set project if provided
+          if (projectId) {
+            try {
+              const projects = await api.invoke('db:getProjects');
+              const project = projects.find(p => p.id === projectId);
+              if (project) {
+                setSelectedProject(project);
+              }
+            } catch (error) {
+              console.error('[TimerContext] Error loading project:', error);
+            }
+          } else {
+            setSelectedProject(null);
+          }
+          
+          // Load and set task if provided
+          if (taskId) {
+            try {
+              const tasks = await api.invoke('db:getTasks');
+              const task = tasks.find(t => t.id === taskId);
+              if (task) {
+                setSelectedTask(task);
+              }
+            } catch (error) {
+              console.error('[TimerContext] Error loading task:', error);
+            }
+          } else {
+            setSelectedTask(null);
+          }
+          
           // Update tray with timer info
           const clientName = clientId ? (await (async () => {
             try {
@@ -301,8 +333,11 @@ export const TimerProvider = ({ children }) => {
         setActiveTimer(null);
         setIsRunning(false);
         setTime(0);
-        setDescription('');
-        setSelectedClient(null);
+        // Keep description, selectedClient, selectedProject, and selectedTask so user can easily start a new timer
+        // setDescription('');  // Don't clear description
+        // setSelectedClient(null);  // Don't clear selected client
+        // setSelectedProject(null);  // Don't clear selected project  
+        // setSelectedTask(null);  // Don't clear selected task
         
         // Clear tray status
         updateTrayStatus(null);
@@ -316,12 +351,13 @@ export const TimerProvider = ({ children }) => {
     } catch (error) {
       console.error('[TimerContext] Error stopping timer:', error);
       // Don't throw error anymore since we made stopTimer more forgiving
-      // Just clear the state to prevent UI inconsistencies
+      // Just clear the timer state to prevent UI inconsistencies, but keep selection
       setActiveTimer(null);
       setIsRunning(false);
       setTime(0);
-      setDescription('');
-      setSelectedClient(null);
+      // Keep description and selectedClient for user convenience
+      // setDescription('');  // Don't clear description
+      // setSelectedClient(null);  // Don't clear selected client
       updateTrayStatus(null);
     } finally {
       setIsStoppingTimer(false);
@@ -381,6 +417,9 @@ export const TimerProvider = ({ children }) => {
   const updateTimerTask = async (task) => {
     console.log('[TimerContext] Updating timer task to:', task);
     
+    // Update the selected task state
+    setSelectedTask(task);
+    
     // If there's an active timer, update it in the database
     if (activeTimer) {
       try {
@@ -407,6 +446,11 @@ export const TimerProvider = ({ children }) => {
 
   const updateTimerProject = async (project) => {
     console.log('[TimerContext] Updating timer project to:', project);
+    
+    // Update the selected project state and clear task when project changes
+    setSelectedProject(project);
+    setSelectedTask(null);
+    
     if (activeTimer) {
       try {
         const api = await waitForReady();
@@ -449,6 +493,8 @@ export const TimerProvider = ({ children }) => {
     time,
     activeTimer,
     selectedClient,
+    selectedProject,
+    selectedTask,
     description,
     
     // Actions

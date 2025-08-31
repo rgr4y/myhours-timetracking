@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Building, Edit3, Trash2 } from 'lucide-react';
 import styled from 'styled-components';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
+import { colors } from '../styles/theme';
 import {
   Container,
   Grid,
@@ -95,7 +96,7 @@ const Clients = () => {
 
   // Loading states
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [setIsLoadingTasks] = useState(false);
 
   const [clientForm, setClientForm] = useState({
     name: '',
@@ -186,7 +187,7 @@ const Clients = () => {
       }
     };
     loadTasks();
-  }, [selectedProject]);
+  }, [selectedProject, setIsLoadingTasks]);
 
   const handleCreateClient = async () => {
     console.log('handleCreateClient called', { clientForm, electronAPI: !!window.electronAPI });
@@ -551,7 +552,7 @@ const Clients = () => {
                   hoverable
                   style={{ 
                     cursor: 'pointer',
-                    border: selectedClient?.id === client.id ? '2px solid #007AFF' : '1px solid #404040'
+                    border: selectedClient?.id === client.id ? `2px solid ${colors.primary}` : `1px solid ${colors.borderDefault}`
                   }}
                   onClick={() => handleClientClick(client)}
                 >
@@ -599,7 +600,7 @@ const Clients = () => {
                     hoverable
                     style={{ 
                       cursor: 'pointer',
-                      border: selectedProject?.id === project.id ? '2px solid #007AFF' : '1px solid #404040'
+                      border: selectedProject?.id === project.id ? `2px solid ${colors.primary}` : `1px solid ${colors.borderDefault}`
                     }}
                     onClick={() => setSelectedProject(project)}
                   >
@@ -670,7 +671,7 @@ const Clients = () => {
                           <Text size="small">${task.hourly_rate}/hr</Text>
                         )}
                         {task.is_recurring && (
-                          <Text size="small" style={{ color: '#007AFF' }}>Recurring</Text>
+                          <Text size="small" style={{ color: colors.recurringText }}>Recurring</Text>
                         )}
                       </div>
                       <FlexBox gap="8px">
@@ -965,7 +966,7 @@ const Clients = () => {
                 />
               </FlexBox>
               
-              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #333' }}>
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${colors.borderDark}` }}>
                 <Text variant="secondary" size="small" style={{ display: 'block', marginBottom: '5px' }}>
                   Created: {editingClient.createdAt ? new Date(editingClient.createdAt).toLocaleDateString() : 'Unknown'}
                 </Text>

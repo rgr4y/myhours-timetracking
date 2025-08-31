@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, DollarSign, Calendar, Download } from 'lucide-react';
+import { colors } from '../styles/theme';
 import {
   Container,
   Grid,
@@ -121,7 +122,7 @@ const Reports = () => {
       <Grid gap="20px" margin="0 0 40px 0">
         <Card>
           <FlexBox align="center" gap="12px" margin="0 0 16px 0">
-            <IconContainer background="#34C759" rounded>
+            <IconContainer background={colors.success} rounded>
               <Clock size={20} />
             </IconContainer>
             <div>
@@ -134,7 +135,7 @@ const Reports = () => {
 
         <Card>
           <FlexBox align="center" gap="12px" margin="0 0 16px 0">
-            <IconContainer background="#007AFF" rounded>
+            <IconContainer background={colors.primary} rounded>
               <DollarSign size={20} />
             </IconContainer>
             <div>
@@ -147,7 +148,7 @@ const Reports = () => {
 
         <Card>
           <FlexBox align="center" gap="12px" margin="0 0 16px 0">
-            <IconContainer background="#FF9500" rounded>
+            <IconContainer background={colors.warning} rounded>
               <Calendar size={20} />
             </IconContainer>
             <div>

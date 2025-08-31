@@ -1,7 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
-const WebSocket = require('ws');
 const VersionService = require('./services/version-service');
 
 console.log('[MAIN] === MAIN PROCESS STARTING ===');
@@ -33,9 +32,6 @@ if (isDev) {
 const DatabaseService = require('./services/database-service');
 const InvoiceGenerator = require('./invoice-generator');
 
-// Development API server
-const DevApiServer = require('./dev-api-server');
-
 // Platform-specific tray services
 let TrayService = null;
 if (process.platform === 'darwin') {
@@ -51,9 +47,42 @@ class MyHoursApp {
     this.invoiceGenerator = null;
     this.trayService = null;
     this.versionService = new VersionService();
-    this.devApiServer = null;
     this.wsServer = null;
     // this.setupAutoUpdater();
+  }
+
+  // Wait for the CRA dev server to be reachable before loading it in Electron
+  async waitForDevServer(url, timeoutMs = 15000, intervalMs = 250) {
+    const { URL } = require('url');
+    const parsed = new URL(url);
+    const isHttps = parsed.protocol === 'https:';
+    const http = require(isHttps ? 'https' : 'http');
+    const startedAt = Date.now();
+    const tryOnce = () => new Promise((resolve, reject) => {
+      const req = http.get({
+        hostname: parsed.hostname,
+        port: parsed.port,
+        path: parsed.pathname,
+        timeout: Math.min(2000, intervalMs)
+      }, (res) => {
+        // Treat any response as a signal the server is up
+        res.resume();
+        resolve(res.statusCode);
+      });
+      req.on('timeout', () => {
+        req.destroy(new Error('timeout'));
+      });
+      req.on('error', reject);
+    });
+    while (Date.now() - startedAt < timeoutMs) {
+      try {
+        const code = await tryOnce();
+        console.log('[MAIN] Dev server responded with status:', code);
+        return;
+      } catch (_) {}
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+    throw new Error('Dev server not reachable within timeout');
   }
 
   setupAutoUpdater() {
@@ -140,8 +169,15 @@ class MyHoursApp {
     // Load the app
     if (isDev) {
       console.log('[MAIN] Loading app in development mode...');
-      console.log('[MAIN] Loading URL: http://localhost:3010');
-      this.mainWindow.loadURL('http://localhost:3010');
+      const devUrl = 'http://localhost:3010';
+      console.log('[MAIN] Waiting for dev server:', devUrl);
+      try {
+        await this.waitForDevServer(devUrl, 20000, 300);
+      } catch (e) {
+        console.warn('[MAIN] Dev server wait timed out, attempting to load anyway');
+      }
+      console.log('[MAIN] Loading URL:', devUrl);
+      this.mainWindow.loadURL(devUrl);
       this.mainWindow.webContents.openDevTools();
     } else {
       const indexPath = path.join(__dirname, '../renderer/build/index.html');
@@ -181,9 +217,18 @@ class MyHoursApp {
       } catch (e) {}
     });
 
-    // Helpful diagnostics if the renderer fails to load
-    this.mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    // Helpful diagnostics + auto-retry if the renderer fails to load (common when dev server is still booting)
+    let retryCount = 0;
+    const maxRetries = 30; // ~9s with 300ms delay
+    const retryDelayMs = 300;
+    this.mainWindow.webContents.on('did-fail-load', async (_event, errorCode, errorDescription, validatedURL) => {
       console.error('[MAIN] did-fail-load:', { errorCode, errorDescription, validatedURL });
+      if (isDev && validatedURL && retryCount < maxRetries) {
+        retryCount += 1;
+        console.log(`[MAIN] Retry ${retryCount}/${maxRetries} loading dev URL after ${retryDelayMs}ms...`);
+        await new Promise(r => setTimeout(r, retryDelayMs));
+        try { await this.mainWindow.loadURL(validatedURL); } catch (_) {}
+      }
     });
     this.mainWindow.webContents.on('render-process-gone', (event, details) => {
       console.error('[MAIN] render-process-gone:', details);
@@ -800,12 +845,14 @@ class MyHoursApp {
     });
   }
 
-  setupWebSocketServer() {
+  async setupWebSocketServer() {
     if (!isDev) {
       console.log('[WEBSOCKET] Skipping WebSocket server in production');
       return;
     }
 
+    const WebSocket = require('ws');
+    
     console.log('[WEBSOCKET] Starting WebSocket server on port 3001...');
     this.wsServer = new WebSocket.Server({ port: 3001 });
 
@@ -815,7 +862,7 @@ class MyHoursApp {
       ws.on('message', async (message) => {
         try {
           const request = JSON.parse(message);
-          console.log('[WEBSOCKET] Received IPC request:', request.channel);
+          // console.log('[WEBSOCKET] Received IPC request:', request.channel);
 
           // Create a mock event object for IPC handler compatibility
           const mockEvent = {
@@ -892,7 +939,7 @@ class MyHoursApp {
     console.log('[MAIN] IPC handlers set up');
     
     // Setup WebSocket server for browser debugging
-    this.setupWebSocketServer();
+    await this.setupWebSocketServer();
     
     // Create main window
     await this.createWindow();

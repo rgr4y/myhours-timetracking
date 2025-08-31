@@ -1,14 +1,15 @@
 import styled from 'styled-components';
+import { colors } from '../../styles/theme';
 
 export const Button = styled.button.withConfig({
   shouldForwardProp: (prop) => !['variant', 'size', 'alignSelf', 'active'].includes(prop)
 })`
   background: ${props => {
-    if (props.variant === 'primary') return '#007AFF';
-    if (props.variant === 'secondary') return '#404040';
-    if (props.variant === 'danger') return '#FF3B30';
-    if (props.variant === 'success') return '#34C759';
-    return '#404040';
+    if (props.variant === 'primary') return colors.primary;
+    if (props.variant === 'secondary') return colors.secondary;
+    if (props.variant === 'danger') return colors.danger;
+    if (props.variant === 'success') return colors.success;
+    return colors.secondary;
   }};
   border: none;
   border-radius: 8px;
@@ -29,11 +30,11 @@ export const Button = styled.button.withConfig({
   
   &:hover {
     background: ${props => {
-      if (props.variant === 'primary') return '#0056CC';
-      if (props.variant === 'secondary') return '#505050';
-      if (props.variant === 'danger') return '#D70015';
-      if (props.variant === 'success') return '#248A3D';
-      return '#505050';
+      if (props.variant === 'primary') return colors.primaryHover;
+      if (props.variant === 'secondary') return colors.secondaryHover;
+      if (props.variant === 'danger') return colors.dangerHover;
+      if (props.variant === 'success') return colors.successHover;
+      return colors.secondaryHover;
     }};
   }
   

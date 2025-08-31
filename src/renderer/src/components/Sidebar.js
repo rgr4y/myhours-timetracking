@@ -78,7 +78,7 @@ const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [appVersion, setAppVersion] = useState('');
-  const [easterClicks, setEasterClicks] = useState(0);
+  const [setEasterClicks] = useState(0);
   const [showYay, setShowYay] = useState(false);
   const resetTimerRef = useRef(null);
 
