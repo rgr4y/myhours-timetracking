@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
+const WebSocket = require('ws');
 const VersionService = require('./services/version-service');
 
 console.log('[MAIN] === MAIN PROCESS STARTING ===');
@@ -32,6 +33,9 @@ if (isDev) {
 const DatabaseService = require('./services/database-service');
 const InvoiceGenerator = require('./invoice-generator');
 
+// Development API server
+const DevApiServer = require('./dev-api-server');
+
 // Platform-specific tray services
 let TrayService = null;
 if (process.platform === 'darwin') {
@@ -47,6 +51,8 @@ class MyHoursApp {
     this.invoiceGenerator = null;
     this.trayService = null;
     this.versionService = new VersionService();
+    this.devApiServer = null;
+    this.wsServer = null;
     // this.setupAutoUpdater();
   }
 
@@ -99,9 +105,9 @@ class MyHoursApp {
   async createWindow() {
     this.mainWindow = new BrowserWindow({
       width: 1200,
-      height: 840,
+      height: 860,
       minWidth: 800,
-      minHeight: 820,
+      minHeight: 840,
       title: 'myHours',
       webPreferences: {
         nodeIntegration: false,
@@ -794,6 +800,73 @@ class MyHoursApp {
     });
   }
 
+  setupWebSocketServer() {
+    if (!isDev) {
+      console.log('[WEBSOCKET] Skipping WebSocket server in production');
+      return;
+    }
+
+    console.log('[WEBSOCKET] Starting WebSocket server on port 3001...');
+    this.wsServer = new WebSocket.Server({ port: 3001 });
+
+    this.wsServer.on('connection', (ws) => {
+      console.log('[WEBSOCKET] Browser client connected');
+
+      ws.on('message', async (message) => {
+        try {
+          const request = JSON.parse(message);
+          console.log('[WEBSOCKET] Received IPC request:', request.channel);
+
+          // Create a mock event object for IPC handler compatibility
+          const mockEvent = {
+            sender: {
+              send: () => {},
+              webContents: {
+                send: () => {}
+              }
+            }
+          };
+
+          // Dynamically forward the IPC call to the main process handler
+          const handler = ipcMain._invokeHandlers?.get(request.channel);
+          
+          if (!handler) {
+            throw new Error(`No handler registered for channel: ${request.channel}`);
+          }
+
+          const result = await handler(mockEvent, ...(request.args || []));
+
+          ws.send(JSON.stringify({
+            id: request.id,
+            result: result,
+            error: null
+          }));
+        } catch (error) {
+          console.error('[WEBSOCKET] Error handling IPC request:', error);
+          ws.send(JSON.stringify({
+            id: request.id,
+            result: null,
+            error: error.message
+          }));
+        }
+      });
+
+      ws.on('close', () => {
+        console.log('[WEBSOCKET] Browser client disconnected');
+      });
+
+      ws.on('error', (error) => {
+        console.error('[WEBSOCKET] Client error:', error);
+      });
+    });
+
+    this.wsServer.on('error', (error) => {
+      console.error('[WEBSOCKET] Server error:', error);
+    });
+
+    console.log('[WEBSOCKET] WebSocket server started successfully');
+  }
+
   async initialize() {
     console.log('[MAIN] App initializing...');
     await app.whenReady();
@@ -817,6 +890,9 @@ class MyHoursApp {
     // Setup IPC handlers
     this.setupIPC();
     console.log('[MAIN] IPC handlers set up');
+    
+    // Setup WebSocket server for browser debugging
+    this.setupWebSocketServer();
     
     // Create main window
     await this.createWindow();
@@ -857,6 +933,10 @@ class MyHoursApp {
     app.on('will-quit', () => {
       if (this.trayService) {
         this.trayService.destroy();
+      }
+      if (this.wsServer) {
+        console.log('[WEBSOCKET] Closing WebSocket server...');
+        this.wsServer.close();
       }
     });
   }

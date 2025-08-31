@@ -4,6 +4,16 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+// Browser shim for electronAPI - only in development
+if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && !window.electronAPI) {
+  // Dynamically import the browser shim
+  import('./browserShim').then(() => {
+    console.log('[INDEX] Browser shim loaded for development');
+  }).catch(err => {
+    console.warn('[INDEX] Could not load browser shim:', err);
+  });
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>

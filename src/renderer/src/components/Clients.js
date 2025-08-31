@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Building, Edit3 } from 'lucide-react';
+import { Plus, Building, Edit3, Trash2 } from 'lucide-react';
 import styled from 'styled-components';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import {
@@ -93,6 +93,10 @@ const Clients = () => {
   const [editingProject, setEditingProject] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
 
+  // Loading states
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+
   const [clientForm, setClientForm] = useState({
     name: '',
     email: '',
@@ -137,6 +141,7 @@ const Clients = () => {
   useEffect(() => {
     const loadProjects = async () => {
       if (window.electronAPI && selectedClient) {
+        setIsLoadingProjects(true);
         try {
           const projectList = await window.electronAPI.projects.getAll(selectedClient.id);
           console.log('Projects loaded for client', selectedClient.id, ':', projectList);
@@ -144,13 +149,18 @@ const Clients = () => {
           // Auto-select first project if there are projects available
           if (projectList.length > 0) {
             setSelectedProject(projectList[0]);
+          } else {
+            setSelectedProject(null);
           }
         } catch (error) {
           logger.error('Error loading projects:', error);
+        } finally {
+          setIsLoadingProjects(false);
         }
       } else {
         setProjects([]);
         setSelectedProject(null);
+        setIsLoadingProjects(false);
       }
     };
     loadProjects();
@@ -160,15 +170,19 @@ const Clients = () => {
   useEffect(() => {
     const loadTasks = async () => {
       if (window.electronAPI && selectedProject) {
+        setIsLoadingTasks(true);
         try {
           const taskList = await window.electronAPI.tasks.getAll(selectedProject.id);
           console.log('Tasks loaded for project', selectedProject.id, ':', taskList);
           setTasks(taskList);
         } catch (error) {
           logger.error('Error loading tasks:', error);
+        } finally {
+          setIsLoadingTasks(false);
         }
       } else {
         setTasks([]);
+        setIsLoadingTasks(false);
       }
     };
     loadTasks();
@@ -355,6 +369,55 @@ const Clients = () => {
     }
   };
 
+  const handleDeleteProject = async (projectToDelete) => {
+    if (window.confirm(`Are you sure you want to delete "${projectToDelete.name}"? This will also delete all associated tasks.`)) {
+      try {
+        console.log('Deleting project:', projectToDelete.id);
+        await window.electronAPI.projects.delete(projectToDelete.id);
+        console.log('Project deleted successfully');
+        
+        // Clear selections if deleted project was selected
+        if (selectedProject?.id === projectToDelete.id) {
+          setSelectedProject(null);
+        }
+        
+        setShowProjectModal(false);
+        
+        // Reload projects for the current client
+        if (selectedClient) {
+          const projectList = await window.electronAPI.projects.getAll(selectedClient.id);
+          setProjects(projectList);
+          // Auto-select first project if there are projects available
+          if (projectList.length > 0) {
+            setSelectedProject(projectList[0]);
+          }
+        }
+      } catch (error) {
+        logger.error('Error deleting project:', error);
+        alert('Failed to delete project: ' + error.message);
+      }
+    }
+  };
+
+  const handleDeleteTask = async (taskToDelete) => {
+    if (window.confirm(`Are you sure you want to delete "${taskToDelete.name}"?`)) {
+      try {
+        console.log('Deleting task:', taskToDelete.id);
+        await window.electronAPI.tasks.delete(taskToDelete.id);
+        console.log('Task deleted successfully');
+        
+        // Reload tasks for the current project
+        if (selectedProject) {
+          const taskList = await window.electronAPI.tasks.getAll(selectedProject.id);
+          setTasks(taskList);
+        }
+      } catch (error) {
+        logger.error('Error deleting task:', error);
+        alert('Failed to delete task: ' + error.message);
+      }
+    }
+  };
+
   const handleClientClick = (client) => {
     setSelectedClient(client);
     setSelectedProject(null); // Clear selected project when client changes
@@ -429,26 +492,40 @@ const Clients = () => {
             <Plus size={16} />
             Add Client
           </Button>
-          {selectedClient && (
-            <Button variant="secondary" onClick={() => {
+          {/* Add Project button - show always, gray out if loading projects or no clients */}
+          <Button 
+            variant="secondary" 
+            disabled={clients.length === 0 || isLoadingProjects}
+            onClick={() => {
               setEditingProject(null);
               setProjectForm({ client_id: '', name: '', description: '', hourly_rate: '' });
               setShowProjectModal(true);
-            }}>
-              <Plus size={16} />
-              Add Project
-            </Button>
-          )}
-          {selectedProject && (
-            <Button variant="secondary" onClick={() => {
+            }}
+            style={{ 
+              opacity: (clients.length === 0 || isLoadingProjects) ? 0.5 : 1,
+              cursor: (clients.length === 0 || isLoadingProjects) ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <Plus size={16} />
+            Add Project
+          </Button>
+          {/* Add Task button - show always, gray out if client loading or no projects exist */}
+          <Button 
+            variant="secondary" 
+            disabled={isLoadingProjects || projects.length === 0}
+            onClick={() => {
               setEditingTask(null);
               setTaskForm({ project_id: '', name: '', description: '', is_recurring: false });
               setShowTaskModal(true);
-            }}>
-              <Plus size={16} />
-              Add Task
-            </Button>
-          )}
+            }}
+            style={{ 
+              opacity: (isLoadingProjects || projects.length === 0) ? 0.5 : 1,
+              cursor: (isLoadingProjects || projects.length === 0) ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <Plus size={16} />
+            Add Task
+          </Button>
         </ResponsiveFlexBox>
       </ResponsiveFlexBox>
 
@@ -596,25 +673,38 @@ const Clients = () => {
                           <Text size="small" style={{ color: '#007AFF' }}>Recurring</Text>
                         )}
                       </div>
-                      <Button 
-                        size="small" 
-                        variant="secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTask(task);
-                          setTaskForm({
-                            project_id: task.project_id,
-                            name: task.name,
-                            description: task.description || '',
-                            is_recurring: task.is_recurring || false,
-                            hourly_rate: task.hourly_rate || ''
-                          });
-                          setShowTaskModal(true);
-                        }}
-                        style={{ padding: '6px', fontSize: '12px' }}
-                      >
-                        <Edit3 size={14} />
-                      </Button>
+                      <FlexBox gap="8px">
+                        <Button 
+                          size="small" 
+                          variant="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTask(task);
+                            setTaskForm({
+                              project_id: task.project_id,
+                              name: task.name,
+                              description: task.description || '',
+                              is_recurring: task.is_recurring || false,
+                              hourly_rate: task.hourly_rate || ''
+                            });
+                            setShowTaskModal(true);
+                          }}
+                          style={{ padding: '6px', fontSize: '12px' }}
+                        >
+                          <Edit3 size={14} />
+                        </Button>
+                        <Button 
+                          size="small" 
+                          variant="danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTask(task);
+                          }}
+                          style={{ padding: '6px', fontSize: '12px' }}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </FlexBox>
                     </FlexBox>
                   </Card>
                 ))}
@@ -730,17 +820,29 @@ const Clients = () => {
                 />
               </FlexBox>
               
-              <FlexBox gap="10px" justify="flex-end" style={{ marginTop: '20px' }}>
-                <Button variant="secondary" onClick={() => setShowProjectModal(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  variant="primary" 
-                  onClick={editingProject ? handleUpdateProject : handleCreateProject}
-                  disabled={!projectForm.name}
-                >
-                  {editingProject ? 'Update' : 'Create'} Project
-                </Button>
+              <FlexBox gap="10px" justify="space-between" style={{ marginTop: '20px' }}>
+                <div>
+                  {editingProject && (
+                    <Button 
+                      variant="danger" 
+                      onClick={() => handleDeleteProject(editingProject)}
+                    >
+                      Delete Project
+                    </Button>
+                  )}
+                </div>
+                <FlexBox gap="10px">
+                  <Button variant="secondary" onClick={() => setShowProjectModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="primary" 
+                    onClick={editingProject ? handleUpdateProject : handleCreateProject}
+                    disabled={!projectForm.name}
+                  >
+                    {editingProject ? 'Update' : 'Create'} Project
+                  </Button>
+                </FlexBox>
               </FlexBox>
             </FlexBox>
           </ModalContent>

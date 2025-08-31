@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Clock, Folder, BarChart, FileInput, Settings, Info } from 'lucide-react';
 import { Text, Modal, ModalContent, ModalHeader, ModalTitle, ModalCloseButton } from './ui';
+import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import styled from 'styled-components';
 
 const SidebarContainer = styled.div`
@@ -77,7 +78,7 @@ const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [appVersion, setAppVersion] = useState('');
-  const [setEasterClicks] = useState(0);
+  const [easterClicks, setEasterClicks] = useState(0);
   const [showYay, setShowYay] = useState(false);
   const resetTimerRef = useRef(null);
 
@@ -93,6 +94,12 @@ const Sidebar = () => {
     })();
     return () => { mounted = false; };
   }, []);
+
+  // Add ESC key handling for the debug modal
+  useModalKeyboard({
+    isOpen: showYay,
+    onClose: () => setShowYay(false)
+  });
 
   const menuItems = [
     { path: '/', icon: Clock, label: 'Time Entries' },
@@ -128,8 +135,8 @@ const Sidebar = () => {
         <VersionLink
           onClick={() => {
             if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-            setEasterClicks((c) => {
-              const next = c + 1;
+            setEasterClicks((currentClicks) => {
+              const next = currentClicks + 1;
               if (next >= 5) {
                 setShowYay(true);
                 return 0;

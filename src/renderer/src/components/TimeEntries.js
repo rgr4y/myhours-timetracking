@@ -57,7 +57,7 @@ const TimerContainer = styled.div`
 
 const TimerTopRow = styled(FlexBox)`
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   margin-bottom: 30px;
   
   @media (max-width: 768px) {
@@ -67,7 +67,7 @@ const TimerTopRow = styled(FlexBox)`
 `;
 
 const TimerDisplay = styled.div`
-  text-align: center;
+  text-align: left;
   min-width: 200px;
   
   @media (max-width: 768px) {
@@ -173,6 +173,81 @@ const COLORS = {
   BG_INACTIVE: '#2a2a2a',
   SUCCESS: '#28a745'
 };
+
+// Additional styled components for inline style replacements
+const MainContainer = styled(Container)`
+  height: 100vh;
+  overflow-y: auto;
+  position: relative;
+`;
+
+const DisabledDropdownButton = styled(DropdownButton)`
+  opacity: ${props => props.disabled ? 0.5 : 1};
+`;
+
+const DayGroupContainer = styled.div`
+  margin-bottom: ${props => props.$isLast ? '0' : '20px'};
+  border: ${props => props.$hasActiveEntry ? `2px solid ${COLORS.PRIMARY}` : 'none'};
+  border-radius: 8px;
+  padding: ${props => props.$hasActiveEntry ? '2px' : '0'};
+`;
+
+const DayHeaderCard = styled(Card)`
+  cursor: pointer;
+  background-color: ${props => props.$hasActiveEntry ? COLORS.BG_ACTIVE : COLORS.BG_INACTIVE};
+  border: ${props => props.$hasActiveEntry ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`};
+  border-radius: ${props => props.$collapsed ? '8px' : '8px 8px 0 0'};
+`;
+
+const DayTotalText = styled(Text)`
+  font-weight: bold;
+`;
+
+const EntryHeading = styled(Heading)`
+  margin-bottom: 15px;
+`;
+
+const TaskIcon = styled(CheckSquare)`
+  margin-right: 6px;
+  vertical-align: text-bottom;
+`;
+
+const ActiveBadge = styled(Text)`
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  background-color: ${COLORS.SUCCESS};
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+`;
+
+const ClientIcon = styled(Building)`
+  margin-right: 4px;
+  vertical-align: text-bottom;
+`;
+
+const ProjectIcon = styled(Folder)`
+  margin: 0 4px 0 10px;
+  vertical-align: text-bottom;
+`;
+
+const TimeIcon = styled(Clock)`
+  margin-right: 5px;
+`;
+
+const DisabledIconButton = styled(IconButton)`
+  opacity: ${props => props.disabled ? 0.5 : 1};
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+`;
+
+const FlexForm = styled(FlexBox)`
+  flex: 1;
+`;
+
+const ModalFooter = styled(FlexBox)`
+  margin-top: 20px;
+`;
 
 const TimeEntries = () => {
 
@@ -947,7 +1022,7 @@ const TimeEntries = () => {
   };
 
   return (
-    <Container padding="40px" style={{ height: '100vh', overflowY: 'auto', position: 'relative' }}>
+    <MainContainer padding="40px">
       {/* Timer Section */}
       <TimerSection>
         <TimerContainer>
@@ -986,7 +1061,7 @@ const TimeEntries = () => {
                 value={localDescription}
                 onChange={handleDescriptionChange}
                 onBlur={handleDescriptionBlur}
-                placeholder="What are you working on?"
+                placeholder="Describe this work"
                 rows={1}
               />
             </SettingsGroup>
@@ -1016,17 +1091,16 @@ const TimeEntries = () => {
             <SettingsGroup>
               <SelectorHeader>Project (Optional):</SelectorHeader>
               <Dropdown>
-                <DropdownButton 
+                <DisabledDropdownButton 
                   onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
                   disabled={!localSelectedClient}
-                  style={{ opacity: !localSelectedClient ? 0.5 : 1 }}
                 >
                   {localSelectedProject?.name 
                     || activeTimer?.project?.name 
                     || activeTimer?.task?.project?.name 
                     || 'No Project Selected'}
                   <ChevronDown size={16} />
-                </DropdownButton>
+                </DisabledDropdownButton>
                 {projectDropdownOpen && localSelectedClient && (
                   <DropdownMenu>
                     <DropdownItem onClick={() => handleProjectSelect(null)}>
@@ -1045,16 +1119,15 @@ const TimeEntries = () => {
             <SettingsGroup>
               <SelectorHeader>Task (Optional):</SelectorHeader>
               <Dropdown>
-                <DropdownButton 
+                <DisabledDropdownButton 
                   onClick={() => setTaskDropdownOpen(!taskDropdownOpen)}
                   disabled={!(localSelectedProject || activeTimer?.project || activeTimer?.task?.project)}
-                  style={{ opacity: (localSelectedProject || activeTimer?.project || activeTimer?.task?.project) ? 1 : 0.5 }}
                 >
                   {localSelectedTask?.name 
                     || activeTimer?.task?.name 
                     || 'No Task Selected'}
                   <ChevronDown size={16} />
-                </DropdownButton>
+                </DisabledDropdownButton>
                 {taskDropdownOpen && localSelectedProject && (
                   <DropdownMenu>
                     <DropdownItem onClick={() => handleTaskSelect(null)}>
@@ -1112,26 +1185,19 @@ const TimeEntries = () => {
           <FlexBox direction="column" gap="0">
             {Object.entries(groupedEntries || {}).map(([date, entries], groupIndex) => {
               const hasActiveEntry = entries.some(entry => entry.isActive);
+              const isLast = groupIndex >= Object.keys(groupedEntries).length - 1;
               
               return (
-                <div 
+                <DayGroupContainer 
                   key={date} 
-                  style={{ 
-                    marginBottom: groupIndex < Object.keys(groupedEntries).length - 1 ? '20px' : '0',
-                    border: hasActiveEntry ? `2px solid ${COLORS.PRIMARY}` : 'none',
-                    borderRadius: '8px',
-                    padding: hasActiveEntry ? '2px' : '0'
-                  }}
+                  $hasActiveEntry={hasActiveEntry}
+                  $isLast={isLast}
                 >
-                  <Card 
+                  <DayHeaderCard 
                     padding="15px" 
                     margin="0"
-                    style={{ 
-                      cursor: 'pointer',
-                      backgroundColor: hasActiveEntry ? COLORS.BG_ACTIVE : COLORS.BG_INACTIVE,
-                      border: hasActiveEntry ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`,
-                      borderRadius: collapsedDays.has(date) ? '8px' : '8px 8px 0 0'
-                    }}
+                    $hasActiveEntry={hasActiveEntry}
+                    $collapsed={collapsedDays.has(date)}
                     onClick={() => toggleDayCollapse(date)}
                   >
                     <FlexBox justify="space-between" align="center">
@@ -1143,11 +1209,11 @@ const TimeEntries = () => {
                         )}
                         <Heading size="medium">{date}</Heading>
                       </FlexBox>
-                      <Text size="medium" variant="success" style={{ fontWeight: 'bold' }}>
+                      <DayTotalText size="medium" variant="success">
                         {calculateDayTotal(entries)}
-                      </Text>
+                      </DayTotalText>
                     </FlexBox>
-                  </Card>
+                  </DayHeaderCard>
 
                   {!collapsedDays.has(date) && (
                     <FlexBox direction="column" gap="0">
@@ -1161,44 +1227,36 @@ const TimeEntries = () => {
                           <FlexBox justify="space-between" align="center">
                             <FlexBox direction="column" gap="5px">
                               <FlexBox align="center" gap="10px">
-                                <Heading size="small" style={{ marginBottom: '15px' }}>
+                                <EntryHeading size="small">
                                   {entry.taskId && getTaskName(entry.taskId) && (
                                     <>
-                                      <CheckSquare size={16} style={{ marginRight: '6px', verticalAlign: 'text-bottom' }} />
+                                      <TaskIcon size={16} />
                                       {getTaskName(entry.taskId)}
                                       {entry.description && ' • '}
                                     </>
                                   )}
                                   {entry.description || (!entry.taskId || !getTaskName(entry.taskId) ? 'No description' : '')}
-                                </Heading>
+                                </EntryHeading>
                                 {entry.isActive && (
-                                  <Text size="small" variant="success" style={{ 
-                                    padding: '2px 8px', 
-                                    borderRadius: '12px', 
-                                    marginBottom: '15px',
-                                    backgroundColor: COLORS.SUCCESS,
-                                    color: 'white',
-                                    fontSize: '10px',
-                                    fontWeight: 'bold'
-                                  }}>
+                                  <ActiveBadge size="small" variant="success">
                                     ACTIVE
-                                  </Text>
+                                  </ActiveBadge>
                                 )}
                               </FlexBox>
                               <Text variant="secondary" size="small">
-                                <Building size={14} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
+                                <ClientIcon size={14} />
                                 {getClientName(entry.clientId)}
                                 {entry.project && (
                                   <>
                                     {' '}
-                                    <Folder size={14} style={{ margin: '0 4px 0 10px', verticalAlign: 'text-bottom' }} />
+                                    <ProjectIcon size={14} />
                                     {entry.project.name}
                                   </>
                                 )}
                               </Text>
                               <FlexBox gap="15px">
                                 <Text size="small">
-                                  <Clock size={14} style={{ marginRight: '5px' }} />
+                                  <TimeIcon size={14} />
                                   {entry.isActive 
                                     ? `${formatTime(entry.startTime)} - Running`
                                     : `${formatTime(entry.startTime)} - ${formatTime(entry.endTime)}`
@@ -1224,39 +1282,31 @@ const TimeEntries = () => {
                                   <Play size={14} />
                                 </IconButton>
                               )}
-                              <IconButton 
+                              <DisabledIconButton 
                                 variant="secondary" 
                                 size="small" 
                                 onClick={() => openEditModal(entry)}
                                 disabled={entry.isActive}
-                                style={{ 
-                                  opacity: entry.isActive ? 0.5 : 1,
-                                  cursor: entry.isActive ? 'not-allowed' : 'pointer'
-                                }}
                                 title={entry.isActive ? "Cannot edit active timer" : "Edit entry"}
                               >
                                 <Edit size={14} />
-                              </IconButton>
-                              <IconButton 
+                              </DisabledIconButton>
+                              <DisabledIconButton 
                                 variant={entry.isActive ? "secondary" : "danger"} 
                                 size="small" 
                                 onClick={() => handleDeleteEntry(entry.id)}
                                 disabled={entry.isActive}
-                                style={{ 
-                                  opacity: entry.isActive ? 0.5 : 1,
-                                  cursor: entry.isActive ? 'not-allowed' : 'pointer'
-                                }}
                                 title={entry.isActive ? "Cannot delete active timer" : "Delete entry"}
                               >
                                 <Trash2 size={14} />
-                              </IconButton>
+                              </DisabledIconButton>
                             </FlexBox>
                           </FlexBox>
                         </Card>
                       ))}
                     </FlexBox>
                   )}
-                </div>
+                </DayGroupContainer>
               );
             })}
           </FlexBox>
@@ -1330,23 +1380,23 @@ const TimeEntries = () => {
               </FlexBox>
               
               <FlexBox gap="10px">
-                <FlexBox direction="column" gap="5px" style={{ flex: 1 }}>
+                <FlexForm direction="column" gap="5px">
                   <Label>Start Time *</Label>
                   <Input
                     type="time"
                     value={entryForm.startTime}
                     onChange={(e) => setEntryForm(prev => ({ ...prev, startTime: e.target.value }))}
                   />
-                </FlexBox>
+                </FlexForm>
                 
-                <FlexBox direction="column" gap="5px" style={{ flex: 1 }}>
+                <FlexForm direction="column" gap="5px">
                   <Label>End Time *</Label>
                   <Input
                     type="time"
                     value={entryForm.endTime}
                     onChange={(e) => setEntryForm(prev => ({ ...prev, endTime: e.target.value }))}
                   />
-                </FlexBox>
+                </FlexForm>
               </FlexBox>
               
               <FlexBox direction="column" gap="5px">
@@ -1358,7 +1408,7 @@ const TimeEntries = () => {
                 />
               </FlexBox>
               
-              <FlexBox gap="10px" justify="flex-end" style={{ marginTop: '20px' }}>
+              <ModalFooter gap="10px" justify="flex-end">
                 <Button variant="secondary" onClick={() => setShowModal(false)}>
                   Cancel
                 </Button>
@@ -1369,7 +1419,7 @@ const TimeEntries = () => {
                 >
                   {editingEntry ? 'Update' : 'Create'} Entry
                 </Button>
-              </FlexBox>
+              </ModalFooter>
             </FlexBox>
           </ModalContent>
         </Modal>
@@ -1380,7 +1430,7 @@ const TimeEntries = () => {
         text="Loading Time Entries..." 
         noFadeIn={true}
       />
-    </Container>
+    </MainContainer>
   );
 };
 
