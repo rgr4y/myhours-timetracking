@@ -227,6 +227,16 @@ class MyHoursApp {
         throw error;
       }
     });
+
+    ipcMain.handle('db:getClientsWithRelationships', async () => {
+      try {
+        const clients = await this.database.getClients();
+        return clients;
+      } catch (error) {
+        console.error('[MAIN] IPC: Error getting clients with relationships:', error);
+        throw error;
+      }
+    });
     
     ipcMain.handle('db:createClient', async (event, client) => {
       console.log('[MAIN] IPC: Creating client:', JSON.stringify(client, null, 2));

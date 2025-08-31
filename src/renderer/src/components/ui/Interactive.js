@@ -11,6 +11,7 @@ export const DropdownButton = styled.button`
   border: 1px solid #505050;
   border-radius: 8px;
   padding: 12px 15px;
+  min-height: 44px;
   color: white;
   text-align: left;
   cursor: pointer;

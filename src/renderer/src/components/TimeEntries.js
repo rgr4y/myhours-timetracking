@@ -57,7 +57,7 @@ const TimerContainer = styled.div`
 
 const TimerTopRow = styled(FlexBox)`
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   margin-bottom: 30px;
   
   @media (max-width: 768px) {
@@ -67,7 +67,7 @@ const TimerTopRow = styled(FlexBox)`
 `;
 
 const TimerDisplay = styled.div`
-  text-align: left;
+  text-align: center;
   min-width: 200px;
   
   @media (max-width: 768px) {
@@ -101,7 +101,7 @@ const ControlsContainer = styled(FlexBox)`
 `;
 
 const ControlButton = styled(Button)`
-  border-radius: 50px;
+  border-radius: 8px;
   padding: 12px 24px;
   font-size: 14px;
   min-width: 120px;
@@ -137,7 +137,7 @@ const SelectorHeader = styled(Text)`
 `;
 
 const ExpandingTextArea = styled(TextArea)`
-  min-height: 40px;
+  min-height: 44px;
   max-height: 120px;
   resize: none;
   overflow: hidden;
@@ -251,7 +251,58 @@ const TimeEntries = () => {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Load functions
+  // Optimized load function that fetches all data in minimal calls
+  const loadAllData = useCallback(async () => {
+    const api = await waitForReady();
+    if (api) {
+      try {
+        // Load all data in parallel for better performance
+        const [clientsWithRelationships, timeEntriesData, settingsData] = await Promise.all([
+          api.clients.getAllWithRelationships(),
+          api.timeEntries.getAll(),
+          api.settings.get()
+        ]);
+
+        // Set clients with all their projects and tasks already loaded
+        setClients(clientsWithRelationships || []);
+        
+        // Extract all projects and tasks from the nested structure
+        const allProjects = [];
+        const allTasks = [];
+        
+        (clientsWithRelationships || []).forEach(client => {
+          if (client.projects) {
+            allProjects.push(...client.projects);
+            client.projects.forEach(project => {
+              if (project.tasks) {
+                allTasks.push(...project.tasks);
+              }
+            });
+          }
+        });
+
+        setProjects(allProjects);
+        setTasks(allTasks);
+        setTimeEntries(timeEntriesData || []);
+        
+        // Set settings
+        setSettings(settingsData || { timer_rounding: '15' });
+        if (settingsData?.timer_rounding) {
+          setRoundTo(parseInt(settingsData.timer_rounding));
+        }
+
+        console.log('All data loaded:', {
+          clients: clientsWithRelationships?.length || 0,
+          projects: allProjects.length,
+          tasks: allTasks.length,
+          timeEntries: timeEntriesData?.length || 0
+        });
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    }
+  }, [waitForReady]);
+
   const loadTimeEntries = useCallback(async () => {
     console.log('Loading time entries...');
     const api = await waitForReady();
@@ -262,80 +313,6 @@ const TimeEntries = () => {
         setTimeEntries(entries);
       } catch (error) {
         console.error('Error loading time entries:', error);
-      }
-    }
-  }, [waitForReady]);
-
-  const loadClients = useCallback(async () => {
-    const api = await waitForReady();
-    if (api) {
-      try {
-        const clientList = await api.clients.getAll();
-        setClients(clientList);
-      } catch (error) {
-        console.error('Error loading clients:', error);
-      }
-    }
-  }, [waitForReady]);
-
-  const loadAllTasks = useCallback(async () => {
-    const api = await waitForReady();
-    if (api) {
-      try {
-        // More efficient: get all tasks in one call if the API supports it
-        // or at least reduce the nested calls
-        const allTasks = await api.tasks.getAll(); // If this exists
-        setTasks(allTasks);
-      } catch (error) {
-        // Fallback to the nested approach but with better error handling
-        console.log('Falling back to nested task loading...');
-        try {
-          const allTasks = [];
-          const clientList = await api.clients.getAll();
-          
-          // Use Promise.all to parallelize the API calls
-          const projectPromises = (clientList || []).map(async (client) => {
-            try {
-              return await api.projects.getAll(client.id);
-            } catch (error) {
-              console.error(`Error loading projects for client ${client.id}:`, error);
-              return [];
-            }
-          });
-          
-          const allProjects = (await Promise.all(projectPromises)).flat();
-          
-          const taskPromises = allProjects.map(async (project) => {
-            try {
-              return await api.tasks.getAll(project.id);
-            } catch (error) {
-              console.error(`Error loading tasks for project ${project.id}:`, error);
-              return [];
-            }
-          });
-          
-          const allTaskArrays = await Promise.all(taskPromises);
-          allTasks.push(...allTaskArrays.flat());
-          
-          setTasks(allTasks);
-        } catch (error) {
-          console.error('Error loading all tasks:', error);
-        }
-      }
-    }
-  }, [waitForReady]);
-
-  const loadSettings = useCallback(async () => {
-    const api = await waitForReady();
-    if (api) {
-      try {
-        const settingsData = await api.settings.get();
-        setSettings(settingsData || { timer_rounding: '15' });
-        if (settingsData?.timer_rounding) {
-          setRoundTo(parseInt(settingsData.timer_rounding));
-        }
-      } catch (error) {
-        console.error('Error loading settings:', error);
       }
     }
   }, [waitForReady]);
@@ -398,16 +375,14 @@ const TimeEntries = () => {
 
   // Initialize data on mount (only run once)
   useEffect(() => {
-    const loadAllData = async () => {
+    const initializeData = async () => {
       try {
         setIsInitialLoading(true);
         await checkActiveTimer(); // Check for active timer first
-        await Promise.all([
-          loadTimeEntries(),
-          loadClients(),
-          loadAllTasks(),
-          loadSettings()
-        ]);
+        
+        // Load all data in a single optimized call
+        await loadAllData();
+        
         setTimeout(() => {
           setIsInitialLoading(false);
         }, 100);
@@ -417,9 +392,67 @@ const TimeEntries = () => {
       }
     };
     
-    loadAllData();
+    initializeData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array to run only once on mount
+
+  // Restore last used client/project/task using pre-loaded data
+  useEffect(() => {
+    const restoreLastUsed = async () => {
+      // Only restore if we have loaded the data and are not in initial loading state
+      if (clients.length > 0 && projects.length > 0 && tasks.length > 0 && !isInitialLoading && !activeTimer) {
+        try {
+          const api = await waitForReady();
+          if (api) {
+            console.log('[TimeEntries] Attempting to restore last used client/project/task...');
+            
+            const [lastClient, lastProject, lastTask] = await Promise.all([
+              api.settings.getLastUsedClient(),
+              api.settings.getLastUsedProject(),
+              api.settings.getLastUsedTask()
+            ]);
+            
+            console.log('[TimeEntries] Last used values:', { lastClient, lastProject, lastTask });
+            
+            if (lastClient) {
+              const clientExists = clients.some(c => c.id === lastClient.id);
+              console.log('[TimeEntries] Client exists:', clientExists);
+              
+              if (clientExists) {
+                console.log('[TimeEntries] Restored last client:', lastClient.name);
+                setLocalSelectedClient(lastClient);
+                
+                // Since we have all data loaded, we can directly check and set
+                if (lastProject) {
+                  const projectExists = projects.some(p => p.id === lastProject.id && p.clientId === lastClient.id);
+                  console.log('[TimeEntries] Project exists:', projectExists);
+                  
+                  if (projectExists) {
+                    console.log('[TimeEntries] Restored last project:', lastProject.name);
+                    setLocalSelectedProject(lastProject);
+                    
+                    if (lastTask) {
+                      const taskExists = tasks.some(t => t.id === lastTask.id && t.projectId === lastProject.id);
+                      console.log('[TimeEntries] Task exists:', taskExists);
+                      
+                      if (taskExists) {
+                        console.log('[TimeEntries] Restored last task:', lastTask.name);
+                        setLocalSelectedTask(lastTask);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error loading last used settings:', error);
+        }
+      }
+    };
+    
+    restoreLastUsed();
+  }, [clients, projects, tasks, activeTimer, isInitialLoading, waitForReady]);
 
   // Set up initial collapsed state for time entries
   useEffect(() => {
@@ -485,95 +518,52 @@ const TimeEntries = () => {
     };
   }, [loadTimeEntries]);
 
-  // Load projects when client changes (Timer section)
+  // Filter projects when client changes (using already loaded data)
+  const availableProjects = useMemo(() => {
+    if (!localSelectedClient) return [];
+    return projects.filter(project => project.clientId === localSelectedClient.id);
+  }, [projects, localSelectedClient]);
+
+  // Filter tasks when project changes (using already loaded data)
+  const availableTasks = useMemo(() => {
+    const projectId = localSelectedProject?.id 
+      || activeTimer?.project?.id 
+      || activeTimer?.task?.project?.id 
+      || null;
+    
+    if (!projectId) return [];
+    return tasks.filter(task => task.projectId === projectId);
+  }, [tasks, localSelectedProject, activeTimer]);
+
+  // Reset dependent selections when parent changes
   useEffect(() => {
-    const loadProjects = async () => {
-      if (localSelectedClient && window.electronAPI) {
-        try {
-          const projectList = await window.electronAPI.projects.getAll(localSelectedClient.id);
-          setProjects(projectList);
-          if (!localSelectedProject || !projectList.some(p => p.id === localSelectedProject.id)) {
-            setLocalSelectedProject(null);
-            setLocalSelectedTask(null);
-          }
-        } catch (error) {
-          console.error('Error loading projects:', error);
-          setProjects([]);
-        }
-      } else {
-        setProjects([]);
-      }
-    };
+    if (!localSelectedClient) {
+      setLocalSelectedProject(null);
+      setLocalSelectedTask(null);
+    } else if (localSelectedProject && !availableProjects.some(p => p.id === localSelectedProject.id)) {
+      setLocalSelectedProject(null);
+      setLocalSelectedTask(null);
+    }
+  }, [localSelectedClient, availableProjects, localSelectedProject]);
 
-    loadProjects();
-  }, [localSelectedClient, localSelectedProject]);
-
-  // Load tasks when project changes (Timer section)
   useEffect(() => {
-    const loadTasks = async () => {
-      const projectId = localSelectedProject?.id 
-        || activeTimer?.project?.id 
-        || activeTimer?.task?.project?.id 
-        || null;
+    if (!localSelectedProject) {
+      setLocalSelectedTask(null);
+    } else if (localSelectedTask && !availableTasks.some(t => t.id === localSelectedTask.id)) {
+      setLocalSelectedTask(null);
+    }
+  }, [localSelectedProject, availableTasks, localSelectedTask]);
 
-      if (projectId && window.electronAPI) {
-        try {
-          const taskList = await window.electronAPI.tasks.getAll(projectId);
-          setTasks(taskList);
-        } catch (error) {
-          console.error('Error loading tasks:', error);
-          setTasks([]);
-        }
-      } else {
-        setTasks([]);
-        setLocalSelectedTask(null);
-      }
-    };
+  // Filter projects and tasks for modal (using already loaded data)
+  const modalProjects = useMemo(() => {
+    if (!entryForm.clientId) return [];
+    return projects.filter(project => project.clientId === parseInt(entryForm.clientId));
+  }, [projects, entryForm.clientId]);
 
-    loadTasks();
-  }, [localSelectedProject, activeTimer]);
-
-  // Load projects when client changes in the modal
-  useEffect(() => {
-    const loadModalProjects = async () => {
-      if (entryForm.clientId && window.electronAPI) {
-        try {
-          const projectList = await window.electronAPI.projects.getAll(parseInt(entryForm.clientId));
-          // Only update projects state if we're in edit mode or creating a new entry
-          if (showModal) {
-            setProjects(projectList);
-          }
-        } catch (error) {
-          console.error('Error loading projects for modal:', error);
-        }
-      } else if (showModal) {
-        setProjects([]);
-      }
-    };
-
-    loadModalProjects();
-  }, [entryForm.clientId, showModal]);
-
-  // Load tasks when project changes in the modal
-  useEffect(() => {
-    const loadModalTasks = async () => {
-      if (entryForm.projectId && window.electronAPI) {
-        try {
-          const taskList = await window.electronAPI.tasks.getAll(parseInt(entryForm.projectId));
-          // Only update tasks state if we're in edit mode or creating a new entry
-          if (showModal) {
-            setTasks(taskList);
-          }
-        } catch (error) {
-          console.error('Error loading tasks for modal:', error);
-        }
-      } else if (showModal) {
-        setTasks([]);
-      }
-    };
-
-    loadModalTasks();
-  }, [entryForm.projectId, showModal]);
+  const modalTasks = useMemo(() => {
+    if (!entryForm.projectId) return [];
+    return tasks.filter(task => task.projectId === parseInt(entryForm.projectId));
+  }, [tasks, entryForm.projectId]);
 
   // Timer handlers
   const handleStartTimer = async () => {
@@ -738,22 +728,8 @@ const TimeEntries = () => {
   };
 
   // Time entries handlers
-  const handleStopEntry = useCallback(async (entry) => {
-    try {
-      const api = await waitForReady();
-      if (!api) return;
-      
-      console.log(`Stopping specific timer entry ${entry.id}`);
-      await api.timeEntries.stopTimer(entry.id);
-      await loadTimeEntries();
-    } catch (error) {
-      console.error('Error stopping entry timer:', error);
-    }
-  }, [waitForReady, loadTimeEntries]);
-
   const handlePlayEntry = async (entry) => {
     try {
-      await loadSettings();
       const api = await waitForReady();
       if (!api) return;
       
@@ -1056,7 +1032,7 @@ const TimeEntries = () => {
                     <DropdownItem onClick={() => handleProjectSelect(null)}>
                       No Project
                     </DropdownItem>
-                    {projects.map(project => (
+                    {availableProjects.map(project => (
                       <DropdownItem key={project.id} onClick={() => handleProjectSelect(project)}>
                         {project.name}
                       </DropdownItem>
@@ -1084,7 +1060,7 @@ const TimeEntries = () => {
                     <DropdownItem onClick={() => handleTaskSelect(null)}>
                       No Task
                     </DropdownItem>
-                    {tasks.map(task => (
+                    {availableTasks.map(task => (
                       <DropdownItem key={task.id} onClick={() => handleTaskSelect(task)}>
                         {task.name}
                       </DropdownItem>
@@ -1122,7 +1098,7 @@ const TimeEntries = () => {
           <Title>Recent Time Entries</Title>
           <Button variant="primary" onClick={() => setShowModal(true)}>
             <Plus size={16} />
-            Add Entry
+            Manual Entry
           </Button>
         </FlexBox>
 
@@ -1248,16 +1224,6 @@ const TimeEntries = () => {
                                   <Play size={14} />
                                 </IconButton>
                               )}
-                              {entry.isActive && (
-                                <IconButton 
-                                  variant="danger" 
-                                  size="small" 
-                                  onClick={() => handleStopEntry(entry)}
-                                  title="Stop this timer"
-                                >
-                                  <Square size={14} />
-                                </IconButton>
-                              )}
                               <IconButton 
                                 variant="secondary" 
                                 size="small" 
@@ -1302,7 +1268,7 @@ const TimeEntries = () => {
         <Modal onClick={() => setShowModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
-              <ModalTitle>{editingEntry ? 'Edit Time Entry' : 'Add Time Entry'}</ModalTitle>
+              <ModalTitle>{editingEntry ? 'Edit Time Entry' : 'Manual Time Entry'}</ModalTitle>
               <ModalCloseButton onClick={() => setShowModal(false)}>×</ModalCloseButton>
             </ModalHeader>
             
@@ -1332,7 +1298,7 @@ const TimeEntries = () => {
                   disabled={!entryForm.clientId}
                 >
                   <option value="">Select a project (optional)</option>
-                  {(projects || []).map(project => (
+                  {(modalProjects || []).map(project => (
                     <option key={project.id} value={project.id}>{project.name}</option>
                   ))}
                 </Select>
@@ -1348,7 +1314,7 @@ const TimeEntries = () => {
                   disabled={!entryForm.projectId}
                 >
                   <option value="">Select a task (optional)</option>
-                  {(tasks || []).map(task => (
+                  {(modalTasks || []).map(task => (
                     <option key={task.id} value={task.id}>{task.name}</option>
                   ))}
                 </Select>

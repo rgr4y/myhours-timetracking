@@ -64,6 +64,7 @@ const api = {
   // Database operations
   clients: {
     getAll: () => ipcRenderer.invoke('db:getClients'),
+    getAllWithRelationships: () => ipcRenderer.invoke('db:getClientsWithRelationships'),
     create: (client) => ipcRenderer.invoke('db:createClient', client),
     update: (id, client) => ipcRenderer.invoke('db:updateClient', id, client),
     delete: (id) => ipcRenderer.invoke('db:deleteClient', id)
@@ -84,7 +85,7 @@ const api = {
   },
   
   timeEntries: {
-    getAll: (filters) => {
+    getAll: (filters = {}) => {
       console.log('[PRELOAD] timeEntries.getAll called with filters:', filters);
       return ipcRenderer.invoke('db:getTimeEntries', filters);
     },
@@ -104,7 +105,10 @@ const api = {
   
   settings: {
     get: () => ipcRenderer.invoke('db:getSettings'),
-    update: (settings) => ipcRenderer.invoke('db:updateSettings', settings)
+    update: (settings) => ipcRenderer.invoke('db:updateSettings', settings),
+    getLastUsedClient: () => ipcRenderer.invoke('db:getLastUsedClient'),
+    getLastUsedProject: () => ipcRenderer.invoke('db:getLastUsedProject'),
+    getLastUsedTask: () => ipcRenderer.invoke('db:getLastUsedTask')
   },
   
   invoices: {
