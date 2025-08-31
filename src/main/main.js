@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
+const VersionService = require('./services/version-service');
 
 console.log('[MAIN] === MAIN PROCESS STARTING ===');
 console.log('[MAIN] Node version:', process.version);
@@ -28,7 +29,7 @@ if (isDev) {
   
 }
 
-const DatabaseService = require('./database-service');
+const DatabaseService = require('./services/database-service');
 const InvoiceGenerator = require('./invoice-generator');
 
 // Platform-specific tray services
@@ -45,6 +46,7 @@ class MyHoursApp {
     this.database = null;
     this.invoiceGenerator = null;
     this.trayService = null;
+    this.versionService = new VersionService();
     // this.setupAutoUpdater();
   }
 
@@ -132,8 +134,8 @@ class MyHoursApp {
     // Load the app
     if (isDev) {
       console.log('[MAIN] Loading app in development mode...');
-      console.log('[MAIN] Loading URL: http://localhost:3000');
-      this.mainWindow.loadURL('http://localhost:3000');
+      console.log('[MAIN] Loading URL: http://localhost:3010');
+      this.mainWindow.loadURL('http://localhost:3010');
       this.mainWindow.webContents.openDevTools();
     } else {
       const indexPath = path.join(__dirname, '../renderer/build/index.html');
@@ -208,9 +210,10 @@ class MyHoursApp {
     // Database operations
     ipcMain.handle('app:getVersion', async () => {
       try {
-        return app.getVersion();
+        return this.versionService.getDisplayVersion();
       } catch (e) {
-        return '0.0.0';
+        console.error('[VERSION] Error getting display version:', e);
+        return this.versionService.getBaseVersion();
       }
     });
 
@@ -565,7 +568,7 @@ class MyHoursApp {
         const env = {
           ...process.env,
           ELECTRON_RUN_AS_NODE: '1',
-          DATABASE_URL: `file:${path.join(projectRoot, 'prisma', 'myhours.db')}`,
+          DATABASE_URL: `file:${path.join(projectRoot, 'prisma', MAIN_DB)}`,
         };
         await new Promise((resolve, reject) => {
           const child = execFile(process.execPath, [seedPath], { env, cwd: projectRoot }, (err) => {
