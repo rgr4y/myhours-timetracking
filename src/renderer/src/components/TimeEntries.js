@@ -625,11 +625,8 @@ const TimeEntries = () => {
       }
     }
 
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    if (activeTimer && newDescription !== originalDescription) {
+    // Only set the auto-save timeout if there are unsaved changes after the immediate save attempt
+    if (activeTimer && hasUnsavedChanges) {
       saveTimeoutRef.current = setTimeout(() => {
         saveDescriptionToDatabase(newDescription);
       }, 1000);
