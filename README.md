@@ -1,15 +1,17 @@
 <div align="center">
 
-# myHours ⏱️
+<img src="assets/icon.png" alt="myHours App Icon" width="128" height="128">
 
-No‑frills, no‑strings‑attached time logger and invoice generator for macOS, Windows, and Linux.
+# myHours
+
+### No‑frills, no‑strings‑attached time logger and invoice generator for macOS, Windows, and Linux.
 
 </div>
 
 ## Features
 
 - Time tracking with rounding (5/10/15/30/60m) and manual edits
-- No accounts, no cloud sync — your data stays local
+- No accounts, no phone-home, no cloud sync — your data stays 100% local
 - Clients → Projects → Tasks hierarchy with per‑client/project rates
 - Reports with exports (CSV/JSON)
 - Professional PDF invoices (Puppeteer + Handlebars)
