@@ -1,7 +1,6 @@
 <div align="center">
 
 <img src="assets/icon.png" alt="myHours App Icon" width="128" height="128">
-
 # myHours
 
 ### No‑frills, no‑strings‑attached time logger and invoice generator for macOS, Windows, and Linux.
