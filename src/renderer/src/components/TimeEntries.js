@@ -328,32 +328,6 @@ const TimeEntries = () => {
       
       // Check if this entry was stopped recently and can be resumed
       const canResume = entry.endTime && !entry.isActive;
-      const timeSinceStop = canResume ? Math.floor((new Date() - new Date(entry.endTime)) / (1000 * 60)) : null;
-      
-      if (canResume && timeSinceStop <= roundingMinutes) {
-        // Entry was stopped within rounding window - resume it (modify existing entry)
-        console.log(`Resuming entry ${entry.id} (stopped ${timeSinceStop} minutes ago)`);
-        
-        const resumedEntry = await api.timeEntries.resumeTimer(entry.id);
-        console.log('Timer resumed:', resumedEntry);
-        
-        await loadTimeEntries(); // Refresh the time entries list
-        return;
-      }
-      
-      if (canResume && timeSinceStop > roundingMinutes) {
-        // Entry was stopped outside rounding window - create new entry instead of overwriting
-        console.log(`Creating new entry from ${entry.id} (stopped ${timeSinceStop} minutes ago, > ${roundingMinutes} rounding time)`);
-        
-        await startTimer({
-          clientId: entry.clientId,
-          projectId: entry.projectId,
-          taskId: entry.taskId,
-          description: entry.description
-        });
-        await loadTimeEntries(); // Refresh the time entries list
-        return;
-      }
       
       if (activeTimer) {
         // Calculate elapsed time for active timer
@@ -368,6 +342,7 @@ const TimeEntries = () => {
             description: entry.description
           });
           await loadTimeEntries(); // Refresh the time entries list
+          return;
         } else {
           // More than rounding time - ask for confirmation
           const confirmed = window.confirm(
@@ -383,9 +358,15 @@ const TimeEntries = () => {
             });
             await loadTimeEntries(); // Refresh the time entries list
           }
+          return;
         }
-      } else {
-        // No active timer - start new timer
+      }
+
+      if (canResume) {
+        // Entry was stopped outside rounding window - create new entry instead of overwriting
+        const timeSinceStop = canResume ? Math.floor((new Date() - new Date(entry.endTime)) / (1000 * 60)) : null;
+        console.log(`Creating new entry from ${entry.id} (stopped ${timeSinceStop} minutes ago)`);
+        
         await startTimer({
           clientId: entry.clientId,
           projectId: entry.projectId,
@@ -393,7 +374,17 @@ const TimeEntries = () => {
           description: entry.description
         });
         await loadTimeEntries(); // Refresh the time entries list
+        return;
       }
+
+      // No active timer - start new timer
+      await startTimer({
+        clientId: entry.clientId,
+        projectId: entry.projectId,
+        taskId: entry.taskId,
+        description: entry.description
+      });
+      await loadTimeEntries(); // Refresh the time entries list
     } catch (error) {
       console.error('Error starting timer from entry:', error);
     }

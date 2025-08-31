@@ -249,7 +249,7 @@ export const TimerProvider = ({ children }) => {
   }, [waitForReady, updateTrayStatus]);
 
   const stopTimer = useCallback(async (roundTo = 15) => {
-    console.log('[TimerContext] Stopping timer:', activeTimer?.id, 'roundTo:', roundTo);
+    console.log('[TimerContext] Stopping timer, roundTo:', roundTo);
     
     // Prevent multiple simultaneous stop operations
     if (isStoppingTimer) {
@@ -257,20 +257,47 @@ export const TimerProvider = ({ children }) => {
       return;
     }
     
-    if (!activeTimer) {
-      console.log('[TimerContext] No active timer to stop');
-      return;
-    }
-    
     setIsStoppingTimer(true);
+    
     try {
+      // Always check for the latest active timer state first
+      await checkActiveTimer();
+      
+      // Get the most current active timer (either from state or fresh from DB)
+      let currentActiveTimer = activeTimerRef.current;
+      
+      // If we still don't have an active timer, try to get it directly from the database
+      if (!currentActiveTimer) {
+        console.log('[TimerContext] No active timer in state, checking database directly...');
+        try {
+          const api = await waitForReady();
+          if (api && api.invoke) {
+            currentActiveTimer = await api.invoke('db:getActiveTimer');
+            if (currentActiveTimer) {
+              console.log('[TimerContext] Found active timer in database:', currentActiveTimer);
+              // Update state with the found timer
+              setActiveTimer(currentActiveTimer);
+              setIsRunning(true);
+            }
+          }
+        } catch (error) {
+          console.error('[TimerContext] Error getting active timer from database:', error);
+        }
+      }
+      
+      if (!currentActiveTimer) {
+        console.log('[TimerContext] No active timer to stop');
+        return;
+      }
+      
+      console.log('[TimerContext] Stopping timer:', currentActiveTimer.id);
+      
       const api = await waitForReady();
       if (api && api.invoke) {
-        const stoppedEntry = await api.invoke('db:stopTimer', activeTimer.id, roundTo);
+        const stoppedEntry = await api.invoke('db:stopTimer', currentActiveTimer.id, roundTo);
         console.log('[TimerContext] Timer stopped successfully:', stoppedEntry);
         
         // Only clear state after successful database operation
-        // (stopTimer now returns null if no timer was found, but that's ok)
         setActiveTimer(null);
         setIsRunning(false);
         setTime(0);
@@ -283,6 +310,8 @@ export const TimerProvider = ({ children }) => {
         // Emit timer-stopped event to notify other components
         const stopEvent = new CustomEvent('timer-stopped', { detail: stoppedEntry });
         window.dispatchEvent(stopEvent);
+        
+        return stoppedEntry;
       }
     } catch (error) {
       console.error('[TimerContext] Error stopping timer:', error);
@@ -297,7 +326,7 @@ export const TimerProvider = ({ children }) => {
     } finally {
       setIsStoppingTimer(false);
     }
-  }, [activeTimer, waitForReady, updateTrayStatus, isStoppingTimer]);
+  }, [waitForReady, updateTrayStatus, isStoppingTimer, checkActiveTimer]);
 
   const updateTimerDescription = async (newDescription) => {
     setDescription(newDescription);
@@ -454,21 +483,14 @@ export const TimerProvider = ({ children }) => {
         
         const handleTrayStopTimer = async () => {
           console.log('[TimerContext] Stop timer requested from tray');
-          // Use current values via refs instead of stale closure values
-          const currentActiveTimer = activeTimerRef.current;
-          const currentIsStoppingTimer = isStoppingTimerRef.current;
-          
-          if (currentActiveTimer && !currentIsStoppingTimer) {
-            try {
-              await stopTimer(15); // Use default rounding
-              // Emit event to refresh time entries
-              const refreshEvent = new CustomEvent('refresh-time-entries');
-              window.dispatchEvent(refreshEvent);
-            } catch (error) {
-              console.error('[TimerContext] Error stopping timer from tray:', error);
-            }
-          } else {
-            console.log('[TimerContext] No active timer to stop or stop already in progress');
+          // stopTimer now handles finding the active timer internally
+          try {
+            await stopTimer(15); // Use default rounding
+            // Emit event to refresh time entries
+            const refreshEvent = new CustomEvent('refresh-time-entries');
+            window.dispatchEvent(refreshEvent);
+          } catch (error) {
+            console.error('[TimerContext] Error stopping timer from tray:', error);
           }
         };
         
