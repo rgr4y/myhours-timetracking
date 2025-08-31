@@ -1,6 +1,7 @@
 <div align="center">
 
 <img src="assets/icon.png" alt="myHours App Icon" width="128" height="128">
+
 # myHours
 
 ### No‑frills, no‑strings‑attached time logger and invoice generator for macOS, Windows, and Linux.
@@ -77,6 +78,7 @@ MAC_TARGET=dir
 ```
 
 Notes:
+
 - On macOS, default is `--mac --x64`; add `BUILD_ARM64=1` for universal output.
 - Windows/Linux builds require appropriate host tooling/CI; they’re disabled unless opted‑in.
 
@@ -86,6 +88,7 @@ Notes:
 - Packaged app DB: stored under Electron `userData` as `myhours.sqlite` and initialized from `prisma/template.db` prepared at build time.
 
 Seeding options:
+
 - CLI: `npm run prebuild` (runs migrations and prepares `template.db`).
 - In‑app (dev only): Settings → Danger Zone → “Re‑run Seed (Dev)”.
 
