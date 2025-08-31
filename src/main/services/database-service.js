@@ -9,23 +9,26 @@ const execAsync = promisify(exec);
 
 class DatabaseService {
   constructor() {
+    const TEMPLATE_DB = 'template.db';
+    const MAIN_DB = 'myhours.db';
+
     // Resolve a deterministic, writable DB path for runtime, independent of .env
     const isPackaged = app.isPackaged;
-    const projectRoot = path.join(__dirname, '..', '..');
+    const appPath = app.getAppPath(); // Get the app's base path
     let dbFile;
 
     if (isPackaged) {
       // Packaged app: keep DB under userData
       const userDataDir = app.getPath('userData');
-      dbFile = path.join(userDataDir, 'myhours.sqlite');
+      dbFile = path.join(userDataDir, MAIN_DB);
       // Ensure directory exists
       try { fs.mkdirSync(path.dirname(dbFile), { recursive: true }); } catch (_) {}
 
       // If DB doesn't exist, seed from packaged template
       try {
         if (!fs.existsSync(dbFile)) {
-          const base = process.resourcesPath || path.dirname(app.getAppPath());
-          const templatePath = path.join(base, 'prisma', 'template.db');
+          const base = process.resourcesPath || appPath;
+          const templatePath = path.join(base, 'prisma', TEMPLATE_DB);
           if (fs.existsSync(templatePath)) {
             fs.copyFileSync(templatePath, dbFile);
             console.log('[DATABASE] Copied template DB to user data');
@@ -36,22 +39,21 @@ class DatabaseService {
       }
     } else {
       // Dev: use the workspace DB (checked into repo) to avoid odd CWD issues
-      dbFile = path.join(projectRoot, 'prisma', 'myhours.db');
+      dbFile = path.join(appPath, 'prisma', MAIN_DB);
       // Ensure prisma folder exists (it should in dev)
       try { fs.mkdirSync(path.dirname(dbFile), { recursive: true }); } catch (_) {}
       // If it doesn't exist but a template exists, bootstrap from it
       try {
-        const templatePath = path.join(projectRoot, 'prisma', 'template.db');
+        const templatePath = path.join(appPath, 'prisma', TEMPLATE_DB);
         if (!fs.existsSync(dbFile) && fs.existsSync(templatePath)) {
           fs.copyFileSync(templatePath, dbFile);
-          console.log('[DATABASE] Bootstrapped dev DB from template.db');
+          console.log('[DATABASE] Bootstrapped dev DB from ' + TEMPLATE_DB);
         }
       } catch (e) {
         console.warn('[DATABASE] Unable to bootstrap dev DB:', e.message);
       }
     }
 
-    // Force Prisma to use our resolved path (ignore any DATABASE_URL from .env)
     process.env.DATABASE_URL = `file:${dbFile}`;
     console.log('[DATABASE] Using SQLite at', dbFile);
 
@@ -61,6 +63,33 @@ class DatabaseService {
   async initialize() {
     // Connect to the database
     await this.prisma.$connect();
+    
+    // Configure SQLite for production performance
+    if (app.isPackaged) {
+      try {
+        // Check current journal mode
+        const currentMode = await this.prisma.$queryRaw`PRAGMA journal_mode;`;
+        const journalMode = currentMode[0]?.journal_mode?.toLowerCase();
+        
+        if (journalMode !== 'wal') {
+          console.warn(`[DATABASE] Switching from ${journalMode} to WAL mode`);
+          await this.prisma.$executeRaw`PRAGMA journal_mode = WAL;`;
+        } else {
+          console.log('[DATABASE] WAL mode already enabled');
+        }
+        
+        // Apply other optimizations (these are safe to run multiple times)
+        await this.prisma.$executeRaw`PRAGMA synchronous = NORMAL;`; // Balance safety/performance
+        await this.prisma.$executeRaw`PRAGMA cache_size = 10000;`;   // 10MB cache
+        await this.prisma.$executeRaw`PRAGMA temp_store = MEMORY;`;  // Use memory for temp data
+        await this.prisma.$executeRaw`PRAGMA mmap_size = 268435456;`; // 256MB memory mapping
+        
+        console.log('[DATABASE] Production optimizations applied');
+      } catch (error) {
+        console.warn('[DATABASE] Failed to apply production optimizations:', error);
+      }
+    }
+    
     console.log('Database connected successfully');
     
     // Check if database needs seeding
