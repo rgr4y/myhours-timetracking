@@ -95,8 +95,7 @@ const Sidebar = () => {
   }, []);
 
   const menuItems = [
-    { path: '/', icon: Clock, label: 'Timer' },
-    { path: '/entries', icon: FileText, label: 'Time Entries' },
+    { path: '/', icon: Clock, label: 'Time Entries' },
     { path: '/projects', icon: Folder, label: 'Clients' },
     { path: '/reports', icon: BarChart, label: 'Reports' },
     { path: '/invoice', icon: FileInput, label: 'Invoices' },
