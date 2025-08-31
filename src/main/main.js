@@ -385,7 +385,7 @@ class MyHoursApp {
       const devUrl = 'http://localhost:3010';
       console.log('[MAIN] Waiting for dev server:', devUrl);
       try {
-        await this.waitForDevServer(devUrl, 2000, 300);
+        await this.waitForDevServer(devUrl, 20000, 300);
       } catch (e) {
         console.warn('[MAIN] Dev server wait timed out, attempting to load anyway');
       }
