@@ -145,5 +145,6 @@ You MUST use the safe electronAPI pattern to avoid race conditions.
 1. Don't leave any ESLint warnings. Fix them.
 2. DRY! Don't repeat yourself.
 3. Keep components small and focused.
+4. Don't echo random notes to the terminal.
 
 Remember: This is a single-user desktop app with local SQLite storage - no authentication, API calls, or cloud sync.

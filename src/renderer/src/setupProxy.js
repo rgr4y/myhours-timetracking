@@ -46,7 +46,7 @@ module.exports = function(app) {
         if (connectionAttempts < maxAttempts) {
           setTimeout(() => {
             connectToElectron().catch(() => {});
-          }, 1000);
+          }, 2000);
         }
         
         reject(error);
@@ -147,5 +147,5 @@ module.exports = function(app) {
     connectToElectron().catch(() => {
       console.log('[SETUP-PROXY] Initial connection failed, will retry on first request');
     });
-  }, 1000);
+  }, 2000);
 };

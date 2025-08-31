@@ -48,7 +48,11 @@ class MyHoursApp {
     this.trayService = null;
     this.versionService = new VersionService();
     this.wsServer = null;
-    // this.setupAutoUpdater();
+    this.updater = {
+      mode: null, // 'mock' | 'native' | 'disabled'
+      lastInfo: null,
+      inProgress: false,
+    };
   }
 
   // Wait for the CRA dev server to be reachable before loading it in Electron
@@ -86,49 +90,258 @@ class MyHoursApp {
   }
 
   setupAutoUpdater() {
-    // Skip auto-updater setup to avoid Windows compatibility issues during development
-    if (isDev) {
-      console.log('[UPDATER] Skipping auto-updater setup in development mode');
+    // Only support macOS for updater features per requirement
+    if (process.platform !== 'darwin') {
+      console.log('[UPDATER] Disabled: non-macOS platform');
+      this.updater.mode = 'disabled';
       return;
     }
-    
-    // Configure auto-updater
-    autoUpdater.logger = console;
-    
-    // Only set file transport level if it exists (not available on all platforms)
-    if (autoUpdater.logger.transports && autoUpdater.logger.transports.file) {
-      autoUpdater.logger.transports.file.level = 'info';
+
+    // Development: provide a mock updater that hits a local JSON endpoint
+    if (isDev) {
+      const defaultUrl = 'http://127.0.0.1:3010/mock-update.json';
+      const feedUrl = process.env.MYHOURS_DEV_UPDATE_URL || defaultUrl;
+      console.log('[UPDATER] Dev mock enabled. Feed URL:', feedUrl);
+      this.updater.mode = 'mock';
+      this.updater.feedUrl = feedUrl;
+
+      const sendEvent = (type, payload = {}) => {
+        console.log('[UPDATER] (mock event)', type, payload);
+        try { this.mainWindow?.webContents?.send('updater:event', { type, payload }); } catch (_) {}
+      };
+
+      const fetchJson = async (url) => {
+        return new Promise((resolve, reject) => {
+          try {
+            const { URL } = require('url');
+            const parsed = new URL(url);
+            const isHttps = parsed.protocol === 'https:';
+            const http = require(isHttps ? 'https' : 'http');
+            const req = http.request({
+              hostname: parsed.hostname,
+              port: parsed.port,
+              path: parsed.pathname + (parsed.search || ''),
+              method: 'GET',
+              timeout: 4000,
+              headers: { 'Accept': 'application/json' }
+            }, (res) => {
+              let data = '';
+              res.setEncoding('utf8');
+              res.on('data', chunk => { data += chunk; });
+              res.on('end', () => {
+                if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                  try {
+                    const json = JSON.parse(data);
+                    resolve(json);
+                  } catch (e) {
+                    reject(new Error(`Invalid JSON from feed: ${e.message}`));
+                  }
+                } else {
+                  reject(new Error(`HTTP ${res.statusCode} from feed`));
+                }
+              });
+            });
+            req.on('timeout', () => {
+              req.destroy(new Error('request timeout'));
+            });
+            req.on('error', reject);
+            req.end();
+          } catch (e) {
+            reject(e);
+          }
+        });
+      };
+
+      // Simple semantic version compare: returns -1, 0, 1
+      const cmp = (a, b) => {
+        const sanitize = (v) => String(v).split('-')[0].split('.').map(x => parseInt(x, 10) || 0);
+        const pa = sanitize(a); const pb = sanitize(b);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+          const da = pa[i] || 0; const db = pb[i] || 0;
+          if (da < db) return -1; if (da > db) return 1;
+        }
+        return 0;
+      };
+
+      // IPC handlers for mock updater
+      ipcMain.handle('update:check', async () => {
+        try {
+          sendEvent('checking-for-update');
+          const info = await fetchJson(this.updater.feedUrl);
+          this.updater.lastInfo = info;
+          const current = this.versionService.getBaseVersion();
+          if (info && info.version && cmp(current, info.version) < 0) {
+            const notesUrl = info.version ? `https://github.com/rgr4y/myhours-timetracking/releases/tag/v${info.version}` : undefined;
+            sendEvent('update-available', { version: info.version, notes: info.notes || '', notesUrl });
+            return { available: true, info };
+          }
+          sendEvent('update-not-available', { current });
+          return { available: false, info: { current } };
+        } catch (err) {
+          console.log('[UPDATER] Mock check error:', err);
+          sendEvent('error', { message: err && err.message ? err.message : String(err) });
+          return { error: err.message };
+        }
+      });
+
+      ipcMain.handle('update:getFeedUrl', async () => {
+        return { url: this.updater.feedUrl };
+      });
+
+      ipcMain.handle('update:setFeedUrl', async (_e, url) => {
+        try {
+          if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+            throw new Error('Invalid URL');
+          }
+          this.updater.feedUrl = url;
+          console.log('[UPDATER] Dev mock feed URL set to:', url);
+          return { success: true };
+        } catch (err) {
+          return { success: false, error: err.message };
+        }
+      });
+
+      ipcMain.handle('update:download', async () => {
+        // Simulate download progress
+        if (!this.updater.lastInfo) return { error: 'No update info. Call update:check first.' };
+        if (this.updater.inProgress) return { error: 'Download already in progress' };
+        this.updater.inProgress = true;
+        try {
+          let percent = 0;
+          while (percent < 100) {
+            await new Promise(r => setTimeout(r, 120));
+            percent = Math.min(100, percent + Math.random() * 18);
+            const transferred = Math.round(percent * 1000000 / 100);
+            const total = 1000000;
+            const bytesPerSecond = 200000 + Math.round(Math.random() * 150000);
+            console.log('[UPDATER] (mock) progress', percent.toFixed(1) + '%');
+            sendEvent('download-progress', { percent, transferred, total, bytesPerSecond });
+          }
+          sendEvent('update-downloaded', { version: this.updater.lastInfo.version });
+          // Prompt to install (dev mock)
+          try {
+            const res = await dialog.showMessageBox(this.mainWindow, {
+              type: 'question',
+              buttons: ['Install Now', 'Later'],
+              defaultId: 0,
+              cancelId: 1,
+              title: 'Update Ready',
+              message: `Version ${this.updater.lastInfo.version} has been downloaded. Install now?`
+            });
+            if (res.response === 0) {
+              sendEvent('will-install');
+              console.log('[UPDATER] (mock) install triggered via prompt');
+            }
+          } catch (_) {}
+          return { downloaded: true };
+        } finally {
+          this.updater.inProgress = false;
+        }
+      });
+
+      ipcMain.handle('update:install', async () => {
+        // In dev, just simulate a relaunch
+        sendEvent('will-install');
+        console.log('[UPDATER] (mock) install triggered');
+        return { installed: true };
+      });
+
+      return;
     }
-    
-    console.log('[UPDATER] Setting up auto-updater...');
-    
-    autoUpdater.on('checking-for-update', () => {
-      console.log('[UPDATER] Checking for update...');
-    });
-    
-    autoUpdater.on('update-available', (info) => {
-      console.log('[UPDATER] Update available:', info.version);
-    });
-    
-    autoUpdater.on('update-not-available', (info) => {
-      console.log('[UPDATER] Update not available:', info.version);
-    });
-    
-    autoUpdater.on('error', (err) => {
-      console.log('[UPDATER] Error in auto-updater:', err);
-    });
-    
-    autoUpdater.on('download-progress', (progressObj) => {
-      let log_message = "Download speed: " + progressObj.bytesPerSecond;
-      log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-      log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-      console.log('[UPDATER]', log_message);
-    });
-    
-    autoUpdater.on('update-downloaded', (info) => {
-      console.log('[UPDATER] Update downloaded:', info.version);
-      autoUpdater.quitAndInstall();
-    });
+
+    // Production macOS: wire up electron-updater
+    try {
+      // Configure auto-updater
+      autoUpdater.logger = console;
+      if (autoUpdater.logger.transports && autoUpdater.logger.transports.file) {
+        autoUpdater.logger.transports.file.level = 'info';
+      }
+      // Prod: check-only, do not auto-download
+      try { autoUpdater.autoDownload = false; } catch (_) {}
+      try { autoUpdater.autoInstallOnAppQuit = true; } catch (_) {}
+      this.updater.mode = 'native';
+      console.log('[UPDATER] Setting up electron-updater (macOS) ...');
+
+      // Explicitly point to GitHub releases (also embedded via app-update.yml)
+      try {
+        autoUpdater.setFeedURL({
+          provider: 'github',
+          owner: 'rgr4y',
+          repo: 'myhours-timetracking',
+          releaseType: 'release'
+        });
+        console.log('[UPDATER] Feed set to GitHub releases: rgr4y/myhours-timetracking');
+      } catch (e) {
+        console.warn('[UPDATER] setFeedURL failed (will use embedded config):', e.message);
+      }
+
+      // Diagnostics
+      try {
+        console.log('[UPDATER] updateConfigPath:', autoUpdater.updateConfigPath);
+      } catch (_) {}
+
+      const forward = (type, payload = {}) => {
+        try { this.mainWindow?.webContents?.send('updater:event', { type, payload }); } catch (_) {}
+      };
+
+      autoUpdater.on('checking-for-update', () => {
+        console.log('[UPDATER] Checking for update...');
+        forward('checking-for-update');
+      });
+      autoUpdater.on('update-available', (info) => {
+        const version = info?.version;
+        const notes = info?.releaseNotes;
+        const notesUrl = version ? `https://github.com/rgr4y/myhours-timetracking/releases/tag/v${version}` : undefined;
+        console.log('[UPDATER] Update available:', version);
+        forward('update-available', { version, notes, notesUrl });
+      });
+      autoUpdater.on('update-not-available', (info) => {
+        console.log('[UPDATER] Update not available:', info?.version);
+        forward('update-not-available', { version: info?.version });
+      });
+      autoUpdater.on('error', (err) => {
+        console.log('[UPDATER] Error in auto-updater:', err);
+        forward('error', { message: err?.message || String(err) });
+      });
+      autoUpdater.on('download-progress', (progressObj) => {
+        forward('download-progress', progressObj);
+      });
+      autoUpdater.on('update-downloaded', async (info) => {
+        const version = info?.version;
+        console.log('[UPDATER] Update downloaded:', version);
+        forward('update-downloaded', { version });
+        // Prompt to install now
+        try {
+          const res = await dialog.showMessageBox(this.mainWindow, {
+            type: 'question',
+            buttons: ['Install Now', 'Later'],
+            defaultId: 0,
+            cancelId: 1,
+            title: 'Update Ready',
+            message: `Version ${version || ''} has been downloaded. Install now?`
+          });
+          if (res.response === 0) {
+            autoUpdater.quitAndInstall();
+          }
+        } catch (e) {
+          console.warn('[UPDATER] Install prompt failed:', e);
+        }
+      });
+
+      // IPC wrappers to control native updater too
+      ipcMain.handle('update:check', async () => {
+        try { await autoUpdater.checkForUpdates(); return { started: true }; } catch (e) { return { error: e.message }; }
+      });
+      ipcMain.handle('update:download', async () => {
+        try { await autoUpdater.downloadUpdate(); return { started: true }; } catch (e) { return { error: e.message }; }
+      });
+      ipcMain.handle('update:install', async () => {
+        try { autoUpdater.quitAndInstall(); return { quitting: true }; } catch (e) { return { error: e.message }; }
+      });
+    } catch (e) {
+      console.warn('[UPDATER] Failed to set up native updater:', e);
+      this.updater.mode = 'disabled';
+    }
   }
 
   async createWindow() {
@@ -172,7 +385,7 @@ class MyHoursApp {
       const devUrl = 'http://localhost:3010';
       console.log('[MAIN] Waiting for dev server:', devUrl);
       try {
-        await this.waitForDevServer(devUrl, 20000, 300);
+        await this.waitForDevServer(devUrl, 2000, 300);
       } catch (e) {
         console.warn('[MAIN] Dev server wait timed out, attempting to load anyway');
       }
@@ -919,10 +1132,17 @@ class MyHoursApp {
     await app.whenReady();
     console.log('[MAIN] App ready');
     
+    // Setup updater (mock in dev on macOS, native in prod macOS)
+    this.setupAutoUpdater();
+
     // Check for updates in production
-    if (!isDev) {
+    if (!isDev && process.platform === 'darwin') {
       setTimeout(() => {
-        autoUpdater.checkForUpdatesAndNotify();
+        try {
+          autoUpdater.checkForUpdates(); // check-only (no auto download)
+        } catch (e) {
+          console.warn('[UPDATER] checkForUpdates failed:', e.message);
+        }
       }, 3000); // Wait 3 seconds after startup
     }
     

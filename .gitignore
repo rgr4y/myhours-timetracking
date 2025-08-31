@@ -9,3 +9,4 @@ node_modules/
 src/renderer/node_modules/
 coverage/
 .playwright-mcp
+src/renderer/public/*.dmg

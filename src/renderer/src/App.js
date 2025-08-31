@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { HashRouter as Router, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import styled, { createGlobalStyle } from 'styled-components';
 import './App.css';
@@ -11,6 +11,7 @@ import Settings from './components/Settings';
 import About from './components/About';
 import Invoice from './components/Invoice';
 import BackgroundClockOrbits from './components/BackgroundClockOrbits';
+import { Button } from './components/ui';
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -85,6 +86,29 @@ const MainContent = styled.div`
   overflow: hidden;
 `;
 
+const UpdateBar = styled.div`
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #2a2a2a;
+  border-bottom: 1px solid #404040;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+`;
+
+const UpdateBarText = styled.div`
+  color: #fff;
+  font-size: 14px;
+`;
+
+const UpdateBarActions = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
 // Component to handle window visibility detection
 const VisibilityHandler = () => {
   const navigate = useNavigate();
@@ -140,6 +164,59 @@ const VisibilityHandler = () => {
 };
 
 function App() {
+  const [updateBanner, setUpdateBanner] = useState({ visible: false, version: null, notesUrl: null });
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  useEffect(() => {
+    let unsub = null;
+    const init = async () => {
+      try {
+        // Read preference (default to true if unset)
+        const val = await window.electronAPI?.invoke('db:getSetting', 'update_notifications_enabled');
+        if (val === 'false') setNotificationsEnabled(false);
+      } catch (_) {}
+
+      if (!window.electronAPI?.updater?.onEvent) return;
+      const handler = (evt) => {
+        if (!evt || !evt.type) return;
+        if (evt.type === 'update-available') {
+          if (notificationsEnabled) {
+            const ver = evt.payload?.version || null;
+            const notesUrl = evt.payload?.notesUrl || null;
+            setUpdateBanner({ visible: true, version: ver, notesUrl });
+          }
+        }
+      };
+      window.electronAPI.updater.onEvent(handler);
+      unsub = () => window.electronAPI.updater.removeEventListener(handler);
+    };
+    init();
+    return () => { if (unsub) unsub(); };
+  }, [notificationsEnabled]);
+
+  const handleDownloadUpdate = async () => {
+    try { await window.electronAPI?.updater?.download(); } catch (_) {}
+  };
+  const handleDismiss = () => setUpdateBanner({ visible: false, version: updateBanner.version });
+  const handleDisable = async () => {
+    try {
+      await window.electronAPI?.invoke('db:setSetting', 'update_notifications_enabled', 'false');
+      setNotificationsEnabled(false);
+      setUpdateBanner({ visible: false, version: updateBanner.version, notesUrl: updateBanner.notesUrl });
+    } catch (_) {}
+  };
+
+  const handleOpenReleaseNotes = async () => {
+    try {
+      if (updateBanner?.notesUrl) {
+        await window.electronAPI?.openExternal(updateBanner.notesUrl);
+      } else if (updateBanner?.version) {
+        const url = `https://github.com/rgr4y/myhours-timetracking/releases/tag/v${updateBanner.version}`;
+        await window.electronAPI?.openExternal(url);
+      }
+    } catch (_) {}
+  };
+
   return (
     <TimerProvider>
       <Router>
@@ -152,6 +229,19 @@ function App() {
           <ContentWrapper>
             <Sidebar />
             <MainContent>
+              {updateBanner.visible && (
+                <UpdateBar>
+                  <UpdateBarText>
+                    {updateBanner.version ? `Update v${updateBanner.version} is available.` : 'An update is available.'}
+                  </UpdateBarText>
+                  <UpdateBarActions>
+                    <Button variant="primary" size="small" onClick={handleDownloadUpdate}>Download</Button>
+                    <Button variant="secondary" size="small" onClick={handleOpenReleaseNotes}>Release Notes</Button>
+                    <Button variant="secondary" size="small" onClick={handleDismiss}>Later</Button>
+                    <Button variant="secondary" size="small" onClick={handleDisable}>Disable notifications</Button>
+                  </UpdateBarActions>
+                </UpdateBar>
+              )}
               <Routes>
                 <Route path="/" element={<TimeEntries />} />
                 <Route path="/projects" element={<Clients />} />

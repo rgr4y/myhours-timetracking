@@ -32,6 +32,16 @@ const Settings = () => {
   const [isRemoving, setIsRemoving] = useState(false);
   const isDev = process.env.NODE_ENV !== 'production';
 
+  // Updater state (macOS only, but harmless elsewhere)
+  const [updateStatus, setUpdateStatus] = useState('idle'); // idle|checking|available|not-available|downloading|downloaded|error
+  const [updateInfo, setUpdateInfo] = useState(null); // { version, notes }
+  const [downloadProgress, setDownloadProgress] = useState(null); // { percent, transferred, total }
+  const [updateError, setUpdateError] = useState(null);
+  const [appVersion, setAppVersion] = useState('');
+  const [feedUrl, setFeedUrl] = useState('');
+  const [feedUrlMessage, setFeedUrlMessage] = useState('');
+  const [updateNotificationsEnabled, setUpdateNotificationsEnabled] = useState(true);
+
   useEffect(() => {
     const loadData = async () => {
       if (window.electronAPI) {
@@ -43,10 +53,73 @@ const Settings = () => {
         } catch (error) {
           console.error('Error loading settings:', error);
         }
+
+        // Get app version (display)
+        try {
+          const v = await window.electronAPI.invoke('app:getVersion');
+          setAppVersion(v || '');
+        } catch (e) {
+          // ignore
+        }
+
+        // Get current dev feed URL if available
+        try {
+          const res = await window.electronAPI.invoke('update:getFeedUrl');
+          if (res && res.url) setFeedUrl(res.url);
+        } catch (_) {
+          // ignore in prod or if not available
+        }
+
+        // Load update notifications preference
+        try {
+          const pref = await window.electronAPI.invoke('db:getSetting', 'update_notifications_enabled');
+          setUpdateNotificationsEnabled(pref !== 'false');
+        } catch (_) {}
       }
     };
     loadData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Subscribe to updater events
+  useEffect(() => {
+    if (!window.electronAPI?.updater?.onEvent) return;
+    const handler = (evt) => {
+      if (!evt || !evt.type) return;
+      switch (evt.type) {
+        case 'checking-for-update':
+          setUpdateStatus('checking');
+          setUpdateError(null);
+          setUpdateInfo(null);
+          setDownloadProgress(null);
+          break;
+        case 'update-available':
+          setUpdateStatus('available');
+          setUpdateInfo(evt.payload || null);
+          break;
+        case 'update-not-available':
+          setUpdateStatus('not-available');
+          setUpdateInfo(null);
+          break;
+        case 'download-progress':
+          setUpdateStatus('downloading');
+          setDownloadProgress(evt.payload || null);
+          break;
+        case 'update-downloaded':
+          setUpdateStatus('downloaded');
+          break;
+        case 'error':
+          setUpdateStatus('error');
+          setUpdateError(evt.payload?.message || 'Unknown updater error');
+          break;
+        default:
+          break;
+      }
+    };
+    window.electronAPI.updater.onEvent(handler);
+    return () => {
+      try { window.electronAPI.updater.removeEventListener(handler); } catch (_) {}
+    };
+  }, []);
 
   // Check if settings have changed
   const hasUnsavedChanges = () => {
@@ -80,6 +153,59 @@ const Settings = () => {
     setSettings(prev => ({ ...prev, [field]: value }));
   };
 
+  // Updater action handlers
+  const handleCheckUpdate = async () => {
+    try {
+      setUpdateError(null);
+      // Apply dev feed URL before checking
+      if (feedUrl && isDev) {
+        try { await window.electronAPI?.invoke('update:setFeedUrl', feedUrl); } catch (_) {}
+      }
+      await window.electronAPI?.updater?.check();
+    } catch (e) {
+      console.error('Updater check error:', e);
+      setUpdateStatus('error');
+      setUpdateError(e?.message || String(e));
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    try {
+      setUpdateError(null);
+      await window.electronAPI?.updater?.download();
+    } catch (e) {
+      console.error('Updater download error:', e);
+      setUpdateStatus('error');
+      setUpdateError(e?.message || String(e));
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    try {
+      setUpdateError(null);
+      await window.electronAPI?.updater?.install();
+    } catch (e) {
+      console.error('Updater install error:', e);
+      setUpdateStatus('error');
+      setUpdateError(e?.message || String(e));
+    }
+  };
+
+  const handleApplyFeedUrl = async () => {
+    if (!isDev || !feedUrl) return;
+    try {
+      const res = await window.electronAPI.invoke('update:setFeedUrl', feedUrl);
+      if (res?.success) {
+        setFeedUrlMessage('Applied');
+        setTimeout(() => setFeedUrlMessage(''), 1500);
+      } else {
+        setFeedUrlMessage(res?.error || 'Failed');
+      }
+    } catch (e) {
+      setFeedUrlMessage('Failed');
+    }
+  };
+
   return (
     <Container padding="40px" style={{ height: '100vh', overflowY: 'auto' }}>
       <FlexBox justify="space-between" align="center" margin="0 0 30px 0">
@@ -95,6 +221,78 @@ const Settings = () => {
       </FlexBox>
 
       <FlexBox direction="column" gap="30px">
+        {/* App Updates (macOS only; dev uses mock) */}
+        <Card>
+          <Heading margin="0 0 20px 0">App Updates</Heading>
+          <FlexBox direction="column" gap="12px">
+            {appVersion && (
+              <Text>Current version: {appVersion}</Text>
+            )}
+            <FlexBox gap="10px">
+              <Button variant="secondary" onClick={handleCheckUpdate} disabled={updateStatus === 'checking'}>
+                {updateStatus === 'checking' ? 'Checking…' : 'Check for Updates'}
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={handleDownloadUpdate}
+                disabled={!(updateStatus === 'available')}
+              >
+                Download Update
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={handleInstallUpdate}
+                disabled={!(updateStatus === 'downloaded')}
+              >
+                Install and Restart
+              </Button>
+          </FlexBox>
+
+            {updateStatus === 'available' && updateInfo?.version && (
+              <Text>Update available: v{updateInfo.version}</Text>
+            )}
+            {updateStatus === 'not-available' && (
+              <Text>No updates available.</Text>
+            )}
+            {updateStatus === 'downloading' && (
+              <Text>
+                Downloading… {downloadProgress?.percent ? `${downloadProgress.percent.toFixed?.(1) ?? downloadProgress.percent}%` : ''}
+              </Text>
+            )}
+            {updateStatus === 'downloaded' && (
+              <Text>Update downloaded. Click Install to apply.</Text>
+            )}
+            {updateStatus === 'error' && updateError && (
+              <Text variant="danger">Error: {updateError}</Text>
+            )}
+            {isDev && (
+              <FlexBox direction="column" gap="8px" style={{ marginTop: '6px' }}>
+                <Label>Dev Update Feed URL</Label>
+                <FlexBox gap="8px">
+                  <Input value={feedUrl} onChange={(e) => setFeedUrl(e.target.value)} placeholder="http://127.0.0.1:3010/mock-update.json" />
+                  <Button variant="secondary" onClick={handleApplyFeedUrl}>Apply</Button>
+                </FlexBox>
+                {feedUrlMessage && <Text size="small" variant="secondary">{feedUrlMessage}</Text>}
+              </FlexBox>
+            )}
+
+            <FlexBox align="center" gap="10px" style={{ marginTop: '8px' }}>
+              <input
+                type="checkbox"
+                checked={updateNotificationsEnabled}
+                onChange={async (e) => {
+                  const enabled = e.target.checked;
+                  setUpdateNotificationsEnabled(enabled);
+                  try {
+                    await window.electronAPI.invoke('db:setSetting', 'update_notifications_enabled', enabled ? 'true' : 'false');
+                  } catch (_) {}
+                }}
+              />
+              <Label style={{ margin: 0 }}>Show update notifications on launch</Label>
+            </FlexBox>
+          </FlexBox>
+        </Card>
+
         {/* Company Information */}
         <Card>
           <Heading margin="0 0 20px 0">

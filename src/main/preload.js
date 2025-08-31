@@ -28,36 +28,32 @@ const originalConsole = {
 };
 
 // Simple one-way console forwarding
+const formatArgs = (args) => args.map(arg =>
+  typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg)
+);
+
 console.log = (...args) => {
-  originalConsole.log(...args);
-  const message = args.map(arg => 
-    typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg)
-  ).join(' ');
-  ipcRenderer.send('console:log', 'log', message);
+  const formatted = formatArgs(args);
+  originalConsole.log(...formatted);
+  ipcRenderer.send('console:log', 'log', formatted.join(' '));
 };
 
 console.error = (...args) => {
-  originalConsole.error(...args);
-  const message = args.map(arg => 
-    typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg)
-  ).join(' ');
-  ipcRenderer.send('console:log', 'error', message);
+  const formatted = formatArgs(args);
+  originalConsole.error(...formatted);
+  ipcRenderer.send('console:log', 'error', formatted.join(' '));
 };
 
 console.warn = (...args) => {
-  originalConsole.warn(...args);
-  const message = args.map(arg => 
-    typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg)
-  ).join(' ');
-  ipcRenderer.send('console:log', 'warn', message);
+  const formatted = formatArgs(args);
+  originalConsole.warn(...formatted);
+  ipcRenderer.send('console:log', 'warn', formatted.join(' '));
 };
 
 console.info = (...args) => {
-  originalConsole.info(...args);
-  const message = args.map(arg => 
-    typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg)
-  ).join(' ');
-  ipcRenderer.send('console:log', 'info', message);
+  const formatted = formatArgs(args);
+  originalConsole.info(...formatted);
+  ipcRenderer.send('console:log', 'info', formatted.join(' '));
 };
 
 const api = {
@@ -159,6 +155,28 @@ const api = {
 
   // Direct IPC invoke method for flexibility
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
+};
+
+// Updater API (macOS only; dev uses mock, prod uses native)
+const updaterListenerMap = new Map();
+api.updater = {
+  check: () => ipcRenderer.invoke('update:check'),
+  download: () => ipcRenderer.invoke('update:download'),
+  install: () => ipcRenderer.invoke('update:install'),
+  onEvent: (callback) => {
+    if (typeof callback === 'function') {
+      const wrapper = (_event, data) => callback(data);
+      updaterListenerMap.set(callback, wrapper);
+      ipcRenderer.on('updater:event', wrapper);
+    }
+  },
+  removeEventListener: (callback) => {
+    const wrapper = updaterListenerMap.get(callback);
+    if (wrapper) {
+      ipcRenderer.removeListener('updater:event', wrapper);
+      updaterListenerMap.delete(callback);
+    }
+  }
 };
 
 // Expose the API to the renderer process

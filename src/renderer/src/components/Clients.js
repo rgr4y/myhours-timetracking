@@ -96,7 +96,7 @@ const Clients = () => {
 
   // Loading states
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  const [setIsLoadingTasks] = useState(false);
+  const [, setIsLoadingTasks] = useState(false);
 
   const [clientForm, setClientForm] = useState({
     name: '',

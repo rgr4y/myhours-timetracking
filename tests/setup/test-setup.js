@@ -34,12 +34,38 @@ global.window.electronAPI = {
   },
   settings: {
     get: vi.fn(() => Promise.resolve({ timer_rounding: 15 })),
-    set: vi.fn(() => Promise.resolve())
+    set: vi.fn(() => Promise.resolve()),
+    update: vi.fn(() => Promise.resolve())
   },
   tray: {
     updateTimerStatus: vi.fn()
   },
-  invoke: vi.fn()
+  updater: {
+    check: vi.fn(() => Promise.resolve({})),
+    download: vi.fn(() => Promise.resolve({})),
+    install: vi.fn(() => Promise.resolve({})),
+    onEvent: vi.fn((cb) => {
+      // store handler to trigger within tests if needed
+      global.__updaterHandler = cb
+    }),
+    removeEventListener: vi.fn((cb) => {
+      if (global.__updaterHandler === cb) global.__updaterHandler = null
+    })
+  },
+  openExternal: vi.fn(() => Promise.resolve(true)),
+  invoke: vi.fn((channel, ...args) => {
+    if (channel === 'db:getSetting') {
+      // default to notifications enabled
+      return Promise.resolve('true')
+    }
+    if (channel === 'update:getFeedUrl') {
+      return Promise.resolve({ url: 'http://127.0.0.1:3010/mock-update.json' })
+    }
+    if (channel === 'update:setFeedUrl') {
+      return Promise.resolve({ success: true })
+    }
+    return Promise.resolve({})
+  })
 }
 
 // Mock global functions

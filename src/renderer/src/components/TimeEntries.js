@@ -179,9 +179,9 @@ const DisabledDropdownButton = styled(DropdownButton)`
 
 const DayGroupContainer = styled.div`
   margin-bottom: ${props => props.$isLast ? '0' : '20px'};
-  border: ${props => props.$hasActiveEntry ? `2px solid ${colors.primary}` : 'none'};
   border-radius: 8px;
-  padding: ${props => props.$hasActiveEntry ? '2px' : '0'};
+  /* Use an outer ring that doesn't affect layout */
+  box-shadow: ${props => props.$hasActiveEntry ? `0 0 0 2px ${colors.primary}` : 'none'};
 `;
 
 const DayHeaderCard = styled(Card)`

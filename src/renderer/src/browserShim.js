@@ -95,6 +95,18 @@ class BrowserElectronAPI {
     json: (data) => this.invoke('export:json', data)
   };
 
+  // Updater (mirrors preload API); in browser dev it proxies to WebSocket IPC
+  updater = {
+    check: () => this.invoke('update:check'),
+    download: () => this.invoke('update:download'),
+    install: () => this.invoke('update:install'),
+    onEvent: (callback) => {
+      // No event bus in browser shim; noop to keep API parity
+      console.log('[BROWSER-SHIM] updater.onEvent registered (no-op in browser)');
+    },
+    removeEventListener: () => {}
+  };
+
   // App helpers - simplified for browser
   openExternal = (url) => {
     window.open(url, '_blank');
