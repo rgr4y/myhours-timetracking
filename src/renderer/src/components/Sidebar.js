@@ -140,7 +140,7 @@ const Sidebar = () => {
             });
           }}
         >
-          v{appVersion || '—'}
+          {appVersion || '—'}
         </VersionLink>
         <span>•</span>
         <FooterLink

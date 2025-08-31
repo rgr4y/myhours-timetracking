@@ -43,7 +43,7 @@ assets/                   # App assets (icons, etc.)
 
 1. **Check running tasks first**: The `Start Dev` task should already be running
 2. **Start development**: `Start Dev` task runs two processes with electronmon:
-   - React dev server at `http://localhost:3000`
+   - React dev server at `http://localhost:3010`
    - Electron app with electronmon (auto-restart on main process changes)
 3. **Debug outputs**: Check all terminal tabs - main process logs appear in terminal, renderer logs forward through preload.js
 

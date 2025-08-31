@@ -6,7 +6,7 @@
 			"script": "dev",
 			"problemMatcher": [],
 			"label": "Start Dev",
-			"detail": "concurrently \"npm run start-renderer\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\""
+			"detail": "Runs the development environment for myHours"
 		}
 	]
 }

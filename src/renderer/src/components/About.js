@@ -84,6 +84,7 @@ const Footer = styled.div`
   padding: 10px 28px 24px;
   color: #8a8a8a;
   font-size: 12px;
+  text-align: center;
 `;
 
 // Lightweight confetti animation. Plays for exactly 2 cycles on mount and whenever the

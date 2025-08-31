@@ -25,6 +25,32 @@ import { useElectronAPI } from '../hooks/useElectronAPI';
 import { formatDurationHumanFriendly, formatTime, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
 
 const TimeEntries = () => {
+  // Color constants
+  const COLORS = {
+    PRIMARY: '#007AFF',
+    BORDER_DEFAULT: '#404040',
+    BG_ACTIVE: '#1a1a2e',
+    BG_INACTIVE: '#2a2a2a',
+    SUCCESS: '#28a745'
+  };
+
+  // Helper functions for styling
+  const getBorderStyle = (entry, hasActiveEntry) => {
+    if (hasActiveEntry) {
+      return entry.isActive ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`;
+    }
+    return entry.isActive ? `2px solid ${COLORS.PRIMARY}` : `1px solid ${COLORS.BORDER_DEFAULT}`;
+  };
+
+  const getEntryCardStyle = (entry, index, entries, hasActiveEntry) => ({
+    borderLeft: getBorderStyle(entry, hasActiveEntry),
+    borderRight: getBorderStyle(entry, hasActiveEntry),
+    borderBottom: getBorderStyle(entry, hasActiveEntry),
+    borderTop: index === 0 ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`,
+    borderRadius: index === entries.length - 1 ? '0 0 8px 8px' : '0',
+    backgroundColor: entry.isActive ? COLORS.BG_ACTIVE : undefined
+  });
+
   const { activeTimer, startTimer, stopTimer } = useTimer();
   const { waitForReady } = useElectronAPI();
   const [timeEntries, setTimeEntries] = useState([]);
@@ -100,7 +126,7 @@ const TimeEntries = () => {
         }
         
         setTasks(allTasks);
-        console.log('All tasks loaded:', allTasks.length, 'tasks');
+        // console.log('All tasks loaded:', allTasks.length, 'tasks');
       } catch (error) {
         console.error('Error loading all tasks:', error);
       }
@@ -588,7 +614,7 @@ const TimeEntries = () => {
                 key={date} 
                 style={{ 
                   marginBottom: groupIndex < Object.keys(groupEntriesByDate(timeEntries)).length - 1 ? '20px' : '0',
-                  border: hasActiveEntry ? '2px solid #007AFF' : 'none',
+                  border: hasActiveEntry ? `2px solid ${COLORS.PRIMARY}` : 'none',
                   borderRadius: '8px',
                   padding: hasActiveEntry ? '2px' : '0'
                 }}
@@ -599,8 +625,8 @@ const TimeEntries = () => {
                   margin="0"
                   style={{ 
                     cursor: 'pointer',
-                    backgroundColor: hasActiveEntry ? '#1a1a2e' : '#2a2a2a',
-                    border: hasActiveEntry ? 'none' : '1px solid #404040',
+                    backgroundColor: hasActiveEntry ? COLORS.BG_ACTIVE : COLORS.BG_INACTIVE,
+                    border: hasActiveEntry ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`,
                     borderRadius: collapsedDays.has(date) ? '8px' : '8px 8px 0 0'
                   }}
                   onClick={() => toggleDayCollapse(date)}
@@ -628,12 +654,7 @@ const TimeEntries = () => {
                       key={entry.id} 
                       padding="15px"
                       margin="0"
-                      style={{
-                        border: hasActiveEntry ? (entry.isActive ? 'none' : '1px solid #404040') : (entry.isActive ? '2px solid #007AFF' : '1px solid #404040'),
-                        borderTop: index === 0 ? 'none' : '1px solid #404040',
-                        borderRadius: index === entries.length - 1 ? '0 0 8px 8px' : '0',
-                        backgroundColor: entry.isActive ? '#1a1a2e' : undefined
-                      }}
+                      style={getEntryCardStyle(entry, index, entries, hasActiveEntry)}
                     >
                       <FlexBox justify="space-between" align="center">
                         <FlexBox direction="column" gap="5px">
@@ -653,7 +674,7 @@ const TimeEntries = () => {
                                 padding: '2px 8px', 
                                 borderRadius: '12px', 
                                 marginBottom: '15px',
-                                backgroundColor: '#28a745',
+                                backgroundColor: COLORS.SUCCESS,
                                 color: 'white',
                                 fontSize: '10px',
                                 fontWeight: 'bold'
