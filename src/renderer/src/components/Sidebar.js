@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Clock, FileText, Folder, BarChart, FileInput, Settings, Info } from 'lucide-react';
+import { Clock, Folder, BarChart, FileInput, Settings, Info } from 'lucide-react';
 import { Text, Modal, ModalContent, ModalHeader, ModalTitle, ModalCloseButton } from './ui';
 import styled from 'styled-components';
 
@@ -95,8 +95,7 @@ const Sidebar = () => {
   }, []);
 
   const menuItems = [
-    { path: '/', icon: Clock, label: 'Timer' },
-    { path: '/entries', icon: FileText, label: 'Time Entries' },
+    { path: '/', icon: Clock, label: 'Time Entries' },
     { path: '/projects', icon: Folder, label: 'Clients' },
     { path: '/reports', icon: BarChart, label: 'Reports' },
     { path: '/invoice', icon: FileInput, label: 'Invoices' },

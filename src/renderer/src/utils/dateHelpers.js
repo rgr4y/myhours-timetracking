@@ -132,7 +132,9 @@ export const parseTimeWithDate = (timeString, dateString) => {
     }
     
     date.setHours(hours, minutes, 0, 0);
-    return date.toISOString();
+    
+    // Return the Date object directly for consistency with backend
+    return date;
   } catch (error) {
     console.error('Error parsing time with date:', error);
     return null;

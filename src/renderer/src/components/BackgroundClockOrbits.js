@@ -45,15 +45,12 @@ export default function BackgroundClockOrbits({
       running = true,
       t0 = performance.now();
 
-    /*
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches || process.env.NODE_ENV !== 'production';
 
-    // if (prefersReducedMotion) return;
-    */
+    if (prefersReducedMotion) return;
      
-    const prefersReducedMotion = false;
     const resize = () => {
       const parent = canvas.parentElement || canvas;
       const fallbackH = winSizeRef.current.height || (typeof window !== 'undefined' ? window.innerHeight : 820);

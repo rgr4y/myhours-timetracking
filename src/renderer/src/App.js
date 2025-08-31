@@ -4,7 +4,6 @@ import styled, { createGlobalStyle } from 'styled-components';
 import './App.css';
 import { TimerProvider } from './context/TimerContext';
 import Sidebar from './components/Sidebar';
-import Timer from './components/Timer';
 import TimeEntries from './components/TimeEntries';
 import Clients from './components/Clients';
 import Reports from './components/Reports';
@@ -154,8 +153,7 @@ function App() {
             <Sidebar />
             <MainContent>
               <Routes>
-                <Route path="/" element={<Timer />} />
-                <Route path="/entries" element={<TimeEntries />} />
+                <Route path="/" element={<TimeEntries />} />
                 <Route path="/projects" element={<Clients />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/invoice" element={<Invoice />} />
