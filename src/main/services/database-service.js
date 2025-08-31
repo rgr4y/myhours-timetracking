@@ -170,7 +170,9 @@ class DatabaseService {
       }
       
       date.setHours(hours, minutes, 0, 0);
-      return date.toISOString();
+      
+      // Return the Date object directly - let Prisma handle the conversion
+      return date;
     } catch (error) {
       console.error('Error parsing time with date:', error);
       return null;

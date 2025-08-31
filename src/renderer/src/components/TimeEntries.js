@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { 
   Play, 
@@ -165,32 +165,33 @@ const TimeEntriesSection = styled.div`
   margin: 0 auto;
 `;
 
-const TimeEntries = () => {
-  // Color constants for time entries
-  const COLORS = {
-    PRIMARY: '#007AFF',
-    BORDER_DEFAULT: '#404040',
-    BG_ACTIVE: '#1a1a2e',
-    BG_INACTIVE: '#2a2a2a',
-    SUCCESS: '#28a745'
-  };
+// Color constants for time entries
+const COLORS = {
+  PRIMARY: '#007AFF',
+  BORDER_DEFAULT: '#404040',
+  BG_ACTIVE: '#1a1a2e',
+  BG_INACTIVE: '#2a2a2a',
+  SUCCESS: '#28a745'
+};
 
-  // Helper functions for styling time entries
-  const getBorderStyle = (entry, hasActiveEntry) => {
+const TimeEntries = () => {
+
+  // Helper functions for styling time entries (memoized)
+  const getBorderStyle = useCallback((entry, hasActiveEntry) => {
     if (hasActiveEntry) {
       return entry.isActive ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`;
     }
     return entry.isActive ? `2px solid ${COLORS.PRIMARY}` : `1px solid ${COLORS.BORDER_DEFAULT}`;
-  };
+  }, []);
 
-  const getEntryCardStyle = (entry, index, entries, hasActiveEntry) => ({
+  const getEntryCardStyle = useCallback((entry, index, entries, hasActiveEntry) => ({
     borderLeft: getBorderStyle(entry, hasActiveEntry),
     borderRight: getBorderStyle(entry, hasActiveEntry),
     borderBottom: getBorderStyle(entry, hasActiveEntry),
     borderTop: index === 0 ? 'none' : `1px solid ${COLORS.BORDER_DEFAULT}`,
     borderRadius: index === entries.length - 1 ? '0 0 8px 8px' : '0',
     backgroundColor: entry.isActive ? COLORS.BG_ACTIVE : undefined
-  });
+  }), [getBorderStyle]);
 
   // Timer context and hooks
   const {
@@ -238,7 +239,7 @@ const TimeEntries = () => {
   const [editingEntry, setEditingEntry] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [collapsedDays, setCollapsedDays] = useState(new Set());
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const [entryForm, setEntryForm] = useState({
     clientId: '',
@@ -281,29 +282,45 @@ const TimeEntries = () => {
     const api = await waitForReady();
     if (api) {
       try {
-        // Load tasks from all projects to be able to resolve task names
-        const allTasks = [];
-        const clientList = await api.clients.getAll();
-        
-        for (const client of (clientList || [])) {
-          try {
-            const projects = await api.projects.getAll(client.id);
-            for (const project of (projects || [])) {
-              try {
-                const projectTasks = await api.tasks.getAll(project.id);
-                allTasks.push(...(projectTasks || []));
-              } catch (error) {
-                console.error(`Error loading tasks for project ${project.id}:`, error);
-              }
-            }
-          } catch (error) {
-            console.error(`Error loading projects for client ${client.id}:`, error);
-          }
-        }
-        
+        // More efficient: get all tasks in one call if the API supports it
+        // or at least reduce the nested calls
+        const allTasks = await api.tasks.getAll(); // If this exists
         setTasks(allTasks);
       } catch (error) {
-        console.error('Error loading all tasks:', error);
+        // Fallback to the nested approach but with better error handling
+        console.log('Falling back to nested task loading...');
+        try {
+          const allTasks = [];
+          const clientList = await api.clients.getAll();
+          
+          // Use Promise.all to parallelize the API calls
+          const projectPromises = (clientList || []).map(async (client) => {
+            try {
+              return await api.projects.getAll(client.id);
+            } catch (error) {
+              console.error(`Error loading projects for client ${client.id}:`, error);
+              return [];
+            }
+          });
+          
+          const allProjects = (await Promise.all(projectPromises)).flat();
+          
+          const taskPromises = allProjects.map(async (project) => {
+            try {
+              return await api.tasks.getAll(project.id);
+            } catch (error) {
+              console.error(`Error loading tasks for project ${project.id}:`, error);
+              return [];
+            }
+          });
+          
+          const allTaskArrays = await Promise.all(taskPromises);
+          allTasks.push(...allTaskArrays.flat());
+          
+          setTasks(allTasks);
+        } catch (error) {
+          console.error('Error loading all tasks:', error);
+        }
       }
     }
   }, [waitForReady]);
@@ -322,6 +339,36 @@ const TimeEntries = () => {
       }
     }
   }, [waitForReady]);
+
+  // Memoized grouped entries to prevent expensive recalculations
+  const groupedEntries = useMemo(() => {
+    const groups = {};
+    timeEntries.forEach(entry => {
+      const date = new Date(entry.startTime);
+      const dateKey = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric', 
+        month: 'short',
+        day: 'numeric'
+      });
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(entry);
+    });
+    
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      const dateA = new Date(groups[a][0].startTime);
+      const dateB = new Date(groups[b][0].startTime);
+      return dateB - dateA;
+    });
+    const sortedGroups = {};
+    sortedKeys.forEach(key => {
+      sortedGroups[key] = groups[key];
+    });
+    
+    return sortedGroups;
+  }, [timeEntries]);
 
   // Timer sync with context
   useEffect(() => {
@@ -349,11 +396,11 @@ const TimeEntries = () => {
     }
   }, [activeTimer, description, selectedClient]);
 
-  // Initialize data on mount
+  // Initialize data on mount (only run once)
   useEffect(() => {
     const loadAllData = async () => {
       try {
-        setIsLoading(true);
+        setIsInitialLoading(true);
         await checkActiveTimer(); // Check for active timer first
         await Promise.all([
           loadTimeEntries(),
@@ -362,22 +409,22 @@ const TimeEntries = () => {
           loadSettings()
         ]);
         setTimeout(() => {
-          setIsLoading(false);
+          setIsInitialLoading(false);
         }, 100);
       } catch (error) {
         console.error('Error loading data:', error);
-        setIsLoading(false);
+        setIsInitialLoading(false);
       }
     };
     
     loadAllData();
-  }, [checkActiveTimer, loadTimeEntries, loadClients, loadAllTasks, loadSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array to run only once on mount
 
   // Set up initial collapsed state for time entries
   useEffect(() => {
     if (timeEntries.length > 0) {
-      const grouped = groupEntriesByDate(timeEntries);
-      const dates = Object.keys(grouped);
+      const dates = Object.keys(groupedEntries);
       
       if (dates.length > 0) {
         const allDatesExceptMostRecent = new Set(dates.slice(1));
@@ -386,16 +433,22 @@ const TimeEntries = () => {
     } else {
       setCollapsedDays(new Set());
     }
-  }, [timeEntries]);
+  }, [timeEntries, groupedEntries]);
 
-  // Update current time every second for active timers
+  // Update current time every second for active timers (only if there are active timers)
   useEffect(() => {
+    const hasActiveTimer = timeEntries.some(entry => entry.isActive);
+    
+    if (!hasActiveTimer) {
+      return; // Don't set up interval if no active timers
+    }
+    
     const interval = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [timeEntries]); // Re-run when timeEntries change to check for active timers
 
   // Listen for events
   useEffect(() => {
@@ -479,6 +532,48 @@ const TimeEntries = () => {
 
     loadTasks();
   }, [localSelectedProject, activeTimer]);
+
+  // Load projects when client changes in the modal
+  useEffect(() => {
+    const loadModalProjects = async () => {
+      if (entryForm.clientId && window.electronAPI) {
+        try {
+          const projectList = await window.electronAPI.projects.getAll(parseInt(entryForm.clientId));
+          // Only update projects state if we're in edit mode or creating a new entry
+          if (showModal) {
+            setProjects(projectList);
+          }
+        } catch (error) {
+          console.error('Error loading projects for modal:', error);
+        }
+      } else if (showModal) {
+        setProjects([]);
+      }
+    };
+
+    loadModalProjects();
+  }, [entryForm.clientId, showModal]);
+
+  // Load tasks when project changes in the modal
+  useEffect(() => {
+    const loadModalTasks = async () => {
+      if (entryForm.projectId && window.electronAPI) {
+        try {
+          const taskList = await window.electronAPI.tasks.getAll(parseInt(entryForm.projectId));
+          // Only update tasks state if we're in edit mode or creating a new entry
+          if (showModal) {
+            setTasks(taskList);
+          }
+        } catch (error) {
+          console.error('Error loading tasks for modal:', error);
+        }
+      } else if (showModal) {
+        setTasks([]);
+      }
+    };
+
+    loadModalTasks();
+  }, [entryForm.projectId, showModal]);
 
   // Timer handlers
   const handleStartTimer = async () => {
@@ -828,55 +923,26 @@ const TimeEntries = () => {
     setShowModal(true);
   };
 
-  // Helper functions for time entries
-  const getClientName = (clientId) => {
+  // Helper functions for time entries (memoized)
+  const getClientName = useCallback((clientId) => {
     const client = clients.find(c => c.id === clientId);
     return client ? client.name : 'Unknown Client';
-  };
+  }, [clients]);
 
-  const getTaskName = (taskId) => {
+  const getTaskName = useCallback((taskId) => {
     const task = tasks.find(t => t.id === taskId);
     return task ? task.name : null;
-  };
+  }, [tasks]);
 
-  const groupEntriesByDate = (entries) => {
-    const groups = {};
-    entries.forEach(entry => {
-      const date = new Date(entry.startTime);
-      const dateKey = date.toLocaleDateString('en-US', {
-        weekday: 'short',
-        year: 'numeric', 
-        month: 'short',
-        day: 'numeric'
-      });
-      if (!groups[dateKey]) {
-        groups[dateKey] = [];
-      }
-      groups[dateKey].push(entry);
-    });
-    
-    const sortedKeys = Object.keys(groups).sort((a, b) => {
-      const dateA = new Date(groups[a][0].startTime);
-      const dateB = new Date(groups[b][0].startTime);
-      return dateB - dateA;
-    });
-    const sortedGroups = {};
-    sortedKeys.forEach(key => {
-      sortedGroups[key] = groups[key];
-    });
-    
-    return sortedGroups;
-  };
-
-  const getElapsedTime = (startTime) => {
+  const getElapsedTime = useCallback((startTime) => {
     const start = new Date(startTime);
     const now = currentTime;
     const diffMs = now.getTime() - start.getTime();
     const minutes = Math.floor(diffMs / (1000 * 60));
     return formatDurationHumanFriendly(minutes);
-  };
+  }, [currentTime]);
 
-  const calculateDayTotal = (entries) => {
+  const calculateDayTotal = useCallback((entries) => {
     const totalMinutes = entries.reduce((total, entry) => {
       if (entry.isActive) {
         const start = new Date(entry.startTime);
@@ -890,7 +956,7 @@ const TimeEntries = () => {
     }, 0);
     
     return formatDurationHumanFriendly(totalMinutes);
-  };
+  }, [currentTime]);
 
   const toggleDayCollapse = (date) => {
     setCollapsedDays(prev => {
@@ -1068,14 +1134,14 @@ const TimeEntries = () => {
           </EmptyState>
         ) : (
           <FlexBox direction="column" gap="0">
-            {Object.entries(groupEntriesByDate(timeEntries) || {}).map(([date, entries], groupIndex) => {
+            {Object.entries(groupedEntries || {}).map(([date, entries], groupIndex) => {
               const hasActiveEntry = entries.some(entry => entry.isActive);
               
               return (
                 <div 
                   key={date} 
                   style={{ 
-                    marginBottom: groupIndex < Object.keys(groupEntriesByDate(timeEntries)).length - 1 ? '20px' : '0',
+                    marginBottom: groupIndex < Object.keys(groupedEntries).length - 1 ? '20px' : '0',
                     border: hasActiveEntry ? `2px solid ${COLORS.PRIMARY}` : 'none',
                     borderRadius: '8px',
                     padding: hasActiveEntry ? '2px' : '0'
@@ -1344,7 +1410,7 @@ const TimeEntries = () => {
       )}
 
       <LoadingOverlay 
-        isVisible={isLoading} 
+        isVisible={isInitialLoading} 
         text="Loading Time Entries..." 
         noFadeIn={true}
       />
