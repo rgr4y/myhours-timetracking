@@ -11,26 +11,32 @@ function log(msg) {
 function generatePngFromSvg(svgPath, outputPath, size = 1024) {
   try {
     // Try rsvg-convert first (best quality)
-    execFileSync('rsvg-convert', [
-      '-w', size.toString(),
-      '-h', size.toString(),
-      '-o', outputPath,
-      svgPath
-    ], { stdio: 'inherit' });
+    execFileSync(
+      'rsvg-convert',
+      ['-w', size.toString(), '-h', size.toString(), '-o', outputPath, svgPath],
+      { stdio: 'inherit' },
+    );
     log(`Generated ${outputPath} from SVG using rsvg-convert`);
     return true;
   } catch (e) {
     log(`rsvg-convert failed: ${e.message}`);
-    
+
     // Fallback to ImageMagick with proper flags for color preservation
     try {
-      execFileSync('convert', [
-        '-background', 'none',
-        '-density', '300',
-        svgPath,
-        '-resize', `${size}x${size}`,
-        outputPath
-      ], { stdio: 'inherit' });
+      execFileSync(
+        'convert',
+        [
+          '-background',
+          'none',
+          '-density',
+          '300',
+          svgPath,
+          '-resize',
+          `${size}x${size}`,
+          outputPath,
+        ],
+        { stdio: 'inherit' },
+      );
       log(`Generated ${outputPath} from SVG using ImageMagick convert`);
       return true;
     } catch (e2) {

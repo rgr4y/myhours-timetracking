@@ -70,18 +70,17 @@
 
     <g stroke="url(#grad-glyph)" stroke-linecap="round" stroke-width="22">
       <line x1="512" y1="302" x2="512" y2="340"/>
-      <line x1="722" y1="512" x2="684" y2="512"/>
-      <line x1="512" y1="684" x2="512" y2="646"/>
-      <line x1="340" y1="512" x2="378" y2="512"/>
+      <line x1="720" y1="512" x2="684" y2="512"/>
+      <line x1="512" y1="720" x2="512" y2="684"/>
+      <line x1="340" y1="512" x2="302" y2="512"/>
     </g>
 
     <g stroke="url(#grad-glyph)" stroke-linecap="round">
-      <line x1="512" y1="512" x2="442" y2="412" stroke-width="26"/>
+      <line x1="512" y1="512" x2="442" y2="402" stroke-width="26"/>
       <line x1="512" y1="512" x2="620" y2="512" stroke-width="18"/>
       <circle cx="512" cy="512" r="14" fill="#FFFFFF"/>
     </g>
 
-    <path d="M760 612c0-20-16-36-36-36h-92c-20 0-36 16-36 36v92c0 20 16 36 36 36h92c20 0 36-16 36-36v-92Z" fill="#FFFFFF" opacity="0.12"/>
     <path d="M704 708l-28-28m-20 20 20-20m0 0 28 28 48-48" stroke="url(#grad-glyph)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>
