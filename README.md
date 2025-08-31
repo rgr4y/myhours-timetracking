@@ -1,10 +1,17 @@
 <div align="center">
-
 <img src="assets/icon.png" alt="myHours App Icon" width="128" height="128">
 
 # myHours
 
-### No‑frills, no‑strings‑attached time logger and invoice generator for macOS, Windows, and Linux.
+### No‑frills, no‑strings‑attached time logger and PDF invoice generator.
+
+---
+
+**📦 [Download the latest release →](https://github.com/rgr4y/myhours-timetracking/releases/latest)**
+
+*Available for macOS, Windows, and Linux*
+
+---
 
 </div>
 
@@ -126,5 +133,4 @@ Disclaimer: This software is provided “as is,” without any warranty of any k
 PRs and suggestions are welcome. This is an experimental project; issues/PRs that improve stability, DX, or polish are appreciated.
 
 ## License
-
 GPLv3
