@@ -96,7 +96,7 @@ const Clients = () => {
 
   // Loading states
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [setIsLoadingTasks] = useState(false);
 
   const [clientForm, setClientForm] = useState({
     name: '',
@@ -187,7 +187,7 @@ const Clients = () => {
       }
     };
     loadTasks();
-  }, [selectedProject]);
+  }, [selectedProject, setIsLoadingTasks]);
 
   const handleCreateClient = async () => {
     console.log('handleCreateClient called', { clientForm, electronAPI: !!window.electronAPI });
