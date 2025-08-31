@@ -4,7 +4,7 @@ const { promisify } = require('util');
 const { app } = require('electron');
 const path = require('path');
 const fs = require('fs');
-
+const truthy = (v) => /^(1|true|yes|on)$/i.test(String(v || ''));
 const execAsync = promisify(exec);
 
 class DatabaseService {
@@ -65,7 +65,7 @@ class DatabaseService {
     await this.prisma.$connect();
     
     // Configure SQLite for production performance
-    if (app.isPackaged) {
+    if (app.isPackaged || truthy(process.env.FORCE_WAL)) {
       try {
         // Check current journal mode
         const currentMode = await this.prisma.$queryRaw`PRAGMA journal_mode;`;
