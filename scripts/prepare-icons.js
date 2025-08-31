@@ -8,6 +8,38 @@ function log(msg) {
   console.log(`[icons] ${msg}`);
 }
 
+function generatePngFromSvg(svgPath, outputPath, size = 1024) {
+  try {
+    // Try rsvg-convert first (best quality)
+    execFileSync('rsvg-convert', [
+      '-w', size.toString(),
+      '-h', size.toString(),
+      '-o', outputPath,
+      svgPath
+    ], { stdio: 'inherit' });
+    log(`Generated ${outputPath} from SVG using rsvg-convert`);
+    return true;
+  } catch (e) {
+    log(`rsvg-convert failed: ${e.message}`);
+    
+    // Fallback to ImageMagick with proper flags for color preservation
+    try {
+      execFileSync('convert', [
+        '-background', 'none',
+        '-density', '300',
+        svgPath,
+        '-resize', `${size}x${size}`,
+        outputPath
+      ], { stdio: 'inherit' });
+      log(`Generated ${outputPath} from SVG using ImageMagick convert`);
+      return true;
+    } catch (e2) {
+      log(`ImageMagick convert also failed: ${e2.message}`);
+      return false;
+    }
+  }
+}
+
 function generateIcnsFromPng(pngPath) {
   const script = join(__dirname, 'generate-mac-icns.sh');
   try {
@@ -43,10 +75,8 @@ function qlThumbSvgToPng(svgPath, outDir) {
   const pngFallback1024 = join(process.cwd(), 'assets', 'icon-1024.png');
   const pngFallbackGeneric = join(process.cwd(), 'assets', 'icon.png');
 
-  if (existsSync(icnsPath)) {
-    log('Existing build/icon.icns found; skipping generation.');
-    return;
-  }
+  // Always regenerate icon.icns to pick up any changes to source assets
+  log('Generating macOS icon.icns from source assets...');
 
   mkdirSync(buildDir, { recursive: true });
 
@@ -62,9 +92,20 @@ function qlThumbSvgToPng(svgPath, outDir) {
     return;
   }
 
-  // 2) Try to rasterize SVG via QuickLook
+  // 2) Generate PNG from SVG if SVG exists
   if (existsSync(svgPath)) {
-    log('Rasterizing SVG via QuickLook to 1024 PNG...');
+    log('No PNG found, generating PNG from SVG...');
+    const generatedPng = join(process.cwd(), 'assets', 'icon.png');
+    if (generatePngFromSvg(svgPath, generatedPng, 1024)) {
+      log('Generated PNG from SVG; generating ICNS...');
+      generateIcnsFromPng(generatedPng);
+      return;
+    }
+  }
+
+  // 3) Fallback: Try to rasterize SVG via QuickLook
+  if (existsSync(svgPath)) {
+    log('Fallback: Rasterizing SVG via QuickLook to 1024 PNG...');
     const produced = qlThumbSvgToPng(svgPath, buildDir);
     if (produced && existsSync(produced)) {
       const targetPng = join(buildDir, 'icon-1024.png');
