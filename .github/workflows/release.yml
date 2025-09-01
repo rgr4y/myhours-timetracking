@@ -54,7 +54,7 @@ jobs:
         if: matrix.platform == 'mac'
         run: |
           echo "BUILD_ARM64=1" >> .env
-          echo "MAC_TARGET=dmg,zip" >> .env
+          echo "MAC_TARGET=dmg" >> .env
           echo "BUILD_LINUX=1" >> .env
           echo "LINUX_TARGET=AppImage" >> .env
         shell: bash

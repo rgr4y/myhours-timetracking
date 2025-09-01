@@ -336,7 +336,13 @@ class MyHoursApp {
         try { await autoUpdater.downloadUpdate(); return { started: true }; } catch (e) { return { error: e.message }; }
       });
       ipcMain.handle('update:install', async () => {
-        try { autoUpdater.quitAndInstall(); return { quitting: true }; } catch (e) { return { error: e.message }; }
+        try { 
+          forward('will-install');
+          autoUpdater.quitAndInstall(); 
+          return { quitting: true }; 
+        } catch (e) { 
+          return { error: e.message }; 
+        }
       });
     } catch (e) {
       console.warn('[UPDATER] Failed to set up native updater:', e);

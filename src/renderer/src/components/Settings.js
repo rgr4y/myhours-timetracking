@@ -33,7 +33,7 @@ const Settings = () => {
   const isDev = process.env.NODE_ENV !== 'production';
 
   // Updater state (macOS only, but harmless elsewhere)
-  const [updateStatus, setUpdateStatus] = useState('idle'); // idle|checking|available|not-available|downloading|downloaded|error
+  const [updateStatus, setUpdateStatus] = useState('idle'); // idle|checking|available|not-available|downloading|downloaded|error|installing
   const [updateInfo, setUpdateInfo] = useState(null); // { version, notes }
   const [downloadProgress, setDownloadProgress] = useState(null); // { percent, transferred, total }
   const [updateError, setUpdateError] = useState(null);
@@ -41,6 +41,10 @@ const Settings = () => {
   const [feedUrl, setFeedUrl] = useState('');
   const [feedUrlMessage, setFeedUrlMessage] = useState('');
   const [updateNotificationsEnabled, setUpdateNotificationsEnabled] = useState(true);
+  
+  // Install state management
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [installStartTime, setInstallStartTime] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -107,9 +111,16 @@ const Settings = () => {
         case 'update-downloaded':
           setUpdateStatus('downloaded');
           break;
+        case 'will-install':
+          setUpdateStatus('installing');
+          setIsInstalling(true);
+          setInstallStartTime(Date.now());
+          break;
         case 'error':
           setUpdateStatus('error');
           setUpdateError(evt.payload?.message || 'Unknown updater error');
+          setIsInstalling(false);
+          setInstallStartTime(null);
           break;
         default:
           break;
@@ -120,6 +131,22 @@ const Settings = () => {
       try { window.electronAPI.updater.removeEventListener(handler); } catch (_) {}
     };
   }, []);
+
+  // Install timeout handler - reset install state after 60 seconds
+  useEffect(() => {
+    if (!isInstalling || !installStartTime) return;
+    
+    const timeoutId = setTimeout(() => {
+      console.warn('Install timeout reached, resetting install state');
+      setIsInstalling(false);
+      setInstallStartTime(null);
+      if (updateStatus === 'installing') {
+        setUpdateStatus('downloaded'); // Reset to downloaded state
+      }
+    }, 60000); // 60 seconds
+    
+    return () => clearTimeout(timeoutId);
+  }, [isInstalling, installStartTime, updateStatus]);
 
   // Check if settings have changed
   const hasUnsavedChanges = () => {
@@ -170,6 +197,12 @@ const Settings = () => {
   };
 
   const handleDownloadUpdate = async () => {
+    // Don't re-download if already downloaded
+    if (updateStatus === 'downloaded') {
+      console.log('Update already downloaded, skipping');
+      return;
+    }
+    
     try {
       setUpdateError(null);
       await window.electronAPI?.updater?.download();
@@ -183,11 +216,17 @@ const Settings = () => {
   const handleInstallUpdate = async () => {
     try {
       setUpdateError(null);
+      setIsInstalling(true);
+      setInstallStartTime(Date.now());
+      setUpdateStatus('installing');
+      
       await window.electronAPI?.updater?.install();
     } catch (e) {
       console.error('Updater install error:', e);
       setUpdateStatus('error');
       setUpdateError(e?.message || String(e));
+      setIsInstalling(false);
+      setInstallStartTime(null);
     }
   };
 
@@ -235,20 +274,19 @@ const Settings = () => {
               <Button 
                 variant="primary" 
                 onClick={handleDownloadUpdate}
-                disabled={!(updateStatus === 'available')}
+                disabled={!(updateStatus === 'available') || updateStatus === 'downloading' || updateStatus === 'downloaded'}
               >
-                Download Update
+                {updateStatus === 'downloading' ? 'Downloading…' : 
+                 updateStatus === 'downloaded' ? 'Downloaded' : 'Download Update'}
               </Button>
               <Button 
                 variant="primary" 
                 onClick={handleInstallUpdate}
-                disabled={!(updateStatus === 'downloaded')}
+                disabled={!(updateStatus === 'downloaded') || isInstalling}
               >
-                Install and Restart
+                {isInstalling ? 'Installing…' : 'Install and Restart'}
               </Button>
-          </FlexBox>
-
-            {updateStatus === 'available' && updateInfo?.version && (
+            </FlexBox>            {updateStatus === 'available' && updateInfo?.version && (
               <Text>Update available: v{updateInfo.version}</Text>
             )}
             {updateStatus === 'not-available' && (
@@ -259,8 +297,11 @@ const Settings = () => {
                 Downloading… {downloadProgress?.percent ? `${downloadProgress.percent.toFixed?.(1) ?? downloadProgress.percent}%` : ''}
               </Text>
             )}
-            {updateStatus === 'downloaded' && (
+            {updateStatus === 'downloaded' && !isInstalling && (
               <Text>Update downloaded. Click Install to apply.</Text>
+            )}
+            {(updateStatus === 'installing' || isInstalling) && (
+              <Text>Installing update and restarting app…</Text>
             )}
             {updateStatus === 'error' && updateError && (
               <Text variant="danger">Error: {updateError}</Text>
