@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useTimer } from '../context/TimerContext';
 import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import { 
   Container,
   Card, 
@@ -1051,6 +1052,26 @@ const TimeEntries = () => {
       return newSet;
     });
   };
+
+  // Keyboard shortcuts for the time entry modal
+  useModalKeyboard({
+    isOpen: showModal,
+    onClose: () => {
+      setShowModal(false);
+      setEditingEntry(null);
+      setEntryForm({
+        clientId: '',
+        projectId: '',
+        taskId: '',
+        description: '',
+        startTime: '',
+        endTime: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+    },
+    onSubmit: editingEntry ? handleUpdateEntry : handleCreateEntry,
+    formData: entryForm
+  });
 
   return (
     <MainContainer padding="40px">

@@ -49,6 +49,16 @@ export const useModalKeyboard = ({ isOpen, onClose, onSubmit = null, formData = 
             if (formData.end_date !== undefined && !formData.end_date) {
               canSubmit = false;
             }
+            // For time entry forms, clientId, startTime, and endTime are required
+            if (formData.clientId !== undefined && !formData.clientId) {
+              canSubmit = false;
+            }
+            if (formData.startTime !== undefined && !formData.startTime) {
+              canSubmit = false;
+            }
+            if (formData.endTime !== undefined && !formData.endTime) {
+              canSubmit = false;
+            }
           }
 
           if (canSubmit) {
