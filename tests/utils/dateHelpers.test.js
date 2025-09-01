@@ -53,6 +53,73 @@ describe('dateHelpers', () => {
     expect(/\d{4}-\d{2}-\d{2}/.test(out)).toBe(true)
   })
 
+  // Tests that demonstrate the timezone bug in time entry edit modal
+  describe('formatDateForForm timezone issues', () => {
+    // Create a buggy version that uses UTC (like the original broken implementation)
+    const formatDateForFormBuggy = (dateInput) => {
+      if (!dateInput) return '';
+      
+      try {
+        const date = new Date(dateInput);
+        if (isNaN(date.getTime())) return '';
+        
+        // BUGGY: Uses toISOString() which always returns UTC
+        return date.toISOString().split('T')[0];
+      } catch (error) {
+        console.error('Error formatting date for form:', error);
+        return '';
+      }
+    };
+
+    it('should demonstrate the timezone bug with late evening Pacific time', () => {
+      // Create a time that's Aug 31, 2025 11:00 PM PDT
+      // This becomes Sep 1, 2025 06:00 AM UTC when stored
+      const localDate = new Date(2025, 7, 31, 23, 0, 0) // Month is 0-indexed, so 7 = August
+      
+      // Test the buggy version (what was happening before)
+      const buggyResult = formatDateForFormBuggy(localDate.getTime())
+      const fixedResult = formatDateForForm(localDate.getTime())
+      
+      // The bug: shows next day due to UTC conversion
+      expect(buggyResult).toBe('2025-09-01') // BUG: Shows Sep 1 instead of Aug 31
+      
+      // The fix: shows correct local date
+      expect(fixedResult).toBe('2025-08-31') // FIXED: Shows Aug 31 as intended
+      
+      console.log(`Bug demonstrated - Buggy: ${buggyResult}, Fixed: ${fixedResult}`)
+    })
+
+    it('should demonstrate timezone issue with early morning time that crosses date boundary', () => {
+      // Create a time that's Sep 1, 2025 1:00 AM PDT 
+      // This becomes Sep 1, 2025 08:00 AM UTC when stored
+      const localDate = new Date(2025, 8, 1, 1, 0, 0) // Month is 0-indexed, so 8 = September
+      
+      const buggyResult = formatDateForFormBuggy(localDate.getTime())
+      const fixedResult = formatDateForForm(localDate.getTime())
+      
+      // In this case both should be the same since it doesn't cross date boundary
+      expect(buggyResult).toBe('2025-09-01') 
+      expect(fixedResult).toBe('2025-09-01')
+    })
+
+    it('should handle evening time where local and UTC dates differ', () => {
+      // Test with a timestamp that would be stored as UTC in database
+      // Simulate what happens when a time entry from Aug 31 11:45 PM PDT is edited
+      const timestampUTC = new Date('2025-09-01T06:45:00.000Z').getTime() // This is Aug 31 11:45 PM PDT
+      
+      const buggyResult = formatDateForFormBuggy(timestampUTC)
+      const fixedResult = formatDateForForm(timestampUTC)
+      
+      // The bug shows the UTC date (Sep 1)
+      expect(buggyResult).toBe('2025-09-01')
+      
+      // The fix shows the local date (Aug 31) - this depends on system timezone
+      // In PDT timezone, this should show Aug 31
+      const expectedLocalDate = new Date(timestampUTC).toLocaleDateString('en-CA') // YYYY-MM-DD format
+      expect(fixedResult).toBe(expectedLocalDate)
+    })
+  })
+
   it('parseTimeWithDate parses HH:MM with YYYY-MM-DD correctly', () => {
     const d = parseTimeWithDate('09:30', '2024-01-02')
     expect(d instanceof Date).toBe(true)

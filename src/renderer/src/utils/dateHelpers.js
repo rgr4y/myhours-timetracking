@@ -94,6 +94,7 @@ export const formatTimeForForm = (timeInput) => {
 
 /**
  * Format a date for form inputs (YYYY-MM-DD format)
+ * Uses local timezone to show the date as the user intended it
  */
 export const formatDateForForm = (dateInput) => {
   if (!dateInput) return '';
@@ -102,7 +103,12 @@ export const formatDateForForm = (dateInput) => {
     const date = new Date(dateInput);
     if (isNaN(date.getTime())) return '';
     
-    return date.toISOString().split('T')[0];
+    // Use local timezone instead of UTC to show the date correctly
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
   } catch (error) {
     console.error('Error formatting date for form:', error);
     return '';
