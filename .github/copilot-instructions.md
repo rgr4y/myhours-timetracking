@@ -140,6 +140,10 @@ You MUST use the safe electronAPI pattern to avoid race conditions.
 1. Stop `Start Dev` task completely
 2. Restart development environment
 
+### Misc Issues
+
+1. Use vscode-undo-mcp to send undo/redo commands if you break a file. If that doesn't work, go ahead with your normal flow.
+
 ### House rules
 
 1. Don't leave any ESLint warnings. Fix them.
