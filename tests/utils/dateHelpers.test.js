@@ -27,6 +27,12 @@ describe('dateHelpers', () => {
     expect(formatDurationHumanFriendly(125)).toBe('2h 5m')
   })
 
+  it('formatDurationHumanFriendly handles negative values gracefully', () => {
+    expect(formatDurationHumanFriendly(-1)).toBe('0m')
+    expect(formatDurationHumanFriendly(-60)).toBe('0m')
+    expect(formatDurationHumanFriendly(-125)).toBe('0m')
+  })
+
   it('formatDate handles invalid and valid inputs', () => {
     expect(formatDate(undefined)).toBe('Invalid Date')
     expect(formatDate('not-a-date')).toBe('Invalid Date')

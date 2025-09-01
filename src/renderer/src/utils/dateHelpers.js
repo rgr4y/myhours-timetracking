@@ -17,7 +17,7 @@ export const formatDuration = (minutes) => {
  * Format duration in minutes to human-friendly format (e.g., "3h 45m")
  */
 export const formatDurationHumanFriendly = (minutes) => {
-  if (!minutes || isNaN(minutes) || minutes === 0) return '0m';
+  if (!minutes || isNaN(minutes) || minutes <= 0) return '0m';
   
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;

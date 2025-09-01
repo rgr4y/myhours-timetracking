@@ -678,10 +678,10 @@ class MyHoursApp {
       }
     });
     
-    ipcMain.handle('db:stopTimer', async (event, entryId) => {
-      console.log('[MAIN] IPC: Stopping timer with ID:', entryId);
+    ipcMain.handle('db:stopTimer', async (event, entryId, roundTo) => {
+      console.log('[MAIN] IPC: Stopping timer with ID:', entryId, 'roundTo:', roundTo);
       try {
-        const entry = await this.database.stopTimer(entryId);
+        const entry = await this.database.stopTimer(entryId, roundTo);
         console.log('[MAIN] IPC: Timer stopped successfully:', JSON.stringify(entry, null, 2));
         return entry;
       } catch (error) {

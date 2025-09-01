@@ -1021,7 +1021,7 @@ const TimeEntries = () => {
     const start = new Date(startTime);
     const now = currentTime;
     const diffMs = now.getTime() - start.getTime();
-    const minutes = Math.floor(diffMs / (1000 * 60));
+    const minutes = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Ensure non-negative
     return formatDurationHumanFriendly(minutes);
   }, [currentTime]);
 
@@ -1031,7 +1031,7 @@ const TimeEntries = () => {
         const start = new Date(entry.startTime);
         const now = currentTime;
         const diffMs = now.getTime() - start.getTime();
-        const minutes = Math.floor(diffMs / (1000 * 60));
+        const minutes = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Ensure non-negative
         return total + minutes;
       } else {
         return total + calculateDuration(entry.startTime, entry.endTime);

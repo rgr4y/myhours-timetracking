@@ -274,7 +274,7 @@ class DatabaseService {
     }
   }
 
-  async stopTimer(timeEntryId) {
+  async stopTimer(timeEntryId, roundTo = 15) {
     try {
       const timeEntry = await this.prisma.timeEntry.findUnique({
         where: { id: parseInt(timeEntryId) }
@@ -294,7 +294,7 @@ class DatabaseService {
         
         // Use the found active timer instead
         console.log(`[DATABASE] Using active timer ${anyActiveTimer.id} instead of ${timeEntryId}`);
-        return this.stopTimer(anyActiveTimer.id);
+        return this.stopTimer(anyActiveTimer.id, roundTo);
       }
 
       if (!timeEntry.isActive) {
@@ -304,12 +304,20 @@ class DatabaseService {
 
       const endTime = new Date();
       const duration = Math.floor((endTime - timeEntry.startTime) / 1000 / 60); // duration in minutes
+      
+      // Apply rounding logic
+      let roundedDuration = duration;
+      if (roundTo > 0) {
+        // Round up to the nearest roundTo minutes
+        roundedDuration = Math.ceil(duration / roundTo) * roundTo;
+        console.log(`[DATABASE] Duration: ${duration}m, rounded to ${roundTo}m intervals: ${roundedDuration}m`);
+      }
 
       const updatedTimeEntry = await this.prisma.timeEntry.update({
         where: { id: parseInt(timeEntryId) },
         data: {
           endTime,
-          duration,
+          duration: roundedDuration,
           isActive: false
         },
         include: {

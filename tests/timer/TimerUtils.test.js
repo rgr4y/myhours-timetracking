@@ -96,6 +96,11 @@ describe('Timer Utility Functions', () => {
       return Math.ceil(seconds / roundToSeconds) * roundToSeconds
     }
 
+    const roundDuration = (minutes, roundToMinutes = 15) => {
+      if (roundToMinutes <= 0) return minutes
+      return Math.ceil(minutes / roundToMinutes) * roundToMinutes
+    }
+
     it('should round to 15 minutes by default', () => {
       expect(roundTime(0)).toBe(0)
       expect(roundTime(1)).toBe(900) // 15 minutes
@@ -111,11 +116,28 @@ describe('Timer Utility Functions', () => {
       expect(roundTime(1801, 30)).toBe(3600) // 60 minutes
     })
 
-    it('should handle 60-minute rounding', () => {
+    it('should round to 60-minute intervals', () => {
       expect(roundTime(0, 60)).toBe(0)
       expect(roundTime(1, 60)).toBe(3600) // 60 minutes
       expect(roundTime(3600, 60)).toBe(3600) // 60 minutes
       expect(roundTime(3601, 60)).toBe(7200) // 120 minutes
+    })
+
+    it('should round duration in minutes correctly', () => {
+      // Test 10-minute rounding (like in the user's issue)
+      expect(roundDuration(17, 10)).toBe(20) // 17m -> 20m
+      expect(roundDuration(10, 10)).toBe(10) // 10m -> 10m
+      expect(roundDuration(11, 10)).toBe(20) // 11m -> 20m
+      expect(roundDuration(1, 10)).toBe(10)  // 1m -> 10m
+      
+      // Test 15-minute rounding
+      expect(roundDuration(17, 15)).toBe(30) // 17m -> 30m
+      expect(roundDuration(15, 15)).toBe(15) // 15m -> 15m
+      expect(roundDuration(16, 15)).toBe(30) // 16m -> 30m
+      
+      // Test 5-minute rounding
+      expect(roundDuration(17, 5)).toBe(20)  // 17m -> 20m
+      expect(roundDuration(3, 5)).toBe(5)    // 3m -> 5m
     })
 
     it('should handle edge cases', () => {
@@ -123,6 +145,9 @@ describe('Timer Utility Functions', () => {
       expect(roundTime(1, 1)).toBe(60) // 1 minute
       expect(roundTime(59, 1)).toBe(60) // 1 minute
       expect(roundTime(60, 1)).toBe(60) // 1 minute
+      
+      // Test with 0 rounding (no rounding)
+      expect(roundDuration(17, 0)).toBe(17)
     })
   })
 
