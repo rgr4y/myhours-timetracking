@@ -932,6 +932,17 @@ class MyHoursApp {
       }
     });
 
+    ipcMain.handle('invoice:generateFromSelected', async (event, data) => {
+      try {
+        console.log('[MAIN] invoice:generateFromSelected called with data:', data);
+        const filePath = await this.invoiceGenerator.generateInvoiceFromSelectedEntries(data);
+        return { success: true, filePath };
+      } catch (error) {
+        console.log('[MAIN] invoice:generateFromSelected error:', error.message);
+        return { success: false, error: error.message };
+      }
+    });
+
     ipcMain.handle('invoice:download', async (event, invoiceId) => {
       try {
         console.log('[MAIN] invoice:download called with invoiceId:', invoiceId);

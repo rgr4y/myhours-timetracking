@@ -11,9 +11,6 @@ import {
   Text,
   BigNumber,
   Button,
-  Input,
-  Select,
-  Label,
   IconContainer
 } from './ui';
 
@@ -24,25 +21,8 @@ const Reports = () => {
     completedTasks: 0
   });
   
-  // Set default dates to current month
-  const today = new Date();
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  
-  const [filterData, setFilterData] = useState({
-    startDate: firstOfMonth.toISOString().split('T')[0],
-    endDate: lastOfMonth.toISOString().split('T')[0],
-    client: '',
-    project: ''
-  });
-  const [clients, setClients] = useState([]);
-  const [projects, setProjects] = useState([]);
-
-  const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
-
   useEffect(() => {
     loadData();
-    loadClients();
   }, []);
 
   const loadData = async () => {
@@ -66,35 +46,6 @@ const Reports = () => {
     }
   };
 
-  const loadClients = async () => {
-    if (window.electronAPI) {
-      try {
-        const clientList = await window.electronAPI.clients.getAll();
-        setClients(clientList);
-      } catch (error) {
-        console.error('Error loading clients:', error);
-      }
-    }
-  };
-
-  const loadProjects = async (clientId) => {
-    if (window.electronAPI && clientId) {
-      try {
-        const projectList = await window.electronAPI.projects.getAll(clientId);
-        setProjects(projectList);
-      } catch (error) {
-        console.error('Error loading projects:', error);
-      }
-    }
-  };
-
-  const handleFilterChange = (field, value) => {
-    setFilterData(prev => ({ ...prev, [field]: value }));
-    if (field === 'client' && value) {
-      loadProjects(value);
-    }
-  };
-
   const exportToCSV = async () => {
     if (window.electronAPI) {
       try {
@@ -114,6 +65,8 @@ const Reports = () => {
       }
     }
   };
+
+  const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
 
   return (
     <Container padding="40px" style={{ height: '100vh', overflowY: 'auto' }}>
@@ -143,7 +96,7 @@ const Reports = () => {
             </div>
           </FlexBox>
           <BigNumber size="32px" margin="0 0 8px 0">{formatCurrency(stats.totalEarnings)}</BigNumber>
-          <Text variant="secondary" size="small">This month</Text>
+          <Text variant="secondary" size="small">Last 30 days</Text>
         </Card>
 
         <Card>
@@ -159,56 +112,6 @@ const Reports = () => {
           <Text variant="secondary" size="small">This month</Text>
         </Card>
       </Grid>
-
-      <Card margin="0 0 30px 0">
-        <Heading margin="0 0 20px 0">Filter Reports</Heading>
-        <Grid columns="repeat(auto-fit, minmax(200px, 1fr))" gap="20px">
-          <FlexBox direction="column" gap="8px">
-            <Label>Start Date</Label>
-            <Input
-              type="date"
-              value={filterData.startDate}
-              onChange={(e) => handleFilterChange('startDate', e.target.value)}
-            />
-          </FlexBox>
-          
-          <FlexBox direction="column" gap="8px">
-            <Label>End Date</Label>
-            <Input
-              type="date"
-              value={filterData.endDate}
-              onChange={(e) => handleFilterChange('endDate', e.target.value)}
-            />
-          </FlexBox>
-          
-          <FlexBox direction="column" gap="8px">
-            <Label>Client</Label>
-            <Select
-              value={filterData.client}
-              onChange={(e) => handleFilterChange('client', e.target.value)}
-            >
-              <option value="">All Clients</option>
-              {clients.map(client => (
-                <option key={client.id} value={client.id}>{client.name}</option>
-              ))}
-            </Select>
-          </FlexBox>
-          
-          <FlexBox direction="column" gap="8px">
-            <Label>Project</Label>
-            <Select
-              value={filterData.project}
-              onChange={(e) => handleFilterChange('project', e.target.value)}
-              disabled={!filterData.client}
-            >
-              <option value="">All Projects</option>
-              {projects.map(project => (
-                <option key={project.id} value={project.id}>{project.name}</option>
-              ))}
-            </Select>
-          </FlexBox>
-        </Grid>
-      </Card>
 
       <Card>
         <Heading margin="0 0 20px 0">Export Data</Heading>

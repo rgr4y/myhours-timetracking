@@ -521,6 +521,43 @@ class DatabaseService {
     }
   }
 
+  async getTimeEntriesByIds(entryIds) {
+    try {
+      logger.database("debug", "Getting time entries by IDs", { entryIds });
+
+      const timeEntries = await this.prisma.timeEntry.findMany({
+        where: {
+          id: { in: entryIds.map(id => parseInt(id)) }
+        },
+        include: {
+          client: true,
+          project: true,
+          task: {
+            include: {
+              project: true,
+            },
+          },
+        },
+        orderBy: {
+          startTime: "asc",
+        },
+      });
+
+      logger.database("info", "Retrieved time entries by IDs", {
+        count: timeEntries.length,
+        requestedIds: entryIds.length,
+      });
+
+      return timeEntries;
+    } catch (error) {
+      logger.database("error", "Error getting time entries by IDs", {
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
   async updateTimeEntry(id, data) {
     try {
       console.log(
@@ -744,7 +781,7 @@ class DatabaseService {
   // Client methods
   async getClients() {
     try {
-      logger.database("debug", "Getting clients with relationships");
+      // logger.database("debug", "Getting clients with relationships");
 
       const clients = await this.prisma.client.findMany({
         include: {

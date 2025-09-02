@@ -142,7 +142,9 @@ You MUST use the safe electronAPI pattern to avoid race conditions.
 
 ### Misc Issues
 
-1. Use vscode-undo-mcp to send undo/redo commands if you break a file. If that doesn't work, go ahead with your normal flow.
+1. Use vscode-editor-mcp to send undo commands if you break a file. 
+2. If you break a file and want to reset it completely, use the `vscode-editor-mcp` -> `reset_file` tool to empty the file. Do this instead of sending `rm` to the terminal.
+3. If that doesn't work, go ahead with your normal flow.
 
 ### House rules
 

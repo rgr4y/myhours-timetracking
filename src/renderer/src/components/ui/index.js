@@ -5,4 +5,7 @@ export * from './Layout';
 export * from './Typography';
 export * from './Interactive';
 export * from './Display';
+export * from './Tabs';
+export * from './FormSelectors';
+export * from './DataTable';
 export { default as LoadingOverlay } from './LoadingOverlay';

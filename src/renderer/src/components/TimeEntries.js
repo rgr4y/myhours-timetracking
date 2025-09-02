@@ -515,27 +515,27 @@ const TimeEntries = () => {
             
             if (lastClient) {
               const clientExists = clients.some(c => c.id === lastClient.id);
-              console.log('[TimeEntries] Client exists:', clientExists);
+              // console.log('[TimeEntries] Client exists:', clientExists);
               
               if (clientExists) {
-                console.log('[TimeEntries] Restored last client:', lastClient.name);
+                // console.log('[TimeEntries] Restored last client:', lastClient.name);
                 setLocalSelectedClient(lastClient);
                 
                 // Since we have all data loaded, we can directly check and set
                 if (lastProject) {
                   const projectExists = projects.some(p => p.id === lastProject.id && p.clientId === lastClient.id);
-                  console.log('[TimeEntries] Project exists:', projectExists);
+                  // console.log('[TimeEntries] Project exists:', projectExists);
                   
                   if (projectExists) {
-                    console.log('[TimeEntries] Restored last project:', lastProject.name);
+                    // console.log('[TimeEntries] Restored last project:', lastProject.name);
                     setLocalSelectedProject(lastProject);
                     
                     if (lastTask) {
                       const taskExists = tasks.some(t => t.id === lastTask.id && t.projectId === lastProject.id);
-                      console.log('[TimeEntries] Task exists:', taskExists);
-                      
+                      // console.log('[TimeEntries] Task exists:', taskExists);
+
                       if (taskExists) {
-                        console.log('[TimeEntries] Restored last task:', lastTask.name);
+                        // console.log('[TimeEntries] Restored last task:', lastTask.name);
                         setLocalSelectedTask(lastTask);
                       }
                     }

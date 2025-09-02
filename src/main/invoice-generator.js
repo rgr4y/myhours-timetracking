@@ -141,6 +141,121 @@ class InvoiceGenerator {
     }
   }
 
+  async generateInvoiceFromSelectedEntries(data) {
+    try {
+      // Get settings for company info
+      const settings = await this.database.getSettings();
+      
+      if (!data.selectedEntryIds || data.selectedEntryIds.length === 0) {
+        throw new Error('No time entries selected for invoice generation');
+      }
+
+      // Get the selected time entries by ID
+      const timeEntries = await this.database.getTimeEntriesByIds(data.selectedEntryIds);
+
+      if (timeEntries.length === 0) {
+        throw new Error('No time entries found for the selected IDs');
+      }
+
+      // Ensure all entries are uninvoiced
+      const invoicedEntries = timeEntries.filter(entry => entry.isInvoiced);
+      if (invoicedEntries.length > 0) {
+        throw new Error('Some selected time entries have already been invoiced');
+      }
+
+      // Ensure all entries belong to the same client
+      const clientIds = [...new Set(timeEntries.map(entry => entry.clientId))];
+      if (clientIds.length > 1) {
+        throw new Error('Cannot generate invoice for time entries from multiple clients');
+      }
+
+      // Validate that all entries have hourly rates
+      const missingRates = [];
+      let totalAmount = 0;
+      
+      for (const entry of timeEntries) {
+        // Try to get hourly rate from project, then client
+        const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
+        
+        if (!hourlyRate || hourlyRate <= 0) {
+          missingRates.push({
+            entryId: entry.id,
+            clientName: entry.client?.name || 'Unknown Client',
+            projectName: entry.project?.name || 'No Project',
+            date: new Date(entry.startTime).toLocaleDateString()
+          });
+        } else {
+          const hours = (entry.duration || 0) / 60;
+          totalAmount += hours * hourlyRate;
+        }
+      }
+      
+      if (missingRates.length > 0) {
+        const errorDetails = missingRates.map(mr => 
+          `• ${mr.date} - ${mr.clientName}/${mr.projectName}`
+        ).join('\n');
+        
+        throw new Error(`Cannot generate invoice: The following time entries have no hourly rate set:\n\n${errorDetails}\n\nPlease set hourly rates for the client or project before generating an invoice.`);
+      }
+
+      // Group entries by day and combine descriptions
+      const lineItems = this.groupEntriesByDay(timeEntries);
+      
+      // Calculate totals with proper hourly rates
+      const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 60;
+      
+      // Get the first entry's client info for the invoice header
+      const clientInfo = timeEntries[0]?.client;
+      
+      // For display, use the most common hourly rate or indicate "varies"
+      const rates = timeEntries.map(entry => entry.project?.hourlyRate || entry.client?.hourlyRate).filter(Boolean);
+      const uniqueRates = [...new Set(rates)];
+      const displayRate = uniqueRates.length === 1 ? uniqueRates[0] : null;
+
+      // Determine actual period from the entries
+      const periodStartDisplay = this.getOldestEntryDate(timeEntries);
+      const periodEndDisplay = this.getNewestEntryDate(timeEntries);
+
+      // Prepare template data (support snake_case and camelCase settings)
+      const templateData = {
+        companyName: settings.company_name || settings.companyName || 'Your Company',
+        companyEmail: settings.company_email || settings.companyEmail || '',
+        companyPhone: settings.company_phone || settings.companyPhone || '',
+        companyWebsite: settings.company_website || settings.companyWebsite || '',
+        invoiceNumber: data.invoice_number || this.generateInvoiceNumber(),
+        invoiceDate: new Date().toLocaleDateString(),
+        terms: settings.invoice_terms || settings.invoiceTerms || 'Net 30',
+        dueDate: (() => {
+          const days = this.parseNetDays(settings.invoice_terms || settings.invoiceTerms || 'Net 30');
+          const d = new Date();
+          d.setDate(d.getDate() + days);
+          return d.toLocaleDateString();
+        })(),
+        // Show the true invoice period based on included entries
+        periodStart: periodStartDisplay,
+        periodEnd: periodEndDisplay,
+        clientName: clientInfo?.name || 'Unknown Client',
+        clientEmail: clientInfo?.email || '',
+        lineItems: lineItems,
+        totalHours: totalHours.toFixed(2),
+        hourlyRate: displayRate ? displayRate.toFixed(2) : 'Varies',
+        totalAmount: totalAmount.toFixed(2)
+      };
+
+      // Generate PDF
+      const pdfPath = await this.generatePDF(templateData);
+      
+      // Mark entries as invoiced
+      const entryIds = timeEntries.map(entry => entry.id);
+      await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber);
+
+      return pdfPath;
+    } catch (error) {
+      console.error('Error generating invoice from selected entries:', error);
+      throw error;
+    }
+  }
+
   async generateInvoicePDF(invoice) {
     try {
       // Get settings for company info
