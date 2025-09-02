@@ -36,6 +36,20 @@ class BrowserElectronAPI {
     }
   }
 
+  // Console forwarding API - mirroring the structure from preload.js
+  console = {
+    log: (level, ...args) => {
+      // In browser shim, just forward to regular console with level prefix
+      const message = args.join(' ');
+      // Use window.console to avoid conflict with this.console
+      if (window.console[level] && typeof window.console[level] === 'function') {
+        window.console[level](`[SHIM-${level.toUpperCase()}]`, message);
+      } else {
+        window.console.log(`[SHIM-${level.toUpperCase()}]`, message);
+      }
+    }
+  };
+
   // Database operations - mirroring the structure from preload.js
   clients = {
     getAll: () => this.invoke('db:getClients'),
@@ -160,6 +174,12 @@ if (typeof window !== 'undefined') {
   
   // Auto-setup when script loads
   setupElectronAPI();
+  
+  // Test the console API if we're using the shim
+  if (window.electronAPI && window.electronAPI.isBrowser) {
+    window.electronAPI.console.log('info', 'Browser shim console API test');
+    window.console.log('[BROWSER-SHIM] Console API ready for logger utility');
+  }
 }
 
 export default BrowserElectronAPI;

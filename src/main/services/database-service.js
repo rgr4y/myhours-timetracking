@@ -146,9 +146,9 @@ class DatabaseService {
       for (const file of filesToDelete) {
         try {
           fs.unlinkSync(file.path);
-          console.log("[DATABASE] Cleaned up old backup:", file.name);
+          logger.debug("[DATABASE] Cleaned up old backup:", file.name);
         } catch (deleteError) {
-          console.warn(
+          logger.warn(
             "[DATABASE] Failed to delete old backup:",
             file.name,
             deleteError.message
@@ -156,7 +156,7 @@ class DatabaseService {
         }
       }
     } catch (error) {
-      console.warn("[DATABASE] Failed to cleanup old backups:", error.message);
+      logger.warn("[DATABASE] Failed to cleanup old backups:", error.message);
     }
   }
 
@@ -181,7 +181,7 @@ class DatabaseService {
       } catch (_) {}
       return { success: true };
     } catch (error) {
-      console.error("[DATABASE] Error removing demo data:", error);
+      logger.error("[DATABASE] Error removing demo data:", error);
       throw error;
     }
   }
@@ -215,7 +215,7 @@ class DatabaseService {
       // Return the Date object directly - let Prisma handle the conversion
       return date;
     } catch (error) {
-      console.error("Error parsing time with date:", error);
+      logger.error("Error parsing time with date:", error);
       return null;
     }
   }
@@ -229,7 +229,7 @@ class DatabaseService {
       });
 
       if (activeTimers.length > 1) {
-        console.warn(
+        logger.warn(
           `[DATABASE] Found ${activeTimers.length} active timers, stopping older ones`
         );
 
@@ -250,7 +250,7 @@ class DatabaseService {
             },
           });
 
-          console.log(
+          logger.debug(
             `[DATABASE] Auto-stopped duplicate active timer ${timer.id} with duration ${duration} minutes`
           );
         }
@@ -260,7 +260,7 @@ class DatabaseService {
 
       return activeTimers[0] || null;
     } catch (error) {
-      console.error("[DATABASE] Error ensuring single active timer:", error);
+      logger.error("[DATABASE] Error ensuring single active timer:", error);
       throw error;
     }
   }
@@ -287,7 +287,7 @@ class DatabaseService {
           },
         });
 
-        console.log(
+        logger.debug(
           `[DATABASE] Stopped active timer ${timer.id} with duration ${duration} minutes`
         );
       }
@@ -316,7 +316,7 @@ class DatabaseService {
 
       return timeEntry;
     } catch (error) {
-      console.error("Error starting timer:", error);
+      logger.error("Error starting timer:", error);
       throw error;
     }
   }
@@ -328,26 +328,26 @@ class DatabaseService {
       });
 
       if (!timeEntry) {
-        console.warn(`[DATABASE] Timer with ID ${timeEntryId} not found`);
+        logger.warn(`[DATABASE] Timer with ID ${timeEntryId} not found`);
         // Check if there's any active timer we can stop instead
         const anyActiveTimer = await this.prisma.timeEntry.findFirst({
           where: { isActive: true },
         });
 
         if (!anyActiveTimer) {
-          console.warn("[DATABASE] No active timer found to stop");
+          logger.warn("[DATABASE] No active timer found to stop");
           return null; // Return null instead of throwing error
         }
 
         // Use the found active timer instead
-        console.log(
+        logger.debug(
           `[DATABASE] Using active timer ${anyActiveTimer.id} instead of ${timeEntryId}`
         );
         return this.stopTimer(anyActiveTimer.id, roundTo);
       }
 
       if (!timeEntry.isActive) {
-        console.warn(`[DATABASE] Timer ${timeEntryId} is not active`);
+        logger.warn(`[DATABASE] Timer ${timeEntryId} is not active`);
         return timeEntry; // Return the existing entry
       }
 
@@ -359,7 +359,7 @@ class DatabaseService {
       if (roundTo > 0) {
         // Round up to the nearest roundTo minutes
         roundedDuration = Math.ceil(duration / roundTo) * roundTo;
-        console.log(
+        logger.debug(
           `[DATABASE] Duration: ${duration}m, rounded to ${roundTo}m intervals: ${roundedDuration}m`
         );
       }
@@ -383,7 +383,7 @@ class DatabaseService {
 
       return updatedTimeEntry;
     } catch (error) {
-      console.error("Error stopping timer:", error);
+      logger.error("Error stopping timer:", error);
       throw error;
     }
   }
@@ -433,7 +433,7 @@ class DatabaseService {
 
       return resumedTimeEntry;
     } catch (error) {
-      console.error("Error resuming timer:", error);
+      logger.error("Error resuming timer:", error);
       throw error;
     }
   }
@@ -461,7 +461,7 @@ class DatabaseService {
 
       return null;
     } catch (error) {
-      console.error("Error getting active timer:", error);
+      logger.error("Error getting active timer:", error);
       throw error;
     }
   }
@@ -560,7 +560,7 @@ class DatabaseService {
 
   async updateTimeEntry(id, data) {
     try {
-      console.log(
+      logger.debug(
         "[DATABASE] updateTimeEntry called with id:",
         id,
         "data:",
@@ -587,7 +587,7 @@ class DatabaseService {
       // Handle empty string to null conversion for projectId
       if (cleanData.projectId === "") cleanData.projectId = null;
 
-      console.log(
+      logger.debug(
         "[DATABASE] Processing projectId:",
         cleanData.projectId,
         "and taskId:",
@@ -622,7 +622,7 @@ class DatabaseService {
         cleanData.duration = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Convert to minutes
       }
 
-      console.log("[DATABASE] Cleaned data:", cleanData);
+      logger.debug("[DATABASE] Cleaned data:", cleanData);
 
       // Prepare the update data object with relationship operations
       const updateData = { ...cleanData };
@@ -663,7 +663,7 @@ class DatabaseService {
         }
       }
 
-      console.log("[DATABASE] Update data with relationships:", updateData);
+      logger.debug("[DATABASE] Update data with relationships:", updateData);
 
       const updatedTimeEntry = await this.prisma.timeEntry.update({
         where: { id: parseInt(id) },
@@ -681,14 +681,14 @@ class DatabaseService {
 
       return updatedTimeEntry;
     } catch (error) {
-      console.error("Error updating time entry:", error);
+      logger.error("Error updating time entry:", error);
       throw error;
     }
   }
 
   async createTimeEntry(data) {
     try {
-      console.log("[DATABASE] createTimeEntry called with data:", data);
+      logger.debug("[DATABASE] createTimeEntry called with data:", data);
 
       if (!data || Object.keys(data).length === 0) {
         throw new Error("Create data is required");
@@ -708,7 +708,7 @@ class DatabaseService {
         cleanData.projectId = parseInt(cleanData.projectId);
       if (cleanData.taskId) cleanData.taskId = parseInt(cleanData.taskId);
 
-      console.log(
+      logger.debug(
         "[DATABASE] Processing create with projectId:",
         cleanData.projectId,
         "and taskId:",
@@ -743,7 +743,7 @@ class DatabaseService {
         cleanData.duration = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Convert to minutes
       }
 
-      console.log("[DATABASE] Cleaned data for create:", cleanData);
+      logger.debug("[DATABASE] Cleaned data for create:", cleanData);
 
       const newTimeEntry = await this.prisma.timeEntry.create({
         data: cleanData,
@@ -760,7 +760,7 @@ class DatabaseService {
 
       return newTimeEntry;
     } catch (error) {
-      console.error("Error creating time entry:", error);
+      logger.error("Error creating time entry:", error);
       throw error;
     }
   }
@@ -773,7 +773,7 @@ class DatabaseService {
 
       return { success: true };
     } catch (error) {
-      console.error("Error deleting time entry:", error);
+      logger.error("Error deleting time entry:", error);
       throw error;
     }
   }
@@ -830,7 +830,7 @@ class DatabaseService {
 
       return client;
     } catch (error) {
-      console.error("Error creating client:", error);
+      logger.error("Error creating client:", error);
       throw error;
     }
   }
@@ -847,7 +847,7 @@ class DatabaseService {
 
       return client;
     } catch (error) {
-      console.error("Error updating client:", error);
+      logger.error("Error updating client:", error);
       throw error;
     }
   }
@@ -860,7 +860,7 @@ class DatabaseService {
 
       return { success: true };
     } catch (error) {
-      console.error("Error deleting client:", error);
+      logger.error("Error deleting client:", error);
       throw error;
     }
   }
@@ -883,7 +883,7 @@ class DatabaseService {
 
       return projects;
     } catch (error) {
-      console.error("Error getting projects:", error);
+      logger.error("Error getting projects:", error);
       throw error;
     }
   }
@@ -915,7 +915,7 @@ class DatabaseService {
 
       return project;
     } catch (error) {
-      console.error("Error creating project:", error);
+      logger.error("Error creating project:", error);
       throw error;
     }
   }
@@ -960,7 +960,7 @@ class DatabaseService {
 
       return project;
     } catch (error) {
-      console.error("Error updating project:", error);
+      logger.error("Error updating project:", error);
       throw error;
     }
   }
@@ -973,7 +973,7 @@ class DatabaseService {
 
       return project;
     } catch (error) {
-      console.error("Error deleting project:", error);
+      logger.error("Error deleting project:", error);
       throw error;
     }
   }
@@ -993,7 +993,7 @@ class DatabaseService {
 
       return project;
     } catch (error) {
-      console.error("Error getting default project:", error);
+      logger.error("Error getting default project:", error);
       throw error;
     }
   }
@@ -1001,9 +1001,9 @@ class DatabaseService {
   // Task methods
   async getTasks(projectId = null) {
     try {
-      // console.log('[DATABASE] getTasks called with projectId:', projectId);
+      // logger.debug('[DATABASE] getTasks called with projectId:', projectId);
       const where = projectId ? { projectId: parseInt(projectId) } : {};
-      // console.log('[DATABASE] Query where clause:', where);
+      // logger.debug('[DATABASE] Query where clause:', where);
 
       const tasks = await this.prisma.task.findMany({
         where,
@@ -1019,10 +1019,10 @@ class DatabaseService {
         },
       });
 
-      // console.log('[DATABASE] Found', tasks.length, 'tasks');
+      // logger.debug('[DATABASE] Found', tasks.length, 'tasks');
       return tasks;
     } catch (error) {
-      console.error("Error getting tasks:", error);
+      logger.error("Error getting tasks:", error);
       throw error;
     }
   }
@@ -1046,7 +1046,7 @@ class DatabaseService {
 
       return task;
     } catch (error) {
-      console.error("Error creating task:", error);
+      logger.error("Error creating task:", error);
       throw error;
     }
   }
@@ -1070,7 +1070,7 @@ class DatabaseService {
 
       return task;
     } catch (error) {
-      console.error("Error updating task:", error);
+      logger.error("Error updating task:", error);
       throw error;
     }
   }
@@ -1083,7 +1083,7 @@ class DatabaseService {
 
       return task;
     } catch (error) {
-      console.error("Error deleting task:", error);
+      logger.error("Error deleting task:", error);
       throw error;
     }
   }
@@ -1097,7 +1097,7 @@ class DatabaseService {
 
       return setting ? setting.value : null;
     } catch (error) {
-      console.error("Error getting setting:", error);
+      logger.error("Error getting setting:", error);
       throw error;
     }
   }
@@ -1112,7 +1112,7 @@ class DatabaseService {
 
       return setting;
     } catch (error) {
-      console.error("Error setting value:", error);
+      logger.error("Error setting value:", error);
       throw error;
     }
   }
@@ -1142,7 +1142,7 @@ class DatabaseService {
 
       return invoices;
     } catch (error) {
-      console.error("Error getting invoices:", error);
+      logger.error("Error getting invoices:", error);
       throw error;
     }
   }
@@ -1169,7 +1169,7 @@ class DatabaseService {
 
       return invoice;
     } catch (error) {
-      console.error("Error getting invoice by ID:", error);
+      logger.error("Error getting invoice by ID:", error);
       throw error;
     }
   }
@@ -1191,7 +1191,7 @@ class DatabaseService {
 
       return invoice;
     } catch (error) {
-      console.error("Error creating invoice:", error);
+      logger.error("Error creating invoice:", error);
       throw error;
     }
   }
@@ -1212,10 +1212,10 @@ class DatabaseService {
         where: { id: parseInt(id) },
       });
 
-      console.log("[DATABASE] Invoice deleted and time entries unmarked:", id);
+      logger.debug("[DATABASE] Invoice deleted and time entries unmarked:", id);
       return invoice;
     } catch (error) {
-      console.error("Error deleting invoice:", error);
+      logger.error("Error deleting invoice:", error);
       throw error;
     }
   }
@@ -1232,7 +1232,7 @@ class DatabaseService {
 
       return settingsObj;
     } catch (error) {
-      console.error("Error getting settings:", error);
+      logger.error("Error getting settings:", error);
       throw error;
     }
   }
@@ -1294,7 +1294,7 @@ class DatabaseService {
 
       return invoice;
     } catch (error) {
-      console.error("Error marking entries as invoiced:", error);
+      logger.error("Error marking entries as invoiced:", error);
       throw error;
     }
   }

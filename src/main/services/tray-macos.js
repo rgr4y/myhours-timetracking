@@ -2,7 +2,7 @@ const { Tray, Menu, nativeImage, app } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const TrayService = require('./tray-service');
-
+const logger = require('./logger-service');
 class MacOSTrayService extends TrayService {
   constructor(mainWindow, databaseService) {
     super(mainWindow, databaseService);
@@ -12,14 +12,14 @@ class MacOSTrayService extends TrayService {
   // Centralized icon loading method with cache busting
   loadIcon(size = { width: 16, height: 16 }) {
     try {
-      console.log('[TRAY-MACOS] Loading icon from:', this.iconPath);
+      logger.debug('[TRAY-MACOS] Loading icon from:', this.iconPath);
       
       // Force reload by reading file fresh to avoid caching
       const iconBuffer = fs.readFileSync(this.iconPath);
       const icon = nativeImage.createFromBuffer(iconBuffer);
       
       if (icon.isEmpty()) {
-        console.error('[TRAY-MACOS] Failed to load tray icon from:', this.iconPath);
+        logger.error('[TRAY-MACOS] Failed to load tray icon from:', this.iconPath);
         return null;
       }
       
@@ -30,23 +30,23 @@ class MacOSTrayService extends TrayService {
       
       return resizedIcon;
     } catch (error) {
-      console.error('[TRAY-MACOS] Error loading icon:', error);
+      logger.error('[TRAY-MACOS] Error loading icon:', error);
       return null;
     }
   }
 
   initialize() {
-    console.log('[TRAY-MACOS] Initializing macOS tray...');
+    logger.debug('[TRAY-MACOS] Initializing macOS tray...');
     
     try {
-      console.log('[TRAY-MACOS] Icon path exists:', fs.existsSync(this.iconPath));
+      logger.debug('[TRAY-MACOS] Icon path exists:', fs.existsSync(this.iconPath));
       
       const icon = this.loadIcon();
       if (!icon) {
         return false;
       }
       
-      console.log('[TRAY-MACOS] Original icon size:', icon.getSize());
+      logger.debug('[TRAY-MACOS] Original icon size:', icon.getSize());
       
       this.tray = new Tray(icon);
       this.tray.setToolTip('myHours Time Tracker');
@@ -63,10 +63,10 @@ class MacOSTrayService extends TrayService {
       // Check for active timer and restore tray/dock state
       this.restoreTimerState();
       
-      console.log('[TRAY-MACOS] Tray initialized successfully');
+      logger.debug('[TRAY-MACOS] Tray initialized successfully');
       return true;
     } catch (error) {
-      console.error('[TRAY-MACOS] Error initializing tray:', error);
+      logger.error('[TRAY-MACOS] Error initializing tray:', error);
       return false;
     }
   }
@@ -74,16 +74,16 @@ class MacOSTrayService extends TrayService {
   // Set up file watcher for icon hot reload during development
   setupIconWatcher() {
     try {
-      console.log('[TRAY-MACOS] Setting up icon file watcher for development');
+      logger.debug('[TRAY-MACOS] Setting up icon file watcher for development');
       
       this.iconWatcher = fs.watchFile(this.iconPath, { interval: 1000 }, (curr, prev) => {
-        console.log('[TRAY-MACOS] Icon file changed, refreshing...');
+        logger.debug('[TRAY-MACOS] Icon file changed, refreshing...');
         setTimeout(() => {
           this.refreshIcon();
         }, 100); // Small delay to ensure file write is complete
       });
     } catch (error) {
-      console.error('[TRAY-MACOS] Error setting up icon watcher:', error);
+      logger.error('[TRAY-MACOS] Error setting up icon watcher:', error);
     }
   }
 
@@ -91,22 +91,22 @@ class MacOSTrayService extends TrayService {
   refreshIcon() {
     if (!this.tray) return;
     
-    console.log('[TRAY-MACOS] Refreshing icon...');
+    logger.debug('[TRAY-MACOS] Refreshing icon...');
     const icon = this.loadIcon();
     if (icon) {
       this.tray.setImage(icon);
-      console.log('[TRAY-MACOS] Icon refreshed successfully');
+      logger.debug('[TRAY-MACOS] Icon refreshed successfully');
     }
   }
 
   // Check for active timer and restore tray/dock state on initialization
   async restoreTimerState() {
     try {
-      console.log('[TRAY-MACOS] Checking for active timer to restore state...');
+      logger.debug('[TRAY-MACOS] Checking for active timer to restore state...');
       const activeTimer = await this.database.getActiveTimer();
       
       if (activeTimer) {
-        console.log('[TRAY-MACOS] Found active timer on startup, restoring tray state');
+        logger.debug('[TRAY-MACOS] Found active timer on startup, restoring tray state');
         
         // Prepare timer data for tray update
         const timerData = {
@@ -119,17 +119,17 @@ class MacOSTrayService extends TrayService {
         // Update tray and dock status
         this.updateTimerStatus(timerData);
       } else {
-        console.log('[TRAY-MACOS] No active timer found on startup');
+        logger.debug('[TRAY-MACOS] No active timer found on startup');
       }
     } catch (error) {
-      console.error('[TRAY-MACOS] Error restoring timer state:', error);
+      logger.error('[TRAY-MACOS] Error restoring timer state:', error);
     }
   }
 
   async createContextMenu() {
     // Early return if tray is not initialized
     if (!this.tray) {
-      console.warn('[TRAY-MACOS] Tray not initialized, cannot setup menu');
+      logger.warn('[TRAY-MACOS] Tray not initialized, cannot setup menu');
       return;
     }
     
@@ -160,7 +160,7 @@ class MacOSTrayService extends TrayService {
         }
       });
     } catch (error) {
-      console.error('[TRAY-MACOS] Error loading clients for quick start menu:', error);
+      logger.error('[TRAY-MACOS] Error loading clients for quick start menu:', error);
       quickStartSubmenu = [
         {
           label: 'Choose Client...',
@@ -253,15 +253,15 @@ class MacOSTrayService extends TrayService {
     try {
       if (this.currentTimer) {
         // Stop the current timer
-        console.log('[TRAY-MACOS] Stopping timer from tray');
+        logger.debug('[TRAY-MACOS] Stopping timer from tray');
         await this.stopTimer();
       } else {
         // Show quick start dialog or start with last used settings
-        console.log('[TRAY-MACOS] Starting timer from tray');
+        logger.debug('[TRAY-MACOS] Starting timer from tray');
         await this.startTimer();
       }
     } catch (error) {
-      console.error('[TRAY-MACOS] Error toggling timer:', error);
+      logger.error('[TRAY-MACOS] Error toggling timer:', error);
     }
   }
 
@@ -297,7 +297,7 @@ class MacOSTrayService extends TrayService {
       
       return submenu;
     } catch (error) {
-      console.error('[TRAY-MACOS] Error creating quick start submenu:', error);
+      logger.error('[TRAY-MACOS] Error creating quick start submenu:', error);
       return [
         {
           label: 'Choose Client...',
@@ -311,20 +311,20 @@ class MacOSTrayService extends TrayService {
   }
 
   async openSettings() {
-    console.log('[TRAY-MACOS] Opening settings...');
+    logger.debug('[TRAY-MACOS] Opening settings...');
     this.showWindow();
     
     // Wait for the window to be ready before sending the navigation event
     await new Promise(resolve => {
       if (this.mainWindow.isVisible() && this.mainWindow.isFocused()) {
         // Window is already ready
-        console.log('[TRAY-MACOS] Window already ready, proceeding...');
+        logger.debug('[TRAY-MACOS] Window already ready, proceeding...');
         resolve();
       } else {
         // Wait for the window to show and focus
         let resolved = false;
         const onShow = () => {
-          console.log('[TRAY-MACOS] Window shown, sending settings event');
+          logger.debug('[TRAY-MACOS] Window shown, sending settings event');
           if (!resolved) {
             resolved = true;
             resolve();
@@ -338,13 +338,13 @@ class MacOSTrayService extends TrayService {
           if (!resolved) {
             resolved = true;
           }
-          console.log('[TRAY-MACOS] Timeout reached, proceeding anyway');
+          logger.debug('[TRAY-MACOS] Timeout reached, proceeding anyway');
           resolve();
         }, 200);
       }
     });
     
-    console.log('[TRAY-MACOS] Sending navigation event to settings');
+    logger.debug('[TRAY-MACOS] Sending navigation event to settings');
     this.mainWindow.webContents.send('tray-open-settings');
   }
 
@@ -355,7 +355,7 @@ class MacOSTrayService extends TrayService {
     
     // Early return if tray is not initialized
     if (!this.tray) {
-      console.warn('[TRAY-MACOS] Tray not initialized, cannot update timer status');
+      logger.warn('[TRAY-MACOS] Tray not initialized, cannot update timer status');
       return;
     }
     

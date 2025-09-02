@@ -32,7 +32,7 @@ const NavItem = styled.div`
   padding: 12px 20px;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  color: ${props => props.$active ? '#007AFF' : '#cccccc'};
+  color: ${props => props.$active ? '#B91C1C' : '#cccccc'};
   background: ${props => props.$active ? 'rgba(0, 122, 255, 0.1)' : 'transparent'};
   
   &:hover {
@@ -103,7 +103,7 @@ const Sidebar = () => {
 
   const menuItems = [
     { path: '/', icon: Clock, label: 'Time Entries' },
-    { path: '/projects', icon: Folder, label: 'Clients' },
+    { path: '/clients', icon: Folder, label: 'Clients' },
     { path: '/reports', icon: BarChart, label: 'Reports' },
     { path: '/invoice', icon: FileInput, label: 'Invoices' },
     { path: '/settings', icon: Settings, label: 'Settings' },

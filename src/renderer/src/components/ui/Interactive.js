@@ -28,7 +28,7 @@ export const DropdownButton = styled.button`
   
   &:focus {
     outline: none;
-    border-color: #007AFF;
+    border-color: #B91C1C;
   }
 `;
 
@@ -63,7 +63,7 @@ export const DropdownItem = styled.div`
   }
   
   &.selected {
-    background: #007AFF;
+    background: #DC2626;
   }
 `;
 

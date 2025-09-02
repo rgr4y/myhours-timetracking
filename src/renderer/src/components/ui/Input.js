@@ -12,7 +12,7 @@ export const Input = styled.input`
   
   &:focus {
     outline: none;
-    border-color: #007AFF;
+    border-color: #B91C1C;
   }
   
   &::placeholder {
@@ -33,7 +33,7 @@ export const Select = styled.select`
   
   &:focus {
     outline: none;
-    border-color: #007AFF;
+    border-color: #B91C1C;
   }
   
   option {
@@ -56,7 +56,7 @@ export const TextArea = styled.textarea`
   
   &:focus {
     outline: none;
-    border-color: #007AFF;
+    border-color: #B91C1C;
   }
   
   &::placeholder {

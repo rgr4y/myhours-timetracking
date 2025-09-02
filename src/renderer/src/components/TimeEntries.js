@@ -511,7 +511,7 @@ const TimeEntries = () => {
               api.settings.getLastUsedTask()
             ]);
             
-            console.log('[TimeEntries] Last used values:', { lastClient, lastProject, lastTask });
+            // console.log('[TimeEntries] Last used values:', JSON.stringify({ lastClient, lastProject, lastTask }, null, 2));
             
             if (lastClient) {
               const clientExists = clients.some(c => c.id === lastClient.id);

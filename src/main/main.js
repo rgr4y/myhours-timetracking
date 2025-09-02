@@ -19,11 +19,11 @@ logger.main('info', 'Environment', { isDev, isPackaged: app.isPackaged });
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
-  console.log('[MAIN] Another instance is already running, quitting...');
+  logger.debug('[MAIN] Another instance is already running, quitting...');
   app.quit();
 } else {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
-    console.log('[MAIN] Second instance attempted, focusing existing window');
+    logger.debug('[MAIN] Second instance attempted, focusing existing window');
     // Someone tried to run a second instance, we should focus our window instead
     const myHoursApp = global.myHoursAppInstance;
     if (myHoursApp && myHoursApp.mainWindow) {
@@ -37,15 +37,15 @@ if (!gotTheLock) {
 if (isDev) {
   // Enable more verbose logging
   if (process.env.ELECTRON_ENABLE_LOGGING) {
-    console.log('[MAIN] Enhanced logging enabled');
+    logger.debug('[MAIN] Enhanced logging enabled');
     
     // Log unhandled errors
     process.on('uncaughtException', (error) => {
-      console.error('[MAIN] Uncaught Exception:', error);
+      logger.error('[MAIN] Uncaught Exception:', error);
     });
     
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('[MAIN] Unhandled Rejection at:', promise, 'reason:', reason);
+      logger.error('[MAIN] Unhandled Rejection at:', promise, 'reason:', reason);
     });
   }
   
@@ -103,7 +103,7 @@ class MyHoursApp {
     while (Date.now() - startedAt < timeoutMs) {
       try {
         const code = await tryOnce();
-        console.log('[MAIN] Dev server responded with status:', code);
+        logger.debug('[MAIN] Dev server responded with status:', code);
         return;
       } catch (_) {}
       await new Promise(r => setTimeout(r, intervalMs));
@@ -114,7 +114,7 @@ class MyHoursApp {
   setupAutoUpdater() {
     // Only support macOS for updater features per requirement
     if (process.platform !== 'darwin') {
-      console.log('[UPDATER] Disabled: non-macOS platform');
+      logger.debug('[UPDATER] Disabled: non-macOS platform');
       this.updater.mode = 'disabled';
       return;
     }
@@ -123,12 +123,12 @@ class MyHoursApp {
     if (isDev) {
       const defaultUrl = 'http://127.0.0.1:3010/mock-update.json';
       const feedUrl = process.env.MYHOURS_DEV_UPDATE_URL || defaultUrl;
-      console.log('[UPDATER] Dev mock enabled. Feed URL:', feedUrl);
+      logger.debug('[UPDATER] Dev mock enabled. Feed URL:', feedUrl);
       this.updater.mode = 'mock';
       this.updater.feedUrl = feedUrl;
 
       const sendEvent = (type, payload = {}) => {
-        console.log('[UPDATER] (mock event)', type, payload);
+        logger.debug('[UPDATER] (mock event)', type, payload);
         try { this.mainWindow?.webContents?.send('updater:event', { type, payload }); } catch (_) {}
       };
 
@@ -200,7 +200,7 @@ class MyHoursApp {
           sendEvent('update-not-available', { current });
           return { available: false, info: { current } };
         } catch (err) {
-          console.log('[UPDATER] Mock check error:', err);
+          logger.debug('[UPDATER] Mock check error:', err);
           sendEvent('error', { message: err && err.message ? err.message : String(err) });
           return { error: err.message };
         }
@@ -216,7 +216,7 @@ class MyHoursApp {
             throw new Error('Invalid URL');
           }
           this.updater.feedUrl = url;
-          console.log('[UPDATER] Dev mock feed URL set to:', url);
+          logger.debug('[UPDATER] Dev mock feed URL set to:', url);
           return { success: true };
         } catch (err) {
           return { success: false, error: err.message };
@@ -236,7 +236,7 @@ class MyHoursApp {
             const transferred = Math.round(percent * 1000000 / 100);
             const total = 1000000;
             const bytesPerSecond = 200000 + Math.round(Math.random() * 150000);
-            console.log('[UPDATER] (mock) progress', percent.toFixed(1) + '%');
+            logger.debug('[UPDATER] (mock) progress', percent.toFixed(1) + '%');
             sendEvent('download-progress', { percent, transferred, total, bytesPerSecond });
           }
           sendEvent('update-downloaded', { version: this.updater.lastInfo.version });
@@ -252,7 +252,7 @@ class MyHoursApp {
             });
             if (res.response === 0) {
               sendEvent('will-install');
-              console.log('[UPDATER] (mock) install triggered via prompt');
+              logger.debug('[UPDATER] (mock) install triggered via prompt');
             }
           } catch (_) {}
           return { downloaded: true };
@@ -264,7 +264,7 @@ class MyHoursApp {
       ipcMain.handle('update:install', async () => {
         // In dev, just simulate a relaunch
         sendEvent('will-install');
-        console.log('[UPDATER] (mock) install triggered');
+        logger.debug('[UPDATER] (mock) install triggered');
         return { installed: true };
       });
 
@@ -282,7 +282,7 @@ class MyHoursApp {
       try { autoUpdater.autoDownload = false; } catch (_) {}
       try { autoUpdater.autoInstallOnAppQuit = true; } catch (_) {}
       this.updater.mode = 'native';
-      console.log('[UPDATER] Setting up electron-updater (macOS) ...');
+      logger.debug('[UPDATER] Setting up electron-updater (macOS) ...');
 
       // Explicitly point to GitHub releases (also embedded via app-update.yml)
       try {
@@ -292,14 +292,14 @@ class MyHoursApp {
           repo: 'myhours-timetracking',
           releaseType: 'release'
         });
-        console.log('[UPDATER] Feed set to GitHub releases: rgr4y/myhours-timetracking');
+        logger.debug('[UPDATER] Feed set to GitHub releases: rgr4y/myhours-timetracking');
       } catch (e) {
-        console.warn('[UPDATER] setFeedURL failed (will use embedded config):', e.message);
+        logger.warn('[UPDATER] setFeedURL failed (will use embedded config):', e.message);
       }
 
       // Diagnostics
       try {
-        console.log('[UPDATER] updateConfigPath:', autoUpdater.updateConfigPath);
+        logger.debug('[UPDATER] updateConfigPath:', autoUpdater.updateConfigPath);
       } catch (_) {}
 
       const forward = (type, payload = {}) => {
@@ -307,22 +307,22 @@ class MyHoursApp {
       };
 
       autoUpdater.on('checking-for-update', () => {
-        console.log('[UPDATER] Checking for update...');
+        logger.debug('[UPDATER] Checking for update...');
         forward('checking-for-update');
       });
       autoUpdater.on('update-available', (info) => {
         const version = info?.version;
         const notes = info?.releaseNotes;
         const notesUrl = version ? `https://github.com/rgr4y/myhours-timetracking/releases/tag/v${version}` : undefined;
-        console.log('[UPDATER] Update available:', version);
+        logger.debug('[UPDATER] Update available:', version);
         forward('update-available', { version, notes, notesUrl });
       });
       autoUpdater.on('update-not-available', (info) => {
-        console.log('[UPDATER] Update not available:', info?.version);
+        logger.debug('[UPDATER] Update not available:', info?.version);
         forward('update-not-available', { version: info?.version });
       });
       autoUpdater.on('error', (err) => {
-        console.log('[UPDATER] Error in auto-updater:', err);
+        logger.debug('[UPDATER] Error in auto-updater:', err);
         forward('error', { message: err?.message || String(err) });
       });
       autoUpdater.on('download-progress', (progressObj) => {
@@ -330,7 +330,7 @@ class MyHoursApp {
       });
       autoUpdater.on('update-downloaded', async (info) => {
         const version = info?.version;
-        console.log('[UPDATER] Update downloaded:', version);
+        logger.debug('[UPDATER] Update downloaded:', version);
         forward('update-downloaded', { version });
         // Prompt to install now
         try {
@@ -346,7 +346,7 @@ class MyHoursApp {
             autoUpdater.quitAndInstall();
           }
         } catch (e) {
-          console.warn('[UPDATER] Install prompt failed:', e);
+          logger.warn('[UPDATER] Install prompt failed:', e);
         }
       });
 
@@ -367,7 +367,7 @@ class MyHoursApp {
         }
       });
     } catch (e) {
-      console.warn('[UPDATER] Failed to set up native updater:', e);
+      logger.warn('[UPDATER] Failed to set up native updater:', e);
       this.updater.mode = 'disabled';
     }
   }
@@ -409,27 +409,27 @@ class MyHoursApp {
 
     // Load the app
     if (isDev) {
-      console.log('[MAIN] Loading app in development mode...');
+      logger.debug('[MAIN] Loading app in development mode...');
       const devUrl = 'http://localhost:3010';
-      console.log('[MAIN] Waiting for dev server:', devUrl);
+      logger.debug('[MAIN] Waiting for dev server:', devUrl);
       try {
         await this.waitForDevServer(devUrl, 2000, 300);
       } catch (e) {
-        console.warn('[MAIN] Dev server wait timed out, attempting to load anyway');
+        logger.warn('[MAIN] Dev server wait timed out, attempting to load anyway');
       }
-      console.log('[MAIN] Loading URL:', devUrl);
+      logger.debug('[MAIN] Loading URL:', devUrl);
       this.mainWindow.loadURL(devUrl);
       this.mainWindow.webContents.openDevTools();
     } else {
       const indexPath = path.join(__dirname, '../renderer/build/index.html');
-      console.log('[MAIN] Loading production file:', indexPath);
+      logger.debug('[MAIN] Loading production file:', indexPath);
       const fs = require('fs');
-      console.log('[MAIN] index.html exists?', fs.existsSync(indexPath));
+      logger.debug('[MAIN] index.html exists?', fs.existsSync(indexPath));
       this.mainWindow.loadFile(indexPath);
     }
 
     this.mainWindow.once('ready-to-show', () => {
-      console.log('[MAIN] Window ready to show');
+      logger.debug('[MAIN] Window ready to show');
       // Ensure the window title stays consistent regardless of document.title
       try {
         this.mainWindow.setTitle('myHours');
@@ -463,16 +463,16 @@ class MyHoursApp {
     const maxRetries = 30; // ~9s with 300ms delay
     const retryDelayMs = 300;
     this.mainWindow.webContents.on('did-fail-load', async (_event, errorCode, errorDescription, validatedURL) => {
-      console.error('[MAIN] did-fail-load:', { errorCode, errorDescription, validatedURL });
+      logger.error('[MAIN] did-fail-load:', { errorCode, errorDescription, validatedURL });
       if (isDev && validatedURL && retryCount < maxRetries) {
         retryCount += 1;
-        console.log(`[MAIN] Retry ${retryCount}/${maxRetries} loading dev URL after ${retryDelayMs}ms...`);
+        logger.debug(`[MAIN] Retry ${retryCount}/${maxRetries} loading dev URL after ${retryDelayMs}ms...`);
         await new Promise(r => setTimeout(r, retryDelayMs));
         try { await this.mainWindow.loadURL(validatedURL); } catch (_) {}
       }
     });
     this.mainWindow.webContents.on('render-process-gone', (event, details) => {
-      console.error('[MAIN] render-process-gone:', details);
+      logger.error('[MAIN] render-process-gone:', details);
     });
 
     this.mainWindow.on('closed', () => {
@@ -504,7 +504,7 @@ class MyHoursApp {
       try {
         return this.versionService.getDisplayVersion();
       } catch (e) {
-        console.error('[VERSION] Error getting display version:', e);
+        logger.error('[VERSION] Error getting display version:', e);
         return this.versionService.getBaseVersion();
       }
     });
@@ -515,7 +515,7 @@ class MyHoursApp {
         const clients = await this.database.getClients();
         return clients;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting clients:', error);
+        logger.error('[MAIN] IPC: Error getting clients:', error);
         throw error;
       }
     });
@@ -533,13 +533,13 @@ class MyHoursApp {
     });
     
     ipcMain.handle('db:createClient', async (event, client) => {
-      console.log('[MAIN] IPC: Creating client:', JSON.stringify(client, null, 2));
+      logger.debug('[MAIN] IPC: Creating client:', JSON.stringify(client, null, 2));
       try {
         const newClient = await this.database.createClient(client);
-        console.log('[MAIN] IPC: Client created successfully:', JSON.stringify(newClient, null, 2));
+        logger.debug('[MAIN] IPC: Client created successfully:', JSON.stringify(newClient, null, 2));
         return newClient;
       } catch (error) {
-        console.error('[MAIN] IPC: Error creating client:', error);
+        logger.error('[MAIN] IPC: Error creating client:', error);
         throw error;
       }
     });
@@ -548,7 +548,7 @@ class MyHoursApp {
       try {
         return await this.database.updateClient(id, client);
       } catch (error) {
-        console.error('[MAIN] IPC: Error updating client:', error);
+        logger.error('[MAIN] IPC: Error updating client:', error);
         throw error;
       }
     });
@@ -557,7 +557,7 @@ class MyHoursApp {
       try {
         return await this.database.deleteClient(id);
       } catch (error) {
-        console.error('[MAIN] IPC: Error deleting client:', error);
+        logger.error('[MAIN] IPC: Error deleting client:', error);
         throw error;
       }
     });
@@ -566,7 +566,7 @@ class MyHoursApp {
       try {
         return await this.database.getProjects(clientId);
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting projects:', error);
+        logger.error('[MAIN] IPC: Error getting projects:', error);
         throw error;
       }
     });
@@ -575,7 +575,7 @@ class MyHoursApp {
       try {
         return await this.database.createProject(project);
       } catch (error) {
-        console.error('[MAIN] IPC: Error creating project:', error);
+        logger.error('[MAIN] IPC: Error creating project:', error);
         throw error;
       }
     });
@@ -584,7 +584,7 @@ class MyHoursApp {
       try {
         return await this.database.updateProject(id, project);
       } catch (error) {
-        console.error('[MAIN] IPC: Error updating project:', error);
+        logger.error('[MAIN] IPC: Error updating project:', error);
         throw error;
       }
     });
@@ -593,7 +593,7 @@ class MyHoursApp {
       try {
         return await this.database.deleteProject(id);
       } catch (error) {
-        console.error('[MAIN] IPC: Error deleting project:', error);
+        logger.error('[MAIN] IPC: Error deleting project:', error);
         throw error;
       }
     });
@@ -602,19 +602,19 @@ class MyHoursApp {
       try {
         return await this.database.getDefaultProject(clientId);
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting default project:', error);
+        logger.error('[MAIN] IPC: Error getting default project:', error);
         throw error;
       }
     });
 
     ipcMain.handle('db:getTasks', async (event, projectId) => {
       try {
-        // console.log('[MAIN] IPC: Getting tasks for project:', projectId);
+        // logger.debug('[MAIN] IPC: Getting tasks for project:', projectId);
         const tasks = await this.database.getTasks(projectId);
-        // console.log('[MAIN] IPC: Returning', tasks.length, 'tasks');
+        // logger.debug('[MAIN] IPC: Returning', tasks.length, 'tasks');
         return tasks;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting tasks:', error);
+        logger.error('[MAIN] IPC: Error getting tasks:', error);
         throw error;
       }
     });
@@ -623,7 +623,7 @@ class MyHoursApp {
       try {
         return await this.database.createTask(task);
       } catch (error) {
-        console.error('[MAIN] IPC: Error creating task:', error);
+        logger.error('[MAIN] IPC: Error creating task:', error);
         throw error;
       }
     });
@@ -632,7 +632,7 @@ class MyHoursApp {
       try {
         return await this.database.updateTask(id, task);
       } catch (error) {
-        console.error('[MAIN] IPC: Error updating task:', error);
+        logger.error('[MAIN] IPC: Error updating task:', error);
         throw error;
       }
     });
@@ -641,7 +641,7 @@ class MyHoursApp {
       try {
         return await this.database.deleteTask(id);
       } catch (error) {
-        console.error('[MAIN] IPC: Error deleting task:', error);
+        logger.error('[MAIN] IPC: Error deleting task:', error);
         throw error;
       }
     });
@@ -660,20 +660,20 @@ class MyHoursApp {
     
     ipcMain.handle('db:createTimeEntry', async (event, data) => {
       try {
-        console.log('[MAIN] IPC: Creating time entry with data:', data);
+        logger.debug('[MAIN] IPC: Creating time entry with data:', data);
         return await this.database.createTimeEntry(data);
       } catch (error) {
-        console.error('[MAIN] IPC: Error creating time entry:', error);
+        logger.error('[MAIN] IPC: Error creating time entry:', error);
         throw error;
       }
     });
     
     ipcMain.handle('db:updateTimeEntry', async (event, id, data) => {
       try {
-        console.log('[MAIN] IPC: Updating time entry with id:', id, 'data:', data);
+        logger.debug('[MAIN] IPC: Updating time entry with id:', id, 'data:', data);
         return await this.database.updateTimeEntry(id, data);
       } catch (error) {
-        console.error('[MAIN] IPC: Error updating time entry:', error);
+        logger.error('[MAIN] IPC: Error updating time entry:', error);
         throw error;
       }
     });
@@ -682,12 +682,12 @@ class MyHoursApp {
       try {
         return await this.database.deleteTimeEntry(id);
       } catch (error) {
-        console.error('[MAIN] IPC: Error deleting time entry:', error);
+        logger.error('[MAIN] IPC: Error deleting time entry:', error);
         throw error;
       }
     });
     ipcMain.handle('db:startTimer', async (event, data) => {
-      console.log('[MAIN] IPC: Starting timer with data:', JSON.stringify(data, null, 2));
+      logger.debug('[MAIN] IPC: Starting timer with data:', JSON.stringify(data, null, 2));
       try {
         const timer = await this.database.startTimer(data);
         
@@ -703,44 +703,44 @@ class MyHoursApp {
           await this.database.setSetting('lastUsedTaskId', data.taskId.toString());
         }
         
-        console.log('[MAIN] IPC: Timer started successfully:', JSON.stringify(timer, null, 2));
+        logger.debug('[MAIN] IPC: Timer started successfully:', JSON.stringify(timer, null, 2));
         return timer;
       } catch (error) {
-        console.error('[MAIN] IPC: Error starting timer:', error);
+        logger.error('[MAIN] IPC: Error starting timer:', error);
         throw error;
       }
     });
     
     ipcMain.handle('db:stopTimer', async (event, entryId, roundTo) => {
-      console.log('[MAIN] IPC: Stopping timer with ID:', entryId, 'roundTo:', roundTo);
+      logger.debug('[MAIN] IPC: Stopping timer with ID:', entryId, 'roundTo:', roundTo);
       try {
         const entry = await this.database.stopTimer(entryId, roundTo);
-        console.log('[MAIN] IPC: Timer stopped successfully:', JSON.stringify(entry, null, 2));
+        logger.debug('[MAIN] IPC: Timer stopped successfully:', JSON.stringify(entry, null, 2));
         return entry;
       } catch (error) {
-        console.error('[MAIN] IPC: Error stopping timer:', error);
+        logger.error('[MAIN] IPC: Error stopping timer:', error);
         throw error;
       }
     });
 
     ipcMain.handle('db:resumeTimer', async (event, entryId) => {
-      console.log('[MAIN] IPC: Resuming timer with ID:', entryId);
+      logger.debug('[MAIN] IPC: Resuming timer with ID:', entryId);
       try {
         const entry = await this.database.resumeTimer(entryId);
-        console.log('[MAIN] IPC: Timer resumed successfully:', JSON.stringify(entry, null, 2));
+        logger.debug('[MAIN] IPC: Timer resumed successfully:', JSON.stringify(entry, null, 2));
         return entry;
       } catch (error) {
-        console.error('[MAIN] IPC: Error resuming timer:', error);
+        logger.error('[MAIN] IPC: Error resuming timer:', error);
         throw error;
       }
     });
     ipcMain.handle('db:getActiveTimer', async () => {
       try {
         const activeTimer = await this.database.getActiveTimer();
-        console.log('[MAIN] IPC: Active timer:', activeTimer ? 'found' : 'none');
+        logger.debug('[MAIN] IPC: Active timer:', activeTimer ? 'found' : 'none');
         return activeTimer;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting active timer:', error);
+        logger.error('[MAIN] IPC: Error getting active timer:', error);
         throw error;
       }
     });
@@ -755,7 +755,7 @@ class MyHoursApp {
         }
         return null;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting last used client:', error);
+        logger.error('[MAIN] IPC: Error getting last used client:', error);
         return null;
       }
     });
@@ -773,7 +773,7 @@ class MyHoursApp {
         }
         return null;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting last used project:', error);
+        logger.error('[MAIN] IPC: Error getting last used project:', error);
         return null;
       }
     });
@@ -792,7 +792,7 @@ class MyHoursApp {
         }
         return null;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting last used task:', error);
+        logger.error('[MAIN] IPC: Error getting last used task:', error);
         return null;
       }
     });
@@ -801,7 +801,7 @@ class MyHoursApp {
       try {
         return await this.database.getSetting(key);
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting setting:', error);
+        logger.error('[MAIN] IPC: Error getting setting:', error);
         throw error;
       }
     });
@@ -810,7 +810,7 @@ class MyHoursApp {
       try {
         return await this.database.setSetting(key, value);
       } catch (error) {
-        console.error('[MAIN] IPC: Error setting value:', error);
+        logger.error('[MAIN] IPC: Error setting value:', error);
         throw error;
       }
     });
@@ -838,7 +838,7 @@ class MyHoursApp {
         
         return settingsObj;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting settings:', error);
+        logger.error('[MAIN] IPC: Error getting settings:', error);
         throw error;
       }
     });
@@ -849,7 +849,7 @@ class MyHoursApp {
         const result = await this.database.removeDemoData();
         return result;
       } catch (error) {
-        console.error('[MAIN] Error removing demo data:', error);
+        logger.error('[MAIN] Error removing demo data:', error);
         throw error;
       }
     });
@@ -863,7 +863,7 @@ class MyHoursApp {
         
         return { success: true };
       } catch (error) {
-        console.error('[MAIN] IPC: Error updating settings:', error);
+        logger.error('[MAIN] IPC: Error updating settings:', error);
         throw error;
       }
     });
@@ -888,12 +888,12 @@ class MyHoursApp {
             if (err) return reject(err);
             resolve();
           });
-          child.stdout?.on('data', (d) => console.log('[SEED]', d.toString().trim()));
-          child.stderr?.on('data', (d) => console.error('[SEED]', d.toString().trim()));
+          child.stdout?.on('data', (d) => logger.debug('[SEED]', d.toString().trim()));
+          child.stderr?.on('data', (d) => logger.error('[SEED]', d.toString().trim()));
         });
         return { success: true };
       } catch (error) {
-        console.error('[MAIN] dev:runSeed error:', error);
+        logger.error('[MAIN] dev:runSeed error:', error);
         return { success: false, error: error.message };
       }
     });
@@ -901,10 +901,10 @@ class MyHoursApp {
     ipcMain.handle('db:getInvoices', async () => {
       try {
         const invoices = await this.database.getInvoices();
-        console.log('[MAIN] IPC: Got invoices:', invoices.length);
+        logger.debug('[MAIN] IPC: Got invoices:', invoices.length);
         return invoices;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting invoices:', error);
+        logger.error('[MAIN] IPC: Error getting invoices:', error);
         throw error;
       }
     });
@@ -912,10 +912,10 @@ class MyHoursApp {
     ipcMain.handle('db:deleteInvoice', async (event, id) => {
       try {
         const result = await this.database.deleteInvoice(id);
-        console.log('[MAIN] IPC: Invoice deleted:', id);
+        logger.debug('[MAIN] IPC: Invoice deleted:', id);
         return result;
       } catch (error) {
-        console.error('[MAIN] IPC: Error deleting invoice:', error);
+        logger.error('[MAIN] IPC: Error deleting invoice:', error);
         throw error;
       }
     });
@@ -923,29 +923,29 @@ class MyHoursApp {
     // Invoice operations
     ipcMain.handle('invoice:generate', async (event, data) => {
       try {
-        console.log('[MAIN] invoice:generate called with data:', data);
+        logger.debug('[MAIN] invoice:generate called with data:', data);
         const filePath = await this.invoiceGenerator.generateInvoice(data);
         return { success: true, filePath };
       } catch (error) {
-        console.log('[MAIN] invoice:generate error:', error.message);
+        logger.debug('[MAIN] invoice:generate error:', error.message);
         return { success: false, error: error.message };
       }
     });
 
     ipcMain.handle('invoice:generateFromSelected', async (event, data) => {
       try {
-        console.log('[MAIN] invoice:generateFromSelected called with data:', data);
+        logger.debug('[MAIN] invoice:generateFromSelected called with data:', data);
         const filePath = await this.invoiceGenerator.generateInvoiceFromSelectedEntries(data);
         return { success: true, filePath };
       } catch (error) {
-        console.log('[MAIN] invoice:generateFromSelected error:', error.message);
+        logger.debug('[MAIN] invoice:generateFromSelected error:', error.message);
         return { success: false, error: error.message };
       }
     });
 
     ipcMain.handle('invoice:download', async (event, invoiceId) => {
       try {
-        console.log('[MAIN] invoice:download called with invoiceId:', invoiceId);
+        logger.debug('[MAIN] invoice:download called with invoiceId:', invoiceId);
         // Get the invoice data from database
         const invoice = await this.database.getInvoiceById(invoiceId);
         if (!invoice) {
@@ -968,14 +968,14 @@ class MyHoursApp {
           // Copy the generated file to the chosen location
           const fs = require('fs').promises;
           await fs.copyFile(filePath, result.filePath);
-          console.log('[MAIN] invoice:download completed successfully');
+          logger.debug('[MAIN] invoice:download completed successfully');
           return { success: true, filePath: result.filePath };
         } else {
-          console.log('[MAIN] invoice:download cancelled by user');
+          logger.debug('[MAIN] invoice:download cancelled by user');
           return { success: false, error: 'Download cancelled' };
         }
       } catch (error) {
-        console.error('[MAIN] Error downloading invoice:', error);
+        logger.error('[MAIN] Error downloading invoice:', error);
         return { success: false, error: error.message };
       }
     });
@@ -1025,7 +1025,7 @@ class MyHoursApp {
           return { success: false, error: 'Export cancelled' };
         }
       } catch (error) {
-        console.error('[MAIN] Error exporting to CSV:', error);
+        logger.error('[MAIN] Error exporting to CSV:', error);
         return { success: false, error: error.message };
       }
     });
@@ -1081,14 +1081,14 @@ class MyHoursApp {
           return { success: false, error: 'Export cancelled' };
         }
       } catch (error) {
-        console.error('[MAIN] Error exporting to JSON:', error);
+        logger.error('[MAIN] Error exporting to JSON:', error);
         return { success: false, error: error.message };
       }
     });
 
     // Tray-related IPC handlers
     ipcMain.on('tray:timer-status-changed', (event, timerData) => {
-      console.log('[MAIN] Timer status changed:', timerData);
+      logger.debug('[MAIN] Timer status changed:', timerData);
       if (this.trayService) {
         this.trayService.updateTimerStatus(timerData);
         
@@ -1119,22 +1119,22 @@ class MyHoursApp {
 
   async setupWebSocketServer() {
     if (!isDev) {
-      console.log('[WEBSOCKET] Skipping WebSocket server in production');
+      logger.debug('[WEBSOCKET] Skipping WebSocket server in production');
       return;
     }
 
     const WebSocket = require('ws');
     
-    console.log('[WEBSOCKET] Starting WebSocket server on port 3001...');
+    logger.debug('[WEBSOCKET] Starting WebSocket server on port 3001...');
     this.wsServer = new WebSocket.Server({ port: 3001 });
 
     this.wsServer.on('connection', (ws) => {
-      console.log('[WEBSOCKET] Browser client connected');
+      logger.debug('[WEBSOCKET] Browser client connected');
 
       ws.on('message', async (message) => {
         try {
           const request = JSON.parse(message);
-          // console.log('[WEBSOCKET] Received IPC request:', request.channel);
+          // logger.debug('[WEBSOCKET] Received IPC request:', request.channel);
 
           // Create a mock event object for IPC handler compatibility
           const mockEvent = {
@@ -1161,7 +1161,7 @@ class MyHoursApp {
             error: null
           }));
         } catch (error) {
-          console.error('[WEBSOCKET] Error handling IPC request:', error);
+          logger.error('[WEBSOCKET] Error handling IPC request:', error);
           ws.send(JSON.stringify({
             id: request.id,
             result: null,
@@ -1171,25 +1171,25 @@ class MyHoursApp {
       });
 
       ws.on('close', () => {
-        console.log('[WEBSOCKET] Browser client disconnected');
+        logger.debug('[WEBSOCKET] Browser client disconnected');
       });
 
       ws.on('error', (error) => {
-        console.error('[WEBSOCKET] Client error:', error);
+        logger.error('[WEBSOCKET] Client error:', error);
       });
     });
 
     this.wsServer.on('error', (error) => {
-      console.error('[WEBSOCKET] Server error:', error);
+      logger.error('[WEBSOCKET] Server error:', error);
     });
 
-    console.log('[WEBSOCKET] WebSocket server started successfully');
+    logger.debug('[WEBSOCKET] WebSocket server started successfully');
   }
 
   async initialize() {
-    console.log('[MAIN] App initializing...');
+    logger.debug('[MAIN] App initializing...');
     await app.whenReady();
-    console.log('[MAIN] App ready');
+    logger.debug('[MAIN] App ready');
     
     // Setup updater (mock in dev on macOS, native in prod macOS)
     this.setupAutoUpdater();
@@ -1200,7 +1200,7 @@ class MyHoursApp {
         try {
           autoUpdater.checkForUpdates(); // check-only (no auto download)
         } catch (e) {
-          console.warn('[UPDATER] checkForUpdates failed:', e.message);
+          logger.warn('[UPDATER] checkForUpdates failed:', e.message);
         }
       }, 3000); // Wait 3 seconds after startup
     }
@@ -1208,33 +1208,33 @@ class MyHoursApp {
     // Initialize database
     this.database = new DatabaseService();
     await this.database.initialize();
-    console.log('[MAIN] Database initialized');
+    logger.debug('[MAIN] Database initialized');
     
     // Initialize invoice generator
     this.invoiceGenerator = new InvoiceGenerator(this.database);
     
     // Setup IPC handlers
     this.setupIPC();
-    console.log('[MAIN] IPC handlers set up');
+    logger.debug('[MAIN] IPC handlers set up');
     
     // Setup WebSocket server for browser debugging
     await this.setupWebSocketServer();
     
     // Create main window
     await this.createWindow();
-    console.log('[MAIN] Window created');
+    logger.debug('[MAIN] Window created');
 
     // Initialize tray service (cross-platform)
     if (TrayService) {
       this.trayService = new TrayService(this.mainWindow, this.database);
       const trayInitialized = this.trayService.initialize();
       if (trayInitialized) {
-        console.log(`[MAIN] Tray service initialized for ${process.platform}`);
+        logger.debug(`[MAIN] Tray service initialized for ${process.platform}`);
       } else {
-        console.warn(`[MAIN] Failed to initialize tray service for ${process.platform}`);
+        logger.warn(`[MAIN] Failed to initialize tray service for ${process.platform}`);
       }
     } else {
-      console.log(`[MAIN] No tray service available for platform: ${process.platform}`);
+      logger.debug(`[MAIN] No tray service available for platform: ${process.platform}`);
     }
 
     app.on('window-all-closed', () => {
@@ -1261,7 +1261,7 @@ class MyHoursApp {
         this.trayService.destroy();
       }
       if (this.wsServer) {
-        console.log('[WEBSOCKET] Closing WebSocket server...');
+        logger.debug('[WEBSOCKET] Closing WebSocket server...');
         this.wsServer.close();
       }
     });
@@ -1279,7 +1279,7 @@ ipcMain.handle('app:openExternal', async (_event, url) => {
     await shell.openExternal(url);
     return true;
   } catch (error) {
-    console.error('[MAIN] Error opening external URL:', url, error);
+    logger.error('[MAIN] Error opening external URL:', url, error);
     return false;
   }
 });
@@ -1295,11 +1295,11 @@ ipcMain.handle('app:getWindowSize', async () => {
   return { width: 1200, height: 840 };
 });
 
-console.log('[MAIN] === STARTING APP INITIALIZATION ===');
+logger.debug('[MAIN] === STARTING APP INITIALIZATION ===');
 myHoursApp.initialize().catch((error) => {
-  console.error('[MAIN] === FATAL ERROR DURING INITIALIZATION ===');
-  console.error('[MAIN] Error:', error);
-  console.error('[MAIN] Stack:', error.stack);
+  logger.error('[MAIN] === FATAL ERROR DURING INITIALIZATION ===');
+  logger.error('[MAIN] Error:', error);
+  logger.error('[MAIN] Stack:', error.stack);
   
   // Show an error dialog
   if (dialog) {

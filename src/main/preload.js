@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-console.log('[PRELOAD] Script executing...');
+console.info('[PRELOAD] Script executing...');
 
 // Constants
 const VALID_TRAY_CHANNELS = [
@@ -57,6 +57,11 @@ console.info = (...args) => {
 };
 
 const api = {
+  // Console forwarding for logger utility
+  console: {
+    log: (level, ...args) => ipcRenderer.send('console:log', level, ...args)
+  },
+
   // Database operations
   clients: {
     getAll: () => ipcRenderer.invoke('db:getClients'),

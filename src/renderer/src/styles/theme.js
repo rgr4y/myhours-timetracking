@@ -6,9 +6,9 @@
 
 // Color palette
 export const colors = {
-  // Primary brand colors
-  primary: '#007AFF',
-  primaryHover: '#0056CC',
+  // Primary brand colors - Dark Red Theme
+  primary: '#B91C1C', // Dark red
+  primaryHover: '#DC2626', // Slightly brighter red for buttons
   
   // Secondary colors
   secondary: '#404040',
@@ -20,7 +20,7 @@ export const colors = {
   danger: '#FF3B30',
   dangerHover: '#D70015',
   warning: '#FF9500',
-  info: '#007AFF',
+  info: '#B91C1C', // Changed from blue to dark red
   
   // Background colors
   bgPrimary: '#1a1a1a',
@@ -42,15 +42,15 @@ export const colors = {
   // Specific component colors
   timerBorder: '#404040',
   selectorLabel: '#888',
-  recurringText: '#007AFF',
+  recurringText: '#B91C1C', // Changed from blue to dark red
   
   // Canvas/animation colors
   canvasBg: '#0b0f14',
   
   // Loading colors
-  loadingBorder: '#007AFF',
+  loadingBorder: '#B91C1C', // Changed from blue to dark red
   loadingBg: '#1a1a1a',
-  loadingSpinner: '#007AFF',
+  loadingSpinner: '#B91C1C', // Changed from blue to dark red
 };
 
 // Typography

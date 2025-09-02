@@ -28,7 +28,7 @@ export const IconContainer = styled.div.withConfig({
   width: ${props => props.size || '40px'};
   height: ${props => props.size || '40px'};
   border-radius: ${props => props.rounded ? '50%' : '8px'};
-  background: ${props => props.background || '#007AFF'};
+  background: ${props => props.background || '#B91C1C'};
   color: white;
   margin: ${props => props.margin || '0'};
 `;

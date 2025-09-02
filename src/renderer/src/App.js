@@ -3,6 +3,7 @@ import { HashRouter as Router, Routes, Route, useNavigate, useLocation, Navigate
 import styled, { createGlobalStyle } from 'styled-components';
 import './App.css';
 import { TimerProvider } from './context/TimerContext';
+import { ToastProvider } from './components/ui/Toast';
 import Sidebar from './components/Sidebar';
 import TimeEntries from './components/TimeEntries';
 import Clients from './components/Clients';
@@ -219,42 +220,44 @@ function App() {
 
   return (
     <TimerProvider>
-      <Router>
-        <GlobalStyle />
-        <VisibilityHandler />
-        <AppContainer>
-          <BackgroundContainer>
-            <BackgroundClockOrbits />
-          </BackgroundContainer>
-          <ContentWrapper>
-            <Sidebar />
-            <MainContent>
-              {updateBanner.visible && (
-                <UpdateBar>
-                  <UpdateBarText>
-                    {updateBanner.version ? `Update v${updateBanner.version} is available.` : 'An update is available.'}
-                  </UpdateBarText>
-                  <UpdateBarActions>
-                    <Button variant="primary" size="small" onClick={handleDownloadUpdate}>Download</Button>
-                    <Button variant="secondary" size="small" onClick={handleOpenReleaseNotes}>Release Notes</Button>
-                    <Button variant="secondary" size="small" onClick={handleDismiss}>Later</Button>
-                    <Button variant="secondary" size="small" onClick={handleDisable}>Disable notifications</Button>
-                  </UpdateBarActions>
-                </UpdateBar>
-              )}
-              <Routes>
-                <Route path="/" element={<TimeEntries />} />
-                <Route path="/projects" element={<Clients />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/invoice" element={<Invoice />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/about" element={<About />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </MainContent>
-          </ContentWrapper>
-        </AppContainer>
-      </Router>
+      <ToastProvider>
+        <Router>
+          <GlobalStyle />
+          <VisibilityHandler />
+          <AppContainer>
+            <BackgroundContainer>
+              <BackgroundClockOrbits />
+            </BackgroundContainer>
+            <ContentWrapper>
+              <Sidebar />
+              <MainContent>
+                {updateBanner.visible && (
+                  <UpdateBar>
+                    <UpdateBarText>
+                      {updateBanner.version ? `Update v${updateBanner.version} is available.` : 'An update is available.'}
+                    </UpdateBarText>
+                    <UpdateBarActions>
+                      <Button variant="primary" size="small" onClick={handleDownloadUpdate}>Download</Button>
+                      <Button variant="secondary" size="small" onClick={handleOpenReleaseNotes}>Release Notes</Button>
+                      <Button variant="secondary" size="small" onClick={handleDismiss}>Later</Button>
+                      <Button variant="secondary" size="small" onClick={handleDisable}>Disable notifications</Button>
+                    </UpdateBarActions>
+                  </UpdateBar>
+                )}
+                <Routes>
+                  <Route path="/" element={<TimeEntries />} />
+                  <Route path="/clients" element={<Clients />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/invoice" element={<Invoice />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </MainContent>
+            </ContentWrapper>
+          </AppContainer>
+        </Router>
+      </ToastProvider>
     </TimerProvider>
   );
 }

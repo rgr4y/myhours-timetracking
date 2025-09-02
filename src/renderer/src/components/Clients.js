@@ -22,30 +22,6 @@ import {
   EmptyState
 } from './ui';
 
-// Custom logger that ensures messages reach the terminal
-const logger = {
-  log: (...args) => {
-    console.log(...args); // Keep browser devtools
-    // Create terminal output by triggering database activity
-    if (window.electronAPI) {
-      const message = args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' ');
-      
-      // Use DB call to ensure terminal visibility
-      window.electronAPI.clients.getAll().then(clients => {
-        console.log(`🟢 [${new Date().toLocaleTimeString()}] ${message} | DB: ${clients.length} clients`);
-      }).catch(err => {
-        console.log(`🔴 [LOGGER-FAILED] ${message}`);
-      });
-    }
-  },
-  error: (...args) => {
-    console.error(...args);
-    console.log('❌ ERROR:', ...args);
-  }
-};
-
 const ResponsiveContainer = styled(Container)`
   padding: 40px;
   
@@ -121,10 +97,10 @@ const Clients = () => {
   });
 
   useEffect(() => {
-    console.log('Projects component mounted, electronAPI available:', !!window.electronAPI);
+    console.log('[RENDER->CLIENTS] Component mounted, electronAPI available:', !!window.electronAPI);
     const loadData = async () => {
       if (window.electronAPI) {
-        console.log('Loading clients from electronAPI...');
+        // console.log('Loading clients from electronAPI...');
         try {
           const clientList = await window.electronAPI.clients.getAll();
           setClients(clientList);
@@ -132,7 +108,7 @@ const Clients = () => {
             setSelectedClient(clientList[0]);
           }
         } catch (error) {
-          logger.error('Error loading clients:', error);
+          console.error('Error loading clients:', error);
         }
       }
     };
@@ -146,7 +122,7 @@ const Clients = () => {
         setIsLoadingProjects(true);
         try {
           const projectList = await window.electronAPI.projects.getAll(selectedClient.id);
-          console.log('Projects loaded for client', selectedClient.id, ':', projectList);
+          // console.log('Projects loaded for client', selectedClient.id, ':', projectList);
           setProjects(projectList);
           // Auto-select first project if there are projects available
           if (projectList.length > 0) {
@@ -155,7 +131,7 @@ const Clients = () => {
             setSelectedProject(null);
           }
         } catch (error) {
-          logger.error('Error loading projects:', error);
+          console.error('Error loading projects:', error);
         } finally {
           setIsLoadingProjects(false);
         }
@@ -175,10 +151,10 @@ const Clients = () => {
         setIsLoadingTasks(true);
         try {
           const taskList = await window.electronAPI.tasks.getAll(selectedProject.id);
-          console.log('Tasks loaded for project', selectedProject.id, ':', taskList);
+          // console.log('Tasks loaded for project', selectedProject.id, ':', taskList);          
           setTasks(taskList);
         } catch (error) {
-          logger.error('Error loading tasks:', error);
+          console.error('Error loading tasks:', error);
         } finally {
           setIsLoadingTasks(false);
         }
@@ -215,7 +191,7 @@ const Clients = () => {
           if (newlyCreated) setSelectedClient(newlyCreated);
         } catch (_) {}
       } catch (error) {
-        logger.error('Error creating client:', error);
+        console.error('Error creating client:', error);
       }
     } else {
       console.log('Cannot create client - missing electronAPI or name', { 
@@ -247,7 +223,7 @@ const Clients = () => {
           setSelectedClient(result);
         }
       } catch (error) {
-        logger.error('Error updating client:', error);
+        console.error('Error updating client:', error);
       }
     }
   };
@@ -276,7 +252,7 @@ const Clients = () => {
         const projectList = await window.electronAPI.projects.getAll(selectedClient.id);
         setProjects(projectList);
       } catch (error) {
-        logger.error('Error creating project:', error);
+        console.error('Error creating project:', error);
       }
     }
   };
@@ -297,7 +273,7 @@ const Clients = () => {
         const taskList = await window.electronAPI.tasks.getAll(selectedProject.id);
         setTasks(taskList);
       } catch (error) {
-        logger.error('Error creating task:', error);
+        console.error('Error creating task:', error);
       }
     }
   };
@@ -319,7 +295,7 @@ const Clients = () => {
         const projectList = await window.electronAPI.projects.getAll(selectedClient.id);
         setProjects(projectList);
       } catch (error) {
-        logger.error('Error updating project:', error);
+        console.error('Error updating project:', error);
         alert('Failed to update project: ' + error.message);
       }
     }
@@ -341,7 +317,7 @@ const Clients = () => {
         const taskList = await window.electronAPI.tasks.getAll(selectedProject.id);
         setTasks(taskList);
       } catch (error) {
-        logger.error('Error updating task:', error);
+        console.error('Error updating task:', error);
         alert('Failed to update task: ' + error.message);
       }
     }
@@ -366,7 +342,7 @@ const Clients = () => {
         const clientList = await window.electronAPI.clients.getAll();
         setClients(clientList);
       } catch (error) {
-        logger.error('Error deleting client:', error);
+        console.error('Error deleting client:', error);
         alert('Failed to delete client: ' + error.message);
       }
     }
@@ -396,7 +372,7 @@ const Clients = () => {
           }
         }
       } catch (error) {
-        logger.error('Error deleting project:', error);
+        console.error('Error deleting project:', error);
         alert('Failed to delete project: ' + error.message);
       }
     }
@@ -415,7 +391,7 @@ const Clients = () => {
           setTasks(taskList);
         }
       } catch (error) {
-        logger.error('Error deleting task:', error);
+        console.error('Error deleting task:', error);
         alert('Failed to delete task: ' + error.message);
       }
     }

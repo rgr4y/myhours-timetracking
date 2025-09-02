@@ -8,4 +8,5 @@ export * from './Display';
 export * from './Tabs';
 export * from './FormSelectors';
 export * from './DataTable';
+export * from './Toast';
 export { default as LoadingOverlay } from './LoadingOverlay';

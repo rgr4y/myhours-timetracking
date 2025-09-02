@@ -37,19 +37,6 @@ const TableHeaderCell = styled.th`
 
 const TableBody = styled.tbody``;
 
-const TableRow = styled.tr`
-  border-bottom: 1px solid #404040;
-  transition: background-color 0.2s ease;
-  
-  &:hover {
-    background: #333;
-  }
-  
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
 const TableCell = styled.td`
   padding: 12px 16px;
   color: white;
@@ -57,23 +44,53 @@ const TableCell = styled.td`
   vertical-align: middle;
 `;
 
+const TableRow = styled.tr`
+  border-bottom: 1px solid #404040;
+  transition: background-color 0.2s ease;
+  
+  /* Conventional zebra striping with grays */
+  &:nth-child(even) {
+    background: rgba(255, 255, 255, 0.03); /* Very subtle light gray */
+  }
+  
+  &:nth-child(odd) {
+    background: rgba(0, 0, 0, 0.1); /* Very subtle dark gray */
+  }
+  
+  &:hover {
+    background: #404040 !important;
+    color: white !important;
+    
+    ${TableCell} {
+      color: white !important;
+    }
+  }
+  
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const GroupHeader = styled.div`
+  background: linear-gradient(145deg, #793333ff 0%, #5e1313ff 100%);
+  padding: 16px 20px;
+  font-weight: 700;
+  font-size: 0.95em;
+  color: white;
+  border-bottom: 2px solid #B91C1C;
+  border-top: 1px solid #B91C1C;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 2px 4px rgba(185, 28, 28, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+`;
+
 const Checkbox = styled.input.attrs({ type: 'checkbox' })`
   width: 16px;
   height: 16px;
   accent-color: ${colors.primary};
   cursor: pointer;
-`;
-
-const GroupHeader = styled.div`
-  background-color: #2a2a2a;
-  padding: 12px 16px;
-  font-weight: 600;
-  font-size: 0.9em;
-  color: #e0e0e0;
-  border-bottom: 1px solid #3a3a3a;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 `;
 
 export const DataTable = ({ 
