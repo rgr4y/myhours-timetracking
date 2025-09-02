@@ -2,14 +2,36 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const VersionService = require('./services/version-service');
+const logger = require('./services/logger-service');
 
-console.log('[MAIN] === MAIN PROCESS STARTING ===');
-console.log('[MAIN] Node version:', process.version);
-console.log('[MAIN] Electron version:', process.versions.electron);
-console.log('[MAIN] Working directory:', process.cwd());
+// Initialize logger early
+logger.initialize();
+
+logger.main('info', '=== MAIN PROCESS STARTING ===');
+logger.main('info', 'Node version', { version: process.version });
+logger.main('info', 'Electron version', { version: process.versions.electron });
+logger.main('info', 'Working directory', { cwd: process.cwd() });
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-console.log('[MAIN] Development mode:', isDev);
+logger.main('info', 'Environment', { isDev, isPackaged: app.isPackaged });
+
+// Single instance lock to prevent multiple app launches
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  console.log('[MAIN] Another instance is already running, quitting...');
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    console.log('[MAIN] Second instance attempted, focusing existing window');
+    // Someone tried to run a second instance, we should focus our window instead
+    const myHoursApp = global.myHoursAppInstance;
+    if (myHoursApp && myHoursApp.mainWindow) {
+      if (myHoursApp.mainWindow.isMinimized()) myHoursApp.mainWindow.restore();
+      myHoursApp.mainWindow.focus();
+    }
+  });
+}
 
 // Enhanced logging for development
 if (isDev) {
@@ -391,7 +413,7 @@ class MyHoursApp {
       const devUrl = 'http://localhost:3010';
       console.log('[MAIN] Waiting for dev server:', devUrl);
       try {
-        await this.waitForDevServer(devUrl, 20000, 300);
+        await this.waitForDevServer(devUrl, 2000, 300);
       } catch (e) {
         console.warn('[MAIN] Dev server wait timed out, attempting to load anyway');
       }
@@ -500,10 +522,12 @@ class MyHoursApp {
 
     ipcMain.handle('db:getClientsWithRelationships', async () => {
       try {
+        logger.main('debug', 'IPC: Getting clients with relationships');
         const clients = await this.database.getClients();
+        logger.main('info', 'IPC: Retrieved clients', { count: clients.length });
         return clients;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting clients with relationships:', error);
+        logger.main('error', 'IPC: Error getting clients with relationships', { error: error.message, stack: error.stack });
         throw error;
       }
     });
@@ -574,6 +598,15 @@ class MyHoursApp {
       }
     });
 
+    ipcMain.handle('db:getDefaultProject', async (event, clientId) => {
+      try {
+        return await this.database.getDefaultProject(clientId);
+      } catch (error) {
+        console.error('[MAIN] IPC: Error getting default project:', error);
+        throw error;
+      }
+    });
+
     ipcMain.handle('db:getTasks', async (event, projectId) => {
       try {
         // console.log('[MAIN] IPC: Getting tasks for project:', projectId);
@@ -614,13 +647,13 @@ class MyHoursApp {
     });
 
     ipcMain.handle('db:getTimeEntries', async (event, filters) => {
-      // console.log('[MAIN] IPC: Getting time entries with filters:', filters);
       try {
+        logger.main('debug', 'IPC: Getting time entries', { filters });
         const entries = await this.database.getTimeEntries(filters);
-        // console.log('[MAIN] IPC: Returning', entries.length, 'time entries');
+        logger.main('info', 'IPC: Retrieved time entries', { count: entries.length });
         return entries;
       } catch (error) {
-        console.error('[MAIN] IPC: Error getting time entries:', error);
+        logger.main('error', 'IPC: Error getting time entries', { error: error.message, stack: error.stack });
         throw error;
       }
     });
@@ -1059,8 +1092,17 @@ class MyHoursApp {
 
     // Console forwarding from renderer
     ipcMain.on('console:log', (event, level, ...args) => {
-      const prefix = `[RENDERER-${level.toUpperCase()}]`;
-      console.log(prefix, ...args);
+      const message = args.join(' ');
+      
+      // Map console levels to Winston levels
+      const logLevel = level === 'log' ? 'info' : level;
+      
+      // Validate the log level exists in Winston
+      if (['error', 'warn', 'info', 'debug'].includes(logLevel)) {
+        logger.renderer(logLevel, message);
+      } else {
+        logger.renderer('info', `[${level.toUpperCase()}] ${message}`);
+      }
     });
   }
 
@@ -1217,6 +1259,31 @@ class MyHoursApp {
 
 const myHoursApp = new MyHoursApp();
 
+// Store globally for single instance handling
+global.myHoursAppInstance = myHoursApp;
+
+// Additional IPC handlers that need to be available immediately
+ipcMain.handle('app:openExternal', async (_event, url) => {
+  try {
+    await shell.openExternal(url);
+    return true;
+  } catch (error) {
+    console.error('[MAIN] Error opening external URL:', url, error);
+    return false;
+  }
+});
+
+// Window helpers
+ipcMain.handle('app:getWindowSize', async () => {
+  try {
+    if (myHoursApp.mainWindow) {
+      const { width, height } = myHoursApp.mainWindow.getContentBounds();
+      return { width, height };
+    }
+  } catch (e) {}
+  return { width: 1200, height: 840 };
+});
+
 console.log('[MAIN] === STARTING APP INITIALIZATION ===');
 myHoursApp.initialize().catch((error) => {
   console.error('[MAIN] === FATAL ERROR DURING INITIALIZATION ===');
@@ -1230,23 +1297,3 @@ myHoursApp.initialize().catch((error) => {
   
   process.exit(1);
 });
-    ipcMain.handle('app:openExternal', async (_event, url) => {
-      try {
-        await shell.openExternal(url);
-        return true;
-      } catch (error) {
-        console.error('[MAIN] Error opening external URL:', url, error);
-        return false;
-      }
-    });
-
-    // Window helpers
-    ipcMain.handle('app:getWindowSize', async () => {
-      try {
-        if (this.mainWindow) {
-          const { width, height } = this.mainWindow.getContentBounds();
-          return { width, height };
-        }
-      } catch (e) {}
-      return { width: 1200, height: 840 };
-    });

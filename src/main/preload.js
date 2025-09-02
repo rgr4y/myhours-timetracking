@@ -70,7 +70,8 @@ const api = {
     getAll: (clientId) => ipcRenderer.invoke('db:getProjects', clientId),
     create: (project) => ipcRenderer.invoke('db:createProject', project),
     update: (id, project) => ipcRenderer.invoke('db:updateProject', id, project),
-    delete: (id) => ipcRenderer.invoke('db:deleteProject', id)
+    delete: (id) => ipcRenderer.invoke('db:deleteProject', id),
+    getDefault: (clientId) => ipcRenderer.invoke('db:getDefaultProject', clientId)
   },
   
   tasks: {

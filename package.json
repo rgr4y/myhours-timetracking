@@ -43,8 +43,7 @@
     },
     "asarUnpack": [
       "node_modules/@prisma/client/**",
-      "node_modules/.prisma/**",
-      "node_modules/prisma/**"
+      "node_modules/.prisma/**"
     ],
     "extraResources": [
       {
@@ -56,14 +55,6 @@
         "to": "node_modules/.prisma"
       },
       {
-        "from": "node_modules/@prisma/engines",
-        "to": "node_modules/@prisma/engines"
-      },
-      {
-        "from": "node_modules/prisma",
-        "to": "node_modules/prisma"
-      },
-      {
         "from": "prisma",
         "to": "prisma"
       }
@@ -73,14 +64,10 @@
     },
     "files": [
       "src/main/**/*",
-      "src/renderer/build/**/*",
+      "src/renderer/build/**/*", 
       "assets/**/*",
       "node_modules/**/*",
-      "!node_modules/@prisma/engines/**",
-      "!node_modules/@prisma/client/**",
-      "!node_modules/.prisma/**",
-      "!node_modules/prisma/**",
-      "!prisma/**"
+      "prisma/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -144,7 +131,8 @@
     "electron-updater": "^6.1.4",
     "handlebars": "^4.7.8",
     "prisma": "^6.15.0",
-    "puppeteer-core": "^21.3.6"
+    "puppeteer-core": "^21.3.6",
+    "winston": "^3.17.0"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

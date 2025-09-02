@@ -108,7 +108,8 @@ const Clients = () => {
     client_id: '',
     name: '',
     description: '',
-    hourly_rate: ''
+    hourly_rate: '',
+    isDefault: false
   });
 
   const [taskForm, setTaskForm] = useState({
@@ -269,7 +270,7 @@ const Clients = () => {
         console.log('Creating project with data:', projectData);
         const result = await window.electronAPI.projects.create(projectData);
         console.log('Project created successfully:', result);
-        setProjectForm({ client_id: '', name: '', description: '', hourly_rate: '' });
+        setProjectForm({ client_id: '', name: '', description: '', hourly_rate: '', isDefault: false });
         setShowProjectModal(false);
         // Reload projects
         const projectList = await window.electronAPI.projects.getAll(selectedClient.id);
@@ -306,7 +307,8 @@ const Clients = () => {
       try {
         const projectData = {
           name: projectForm.name,
-          hourlyRate: projectForm.hourly_rate ? parseFloat(projectForm.hourly_rate) : null
+          hourlyRate: projectForm.hourly_rate ? parseFloat(projectForm.hourly_rate) : null,
+          isDefault: projectForm.isDefault
         };
         console.log('Updating project with data:', projectData);
         await window.electronAPI.projects.update(editingProject.id, projectData);
@@ -453,7 +455,7 @@ const Clients = () => {
     onClose: () => {
       setShowProjectModal(false);
       setEditingProject(null);
-      setProjectForm({ client_id: '', name: '', description: '', hourly_rate: '' });
+      setProjectForm({ client_id: '', name: '', description: '', hourly_rate: '', isDefault: false });
     },
     formData: projectForm
   });
@@ -499,7 +501,7 @@ const Clients = () => {
             disabled={clients.length === 0 || isLoadingProjects}
             onClick={() => {
               setEditingProject(null);
-              setProjectForm({ client_id: '', name: '', description: '', hourly_rate: '' });
+              setProjectForm({ client_id: '', name: '', description: '', hourly_rate: '', isDefault: false });
               setShowProjectModal(true);
             }}
             style={{ 
@@ -606,9 +608,14 @@ const Clients = () => {
                   >
                     <FlexBox justify="space-between" align="center">
                       <div>
-                        <Heading size="small" margin="0 0 4px 0">{project.name}</Heading>
+                        <FlexBox align="center" gap="8px">
+                          <Heading size="small" margin="0">{project.name}</Heading>
+                          {project.isDefault && (
+                            <Text size="small" style={{ color: colors.primary, fontWeight: 'bold' }}>Default</Text>
+                          )}
+                        </FlexBox>
                         {project.description && (
-                          <Text variant="secondary" size="small">{project.description}</Text>
+                          <Text variant="secondary" size="small" style={{ marginTop: '4px' }}>{project.description}</Text>
                         )}
                         {project.hourly_rate && (
                           <Text size="small">${project.hourly_rate}/hr</Text>
@@ -624,7 +631,8 @@ const Clients = () => {
                             client_id: project.client_id,
                             name: project.name,
                             description: project.description || '',
-                            hourly_rate: project.hourly_rate || ''
+                            hourly_rate: project.hourly_rate || '',
+                            isDefault: project.isDefault || false
                           });
                           setShowProjectModal(true);
                         }}
@@ -819,6 +827,16 @@ const Clients = () => {
                   }}
                   placeholder="100"
                 />
+              </FlexBox>
+              
+              <FlexBox align="center" gap="10px">
+                <input
+                  type="checkbox"
+                  id="defaultProject"
+                  checked={projectForm.isDefault}
+                  onChange={(e) => setProjectForm(prev => ({ ...prev, isDefault: e.target.checked }))}
+                />
+                <Label htmlFor="defaultProject">Set as Default Project</Label>
               </FlexBox>
               
               <FlexBox gap="10px" justify="space-between" style={{ marginTop: '20px' }}>

@@ -4,126 +4,159 @@ const { promisify } = require('util');
 const { app } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const PathService = require('./path-service');
+const logger = require('./logger-service');
 const truthy = (v) => /^(1|true|yes|on)$/i.test(String(v || ''));
 const execAsync = promisify(exec);
 
 class DatabaseService {
   constructor() {
-    const TEMPLATE_DB = 'template.db';
-    const MAIN_DB = 'myhours.db';
+    this.pathService = new PathService();
 
-    // Resolve a deterministic, writable DB path for runtime, independent of .env
-    const isPackaged = app.isPackaged;
-    const appPath = app.getAppPath(); // Get the app's base path
-    let dbFile;
+    // Use the centralized path service for all path resolution
+    const dbPath = this.pathService.getDatabasePath();
+    process.env.DATABASE_URL = this.pathService.getDatabaseUrl();
 
-    if (isPackaged) {
-      // Packaged app: keep DB under userData
-      const userDataDir = app.getPath('userData');
-      dbFile = path.join(userDataDir, MAIN_DB);
-      // Ensure directory exists
-      try { fs.mkdirSync(path.dirname(dbFile), { recursive: true }); } catch (_) {}
+    logger.database("info", "Using SQLite database", {
+      path: dbPath,
+      exists: fs.existsSync(dbPath),
+    });
+    logger.database(
+      "debug",
+      "Path service configuration",
+      this.pathService.getDebugInfo()
+    );
 
-      // If DB doesn't exist, seed from packaged template
-      try {
-        if (!fs.existsSync(dbFile)) {
-          const base = process.resourcesPath || appPath;
-          const templatePath = path.join(base, 'prisma', TEMPLATE_DB);
-          if (fs.existsSync(templatePath)) {
-            fs.copyFileSync(templatePath, dbFile);
-            console.log('[DATABASE] Copied template DB to user data');
-          }
-        }
-      } catch (e) {
-        console.warn('[DATABASE] Unable to provision packaged DB:', e.message);
-      }
-    } else {
-      // Dev: use the workspace DB (checked into repo) to avoid odd CWD issues
-      dbFile = path.join(appPath, 'prisma', MAIN_DB);
-      // Ensure prisma folder exists (it should in dev)
-      try { fs.mkdirSync(path.dirname(dbFile), { recursive: true }); } catch (_) {}
-      // If it doesn't exist but a template exists, bootstrap from it
-      try {
-        const templatePath = path.join(appPath, 'prisma', TEMPLATE_DB);
-        if (!fs.existsSync(dbFile) && fs.existsSync(templatePath)) {
-          fs.copyFileSync(templatePath, dbFile);
-          console.log('[DATABASE] Bootstrapped dev DB from ' + TEMPLATE_DB);
-        }
-      } catch (e) {
-        console.warn('[DATABASE] Unable to bootstrap dev DB:', e.message);
-      }
-    }
-
-    process.env.DATABASE_URL = `file:${dbFile}`;
-    console.log('[DATABASE] Using SQLite at', dbFile);
+    // Bootstrap from template if needed
+    this.pathService.bootstrapDatabaseFromTemplate();
 
     this.prisma = new PrismaClient();
   }
 
   async initialize() {
-    // Connect to the database
+    // Connect to database
     await this.prisma.$connect();
-    
-    // Configure SQLite for production performance
-    if (app.isPackaged || truthy(process.env.FORCE_WAL)) {
-      try {
-        // Check current journal mode
-        const currentMode = await this.prisma.$queryRaw`PRAGMA journal_mode;`;
-        const journalMode = currentMode[0]?.journal_mode?.toLowerCase();
-        
-        if (journalMode !== 'wal') {
-          console.warn(`[DATABASE] Switching from ${journalMode} to WAL mode`);
-          await this.prisma.$executeRaw`PRAGMA journal_mode = WAL;`;
-        } else {
-          console.log('[DATABASE] WAL mode already enabled');
-        }
-        
-        // Apply other optimizations (these are safe to run multiple times)
-        await this.prisma.$executeRaw`PRAGMA synchronous = NORMAL;`; // Balance safety/performance
-        await this.prisma.$executeRaw`PRAGMA cache_size = 10000;`;   // 10MB cache
-        await this.prisma.$executeRaw`PRAGMA temp_store = MEMORY;`;  // Use memory for temp data
-        await this.prisma.$executeRaw`PRAGMA mmap_size = 268435456;`; // 256MB memory mapping
-        
-        console.log('[DATABASE] Production optimizations applied');
-      } catch (error) {
-        console.warn('[DATABASE] Failed to apply production optimizations:', error);
-      }
+    logger.database("info", "Database connected successfully");
+
+    // Quick validation
+    const [versionResult, tableCount] = await Promise.all([
+      this.prisma.$queryRaw`SELECT sqlite_version() as version`,
+      this.prisma
+        .$queryRaw`SELECT COUNT(*) as count FROM sqlite_master WHERE type='table'`,
+    ]);
+
+    logger.database("info", "Database connection validated", {
+      sqliteVersion: versionResult[0].version,
+      tableCount: Number(tableCount[0].count),
+    });
+
+    // Simple migration check - only in production
+    if (app.isPackaged) {
+      await this.ensureLatestMigration();
     }
-    
-    console.log('Database connected successfully');
-    
+
     // Check if database needs seeding
     await this.seedIfEmpty();
+  }
+
+  async ensureLatestMigration() {
+    // Simple check - just ensure the isDefault column exists
+    try {
+      await this.prisma.$queryRaw`SELECT is_default FROM projects LIMIT 1`;
+      logger.database("info", "Latest migration already applied");
+    } catch (error) {
+      logger.database("info", "Adding isDefault column to projects table");
+      await this.prisma
+        .$executeRaw`ALTER TABLE "projects" ADD COLUMN "is_default" BOOLEAN NOT NULL DEFAULT false`;
+      logger.database("info", "Migration applied successfully");
+    }
   }
 
   async seedIfEmpty() {
     try {
       // Check if we already have data
       const clientCount = await this.prisma.client.count();
-      
+
+      logger.database("info", "Checking if database needs seeding", {
+        clientCount,
+      });
+
       if (clientCount === 0) {
-        console.log('[DATABASE] Starting database seeding...');
-        
-        // In packaged builds, prefer running the seed script directly to avoid relying on the Prisma CLI
-        if (app.isPackaged) {
-          const seedPath = path.join(process.resourcesPath || path.dirname(app.getAppPath()), 'prisma', 'seed.js');
-          if (fs.existsSync(seedPath)) {
-            const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' };
+        logger.database("info", "Starting database seeding - no clients found");
+
+        // Use the path service to get the correct seed script path
+        const seedPath = this.pathService.getSeedScriptPath();
+
+        logger.database("debug", "Seed script path", {
+          seedPath,
+          exists: fs.existsSync(seedPath),
+        });
+
+        if (fs.existsSync(seedPath)) {
+          if (app.isPackaged) {
+            // In packaged builds, run the seed script directly
+            const env = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
             await execAsync(`"${process.execPath}" "${seedPath}"`, { env });
           } else {
-            console.warn('[DATABASE] Seed script not found in resources; skipping seed');
+            // Dev: use prisma CLI which is available locally
+            await execAsync("npx prisma db seed", {
+              cwd: this.pathService.getProjectRoot(),
+            });
           }
+          logger.database("info", "Database seeding completed");
+
+          // Verify seeding worked
+          const newClientCount = await this.prisma.client.count();
+          logger.database("info", "Post-seed verification", {
+            clientCount: newClientCount,
+          });
         } else {
-          // Dev: use prisma CLI which is available locally
-          await execAsync('npx prisma db seed', { cwd: process.cwd() });
+          logger.database("warn", "Seed script not found", { seedPath });
         }
-        
-        console.log('[DATABASE] Database seeding completed');
       } else {
-        console.log('[DATABASE] Database already contains data, skipping seed');
+        logger.database(
+          "info",
+          "Database already contains data, skipping seed",
+          { clientCount }
+        );
       }
     } catch (error) {
-      console.error('[DATABASE] Error seeding database:', error);
+      logger.database("error", "Error seeding database", {
+        error: error.message,
+        stack: error.stack,
+      });
+    }
+  }
+
+  cleanupOldBackups(dbDir) {
+    try {
+      const files = fs.readdirSync(dbDir);
+      const backupFiles = files
+        .filter((file) => file.includes(".backup."))
+        .map((file) => ({
+          name: file,
+          path: path.join(dbDir, file),
+          timestamp: parseInt(file.split(".backup.")[1]) || 0,
+        }))
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+      // Keep only the 5 most recent backups
+      const filesToDelete = backupFiles.slice(5);
+
+      for (const file of filesToDelete) {
+        try {
+          fs.unlinkSync(file.path);
+          console.log("[DATABASE] Cleaned up old backup:", file.name);
+        } catch (deleteError) {
+          console.warn(
+            "[DATABASE] Failed to delete old backup:",
+            file.name,
+            deleteError.message
+          );
+        }
+      }
+    } catch (error) {
+      console.warn("[DATABASE] Failed to cleanup old backups:", error.message);
     }
   }
 
@@ -141,10 +174,14 @@ class DatabaseService {
       await this.prisma.project.deleteMany();
       await this.prisma.client.deleteMany();
       // Clear transient settings that reference IDs
-      try { await this.prisma.setting.delete({ where: { key: 'lastUsedClientId' } }); } catch (_) {}
+      try {
+        await this.prisma.setting.delete({
+          where: { key: "lastUsedClientId" },
+        });
+      } catch (_) {}
       return { success: true };
     } catch (error) {
-      console.error('[DATABASE] Error removing demo data:', error);
+      console.error("[DATABASE] Error removing demo data:", error);
       throw error;
     }
   }
@@ -152,29 +189,33 @@ class DatabaseService {
   // Helper method to parse time string (HH:MM) with date
   parseTimeWithDate(timeString, dateString) {
     if (!timeString || !dateString) return null;
-    
+
     try {
-      const [hours, minutes] = timeString.split(':').map(num => parseInt(num, 10));
-      
+      const [hours, minutes] = timeString
+        .split(":")
+        .map((num) => parseInt(num, 10));
+
       // Parse YYYY-MM-DD dates explicitly using local time constructor to avoid timezone issues
       let date;
       if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        const [year, month, day] = dateString.split('-').map(num => parseInt(num, 10));
+        const [year, month, day] = dateString
+          .split("-")
+          .map((num) => parseInt(num, 10));
         date = new Date(year, month - 1, day); // month is 0-indexed
       } else {
         date = new Date(dateString);
       }
-      
+
       if (isNaN(date.getTime()) || isNaN(hours) || isNaN(minutes)) {
         return null;
       }
-      
+
       date.setHours(hours, minutes, 0, 0);
-      
+
       // Return the Date object directly - let Prisma handle the conversion
       return date;
     } catch (error) {
-      console.error('Error parsing time with date:', error);
+      console.error("Error parsing time with date:", error);
       return null;
     }
   }
@@ -184,38 +225,42 @@ class DatabaseService {
     try {
       const activeTimers = await this.prisma.timeEntry.findMany({
         where: { isActive: true },
-        orderBy: { startTime: 'desc' } // Keep the most recent one
+        orderBy: { startTime: "desc" }, // Keep the most recent one
       });
 
       if (activeTimers.length > 1) {
-        console.warn(`[DATABASE] Found ${activeTimers.length} active timers, stopping older ones`);
-        
+        console.warn(
+          `[DATABASE] Found ${activeTimers.length} active timers, stopping older ones`
+        );
+
         // Keep the first (most recent) timer, stop the rest
         const keepTimer = activeTimers[0];
         const stopTimers = activeTimers.slice(1);
-        
+
         for (const timer of stopTimers) {
           const endTime = new Date();
           const duration = Math.floor((endTime - timer.startTime) / 1000 / 60);
-          
+
           await this.prisma.timeEntry.update({
             where: { id: timer.id },
             data: {
               isActive: false,
               endTime: endTime,
-              duration: duration
-            }
+              duration: duration,
+            },
           });
-          
-          console.log(`[DATABASE] Auto-stopped duplicate active timer ${timer.id} with duration ${duration} minutes`);
+
+          console.log(
+            `[DATABASE] Auto-stopped duplicate active timer ${timer.id} with duration ${duration} minutes`
+          );
         }
-        
+
         return keepTimer;
       }
-      
+
       return activeTimers[0] || null;
     } catch (error) {
-      console.error('[DATABASE] Error ensuring single active timer:', error);
+      console.error("[DATABASE] Error ensuring single active timer:", error);
       throw error;
     }
   }
@@ -225,24 +270,26 @@ class DatabaseService {
     try {
       // Stop any currently active timers first by properly calculating their durations
       const activeTimers = await this.prisma.timeEntry.findMany({
-        where: { isActive: true }
+        where: { isActive: true },
       });
 
       // Stop each active timer with proper duration calculation
       for (const timer of activeTimers) {
         const endTime = new Date();
         const duration = Math.floor((endTime - timer.startTime) / 1000 / 60); // duration in minutes
-        
+
         await this.prisma.timeEntry.update({
           where: { id: timer.id },
           data: {
             isActive: false,
             endTime: endTime,
-            duration: duration
-          }
+            duration: duration,
+          },
         });
-        
-        console.log(`[DATABASE] Stopped active timer ${timer.id} with duration ${duration} minutes`);
+
+        console.log(
+          `[DATABASE] Stopped active timer ${timer.id} with duration ${duration} minutes`
+        );
       }
 
       // Create new time entry
@@ -251,25 +298,25 @@ class DatabaseService {
           clientId: data.clientId || null,
           projectId: data.projectId || null,
           taskId: data.taskId || null,
-          description: data.description || '',
+          description: data.description || "",
           startTime: new Date(),
           isActive: true,
-          duration: 0
+          duration: 0,
         },
         include: {
           client: true,
           project: true,
           task: {
             include: {
-              project: true
-            }
-          }
-        }
+              project: true,
+            },
+          },
+        },
       });
 
       return timeEntry;
     } catch (error) {
-      console.error('Error starting timer:', error);
+      console.error("Error starting timer:", error);
       throw error;
     }
   }
@@ -277,23 +324,25 @@ class DatabaseService {
   async stopTimer(timeEntryId, roundTo = 15) {
     try {
       const timeEntry = await this.prisma.timeEntry.findUnique({
-        where: { id: parseInt(timeEntryId) }
+        where: { id: parseInt(timeEntryId) },
       });
 
       if (!timeEntry) {
         console.warn(`[DATABASE] Timer with ID ${timeEntryId} not found`);
         // Check if there's any active timer we can stop instead
         const anyActiveTimer = await this.prisma.timeEntry.findFirst({
-          where: { isActive: true }
+          where: { isActive: true },
         });
-        
+
         if (!anyActiveTimer) {
-          console.warn('[DATABASE] No active timer found to stop');
+          console.warn("[DATABASE] No active timer found to stop");
           return null; // Return null instead of throwing error
         }
-        
+
         // Use the found active timer instead
-        console.log(`[DATABASE] Using active timer ${anyActiveTimer.id} instead of ${timeEntryId}`);
+        console.log(
+          `[DATABASE] Using active timer ${anyActiveTimer.id} instead of ${timeEntryId}`
+        );
         return this.stopTimer(anyActiveTimer.id, roundTo);
       }
 
@@ -304,13 +353,15 @@ class DatabaseService {
 
       const endTime = new Date();
       const duration = Math.floor((endTime - timeEntry.startTime) / 1000 / 60); // duration in minutes
-      
+
       // Apply rounding logic
       let roundedDuration = duration;
       if (roundTo > 0) {
         // Round up to the nearest roundTo minutes
         roundedDuration = Math.ceil(duration / roundTo) * roundTo;
-        console.log(`[DATABASE] Duration: ${duration}m, rounded to ${roundTo}m intervals: ${roundedDuration}m`);
+        console.log(
+          `[DATABASE] Duration: ${duration}m, rounded to ${roundTo}m intervals: ${roundedDuration}m`
+        );
       }
 
       const updatedTimeEntry = await this.prisma.timeEntry.update({
@@ -318,21 +369,21 @@ class DatabaseService {
         data: {
           endTime,
           duration: roundedDuration,
-          isActive: false
+          isActive: false,
         },
         include: {
           client: true,
           task: {
             include: {
-              project: true
-            }
-          }
-        }
+              project: true,
+            },
+          },
+        },
       });
 
       return updatedTimeEntry;
     } catch (error) {
-      console.error('Error stopping timer:', error);
+      console.error("Error stopping timer:", error);
       throw error;
     }
   }
@@ -342,22 +393,22 @@ class DatabaseService {
       // Stop any currently active timers first
       await this.prisma.timeEntry.updateMany({
         where: { isActive: true },
-        data: { 
+        data: {
           isActive: false,
-          endTime: new Date()
-        }
+          endTime: new Date(),
+        },
       });
 
       // Calculate duration for currently active timers before stopping
       const activeTimers = await this.prisma.timeEntry.findMany({
-        where: { isActive: true }
+        where: { isActive: true },
       });
-      
+
       for (const timer of activeTimers) {
         const duration = Math.floor((new Date() - timer.startTime) / 1000 / 60);
         await this.prisma.timeEntry.update({
           where: { id: timer.id },
-          data: { duration }
+          data: { duration },
         });
       }
 
@@ -367,22 +418,22 @@ class DatabaseService {
         data: {
           isActive: true,
           startTime: new Date(), // Reset start time to now
-          endTime: null // Clear end time
+          endTime: null, // Clear end time
         },
         include: {
           client: true,
           project: true,
           task: {
             include: {
-              project: true
-            }
-          }
-        }
+              project: true,
+            },
+          },
+        },
       });
 
       return resumedTimeEntry;
     } catch (error) {
-      console.error('Error resuming timer:', error);
+      console.error("Error resuming timer:", error);
       throw error;
     }
   }
@@ -391,7 +442,7 @@ class DatabaseService {
     try {
       // Ensure only one active timer exists before returning
       const activeTimer = await this.ensureOnlyOneActiveTimer();
-      
+
       if (activeTimer) {
         // Get the full timer data with relations
         return await this.prisma.timeEntry.findUnique({
@@ -401,38 +452,42 @@ class DatabaseService {
             project: true,
             task: {
               include: {
-                project: true
-              }
-            }
-          }
+                project: true,
+              },
+            },
+          },
         });
       }
-      
+
       return null;
     } catch (error) {
-      console.error('Error getting active timer:', error);
+      console.error("Error getting active timer:", error);
       throw error;
     }
   }
 
   async getTimeEntries(filters = {}) {
     try {
+      logger.database("debug", "Getting time entries", { filters });
+
       const where = {};
-      
+
       if (filters.clientId) {
         where.clientId = parseInt(filters.clientId);
       }
-      
+
       if (filters.startDate && filters.endDate) {
         where.startTime = {
           gte: new Date(filters.startDate),
-          lte: new Date(filters.endDate)
+          lte: new Date(filters.endDate),
         };
       }
-      
+
       if (filters.isInvoiced !== undefined) {
         where.isInvoiced = filters.isInvoiced;
       }
+
+      logger.database("debug", "Time entries query where clause", { where });
 
       const timeEntries = await this.prisma.timeEntry.findMany({
         where,
@@ -441,61 +496,87 @@ class DatabaseService {
           project: true,
           task: {
             include: {
-              project: true
-            }
-          }
+              project: true,
+            },
+          },
         },
         orderBy: {
-          id: 'desc'
-        }
+          id: "desc",
+        },
+      });
+
+      logger.database("info", "Retrieved time entries", {
+        count: timeEntries.length,
+        firstEntryId: timeEntries[0]?.id || null,
+        hasData: timeEntries.length > 0,
       });
 
       return timeEntries;
     } catch (error) {
-      console.error('Error getting time entries:', error);
+      logger.database("error", "Error getting time entries", {
+        error: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
 
   async updateTimeEntry(id, data) {
     try {
-      console.log('[DATABASE] updateTimeEntry called with id:', id, 'data:', data);
-      
+      console.log(
+        "[DATABASE] updateTimeEntry called with id:",
+        id,
+        "data:",
+        data
+      );
+
       if (!data || Object.keys(data).length === 0) {
-        throw new Error('Update data is required');
+        throw new Error("Update data is required");
       }
-      
+
       // Clean the data - convert empty strings to null for optional fields
       const cleanData = { ...data };
-      
+
       // Convert empty strings to null for optional foreign key fields
-      if (cleanData.clientId === '') cleanData.clientId = null;
-      if (cleanData.taskId === '') cleanData.taskId = null;
-      
+      if (cleanData.clientId === "") cleanData.clientId = null;
+      if (cleanData.taskId === "") cleanData.taskId = null;
+
       // Convert string IDs to integers where needed
       if (cleanData.clientId) cleanData.clientId = parseInt(cleanData.clientId);
-      if (cleanData.projectId) cleanData.projectId = parseInt(cleanData.projectId);
+      if (cleanData.projectId)
+        cleanData.projectId = parseInt(cleanData.projectId);
       if (cleanData.taskId) cleanData.taskId = parseInt(cleanData.taskId);
-      
+
       // Handle empty string to null conversion for projectId
-      if (cleanData.projectId === '') cleanData.projectId = null;
-      
-      console.log('[DATABASE] Processing projectId:', cleanData.projectId, 'and taskId:', cleanData.taskId);
-      
+      if (cleanData.projectId === "") cleanData.projectId = null;
+
+      console.log(
+        "[DATABASE] Processing projectId:",
+        cleanData.projectId,
+        "and taskId:",
+        cleanData.taskId
+      );
+
       // Handle date and time fields - combine date with startTime and endTime
       if (cleanData.date && cleanData.startTime) {
-        const startDateTime = this.parseTimeWithDate(cleanData.startTime, cleanData.date);
+        const startDateTime = this.parseTimeWithDate(
+          cleanData.startTime,
+          cleanData.date
+        );
         if (startDateTime) cleanData.startTime = startDateTime;
       }
-      
+
       if (cleanData.date && cleanData.endTime) {
-        const endDateTime = this.parseTimeWithDate(cleanData.endTime, cleanData.date);
+        const endDateTime = this.parseTimeWithDate(
+          cleanData.endTime,
+          cleanData.date
+        );
         if (endDateTime) cleanData.endTime = endDateTime;
       }
-      
+
       // Remove the separate date field as it's not in the schema
       delete cleanData.date;
-      
+
       // Calculate duration if both start and end times are provided
       if (cleanData.startTime && cleanData.endTime) {
         const start = new Date(cleanData.startTime);
@@ -503,50 +584,50 @@ class DatabaseService {
         const diffMs = end.getTime() - start.getTime();
         cleanData.duration = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Convert to minutes
       }
-      
-      console.log('[DATABASE] Cleaned data:', cleanData);
-      
+
+      console.log("[DATABASE] Cleaned data:", cleanData);
+
       // Prepare the update data object with relationship operations
       const updateData = { ...cleanData };
-      
+
       // Handle client relationship
-      if ('clientId' in updateData) {
+      if ("clientId" in updateData) {
         const clientId = updateData.clientId;
         delete updateData.clientId;
-        
+
         if (clientId === null) {
           updateData.client = { disconnect: true };
         } else {
           updateData.client = { connect: { id: clientId } };
         }
       }
-      
+
       // Handle project relationship
-      if ('projectId' in updateData) {
+      if ("projectId" in updateData) {
         const projectId = updateData.projectId;
         delete updateData.projectId;
-        
+
         if (projectId === null) {
           updateData.project = { disconnect: true };
         } else {
           updateData.project = { connect: { id: projectId } };
         }
       }
-      
+
       // Handle task relationship
-      if ('taskId' in updateData) {
+      if ("taskId" in updateData) {
         const taskId = updateData.taskId;
         delete updateData.taskId;
-        
+
         if (taskId === null) {
           updateData.task = { disconnect: true };
         } else {
           updateData.task = { connect: { id: taskId } };
         }
       }
-      
-      console.log('[DATABASE] Update data with relationships:', updateData);
-      
+
+      console.log("[DATABASE] Update data with relationships:", updateData);
+
       const updatedTimeEntry = await this.prisma.timeEntry.update({
         where: { id: parseInt(id) },
         data: updateData,
@@ -555,56 +636,68 @@ class DatabaseService {
           project: true,
           task: {
             include: {
-              project: true
-            }
-          }
-        }
+              project: true,
+            },
+          },
+        },
       });
 
       return updatedTimeEntry;
     } catch (error) {
-      console.error('Error updating time entry:', error);
+      console.error("Error updating time entry:", error);
       throw error;
     }
   }
 
   async createTimeEntry(data) {
     try {
-      console.log('[DATABASE] createTimeEntry called with data:', data);
-      
+      console.log("[DATABASE] createTimeEntry called with data:", data);
+
       if (!data || Object.keys(data).length === 0) {
-        throw new Error('Create data is required');
+        throw new Error("Create data is required");
       }
-      
+
       // Clean the data - convert empty strings to null for optional fields
       const cleanData = { ...data };
-      
+
       // Convert empty strings to null for optional foreign key fields
-      if (cleanData.clientId === '') cleanData.clientId = null;
-      if (cleanData.projectId === '') cleanData.projectId = null;
-      if (cleanData.taskId === '') cleanData.taskId = null;
-      
+      if (cleanData.clientId === "") cleanData.clientId = null;
+      if (cleanData.projectId === "") cleanData.projectId = null;
+      if (cleanData.taskId === "") cleanData.taskId = null;
+
       // Convert string IDs to integers where needed
       if (cleanData.clientId) cleanData.clientId = parseInt(cleanData.clientId);
-      if (cleanData.projectId) cleanData.projectId = parseInt(cleanData.projectId);
+      if (cleanData.projectId)
+        cleanData.projectId = parseInt(cleanData.projectId);
       if (cleanData.taskId) cleanData.taskId = parseInt(cleanData.taskId);
-      
-      console.log('[DATABASE] Processing create with projectId:', cleanData.projectId, 'and taskId:', cleanData.taskId);
-      
+
+      console.log(
+        "[DATABASE] Processing create with projectId:",
+        cleanData.projectId,
+        "and taskId:",
+        cleanData.taskId
+      );
+
       // Handle date and time fields - combine date with startTime and endTime
       if (cleanData.date && cleanData.startTime) {
-        const startDateTime = this.parseTimeWithDate(cleanData.startTime, cleanData.date);
+        const startDateTime = this.parseTimeWithDate(
+          cleanData.startTime,
+          cleanData.date
+        );
         if (startDateTime) cleanData.startTime = startDateTime;
       }
-      
+
       if (cleanData.date && cleanData.endTime) {
-        const endDateTime = this.parseTimeWithDate(cleanData.endTime, cleanData.date);
+        const endDateTime = this.parseTimeWithDate(
+          cleanData.endTime,
+          cleanData.date
+        );
         if (endDateTime) cleanData.endTime = endDateTime;
       }
-      
+
       // Remove the separate date field as it's not in the schema
       delete cleanData.date;
-      
+
       // Calculate duration if both start and end times are provided
       if (cleanData.startTime && cleanData.endTime) {
         const start = new Date(cleanData.startTime);
@@ -612,9 +705,9 @@ class DatabaseService {
         const diffMs = end.getTime() - start.getTime();
         cleanData.duration = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Convert to minutes
       }
-      
-      console.log('[DATABASE] Cleaned data for create:', cleanData);
-      
+
+      console.log("[DATABASE] Cleaned data for create:", cleanData);
+
       const newTimeEntry = await this.prisma.timeEntry.create({
         data: cleanData,
         include: {
@@ -622,15 +715,15 @@ class DatabaseService {
           project: true,
           task: {
             include: {
-              project: true
-            }
-          }
-        }
+              project: true,
+            },
+          },
+        },
       });
 
       return newTimeEntry;
     } catch (error) {
-      console.error('Error creating time entry:', error);
+      console.error("Error creating time entry:", error);
       throw error;
     }
   }
@@ -638,12 +731,12 @@ class DatabaseService {
   async deleteTimeEntry(id) {
     try {
       await this.prisma.timeEntry.delete({
-        where: { id: parseInt(id) }
+        where: { id: parseInt(id) },
       });
 
       return { success: true };
     } catch (error) {
-      console.error('Error deleting time entry:', error);
+      console.error("Error deleting time entry:", error);
       throw error;
     }
   }
@@ -651,22 +744,36 @@ class DatabaseService {
   // Client methods
   async getClients() {
     try {
+      logger.database("debug", "Getting clients with relationships");
+
       const clients = await this.prisma.client.findMany({
         include: {
           projects: {
             include: {
-              tasks: true
-            }
-          }
+              tasks: true,
+            },
+          },
         },
         orderBy: {
-          name: 'asc'
-        }
+          name: "asc",
+        },
+      });
+
+      logger.database("info", "Retrieved clients", {
+        count: clients.length,
+        clientNames: clients.map((c) => c.name),
+        projectCounts: clients.map((c) => ({
+          name: c.name,
+          projects: c.projects.length,
+        })),
       });
 
       return clients;
     } catch (error) {
-      console.error('Error getting clients:', error);
+      logger.database("error", "Error getting clients", {
+        error: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
@@ -677,16 +784,16 @@ class DatabaseService {
         data: {
           name: data.name,
           email: data.email || null,
-          hourlyRate: data.hourlyRate || 0
+          hourlyRate: data.hourlyRate || 0,
         },
         include: {
-          projects: true
-        }
+          projects: true,
+        },
       });
 
       return client;
     } catch (error) {
-      console.error('Error creating client:', error);
+      console.error("Error creating client:", error);
       throw error;
     }
   }
@@ -697,13 +804,13 @@ class DatabaseService {
         where: { id: parseInt(id) },
         data,
         include: {
-          projects: true
-        }
+          projects: true,
+        },
       });
 
       return client;
     } catch (error) {
-      console.error('Error updating client:', error);
+      console.error("Error updating client:", error);
       throw error;
     }
   }
@@ -711,12 +818,12 @@ class DatabaseService {
   async deleteClient(id) {
     try {
       await this.prisma.client.delete({
-        where: { id: parseInt(id) }
+        where: { id: parseInt(id) },
       });
 
       return { success: true };
     } catch (error) {
-      console.error('Error deleting client:', error);
+      console.error("Error deleting client:", error);
       throw error;
     }
   }
@@ -725,63 +832,98 @@ class DatabaseService {
   async getProjects(clientId = null) {
     try {
       const where = clientId ? { clientId: parseInt(clientId) } : {};
-      
+
       const projects = await this.prisma.project.findMany({
         where,
         include: {
           client: true,
-          tasks: true
+          tasks: true,
         },
         orderBy: {
-          name: 'asc'
-        }
+          name: "asc",
+        },
       });
 
       return projects;
     } catch (error) {
-      console.error('Error getting projects:', error);
+      console.error("Error getting projects:", error);
       throw error;
     }
   }
 
   async createProject(data) {
     try {
+      const clientId = parseInt(data.clientId);
+
+      // If this project should be default, clear any existing default for this client
+      if (data.isDefault) {
+        await this.prisma.project.updateMany({
+          where: { clientId },
+          data: { isDefault: false },
+        });
+      }
+
       const project = await this.prisma.project.create({
         data: {
           name: data.name,
-          clientId: parseInt(data.clientId),
-          hourlyRate: data.hourlyRate || null
+          clientId: clientId,
+          hourlyRate: data.hourlyRate || null,
+          isDefault: data.isDefault || false,
         },
         include: {
           client: true,
-          tasks: true
-        }
+          tasks: true,
+        },
       });
 
       return project;
     } catch (error) {
-      console.error('Error creating project:', error);
+      console.error("Error creating project:", error);
       throw error;
     }
   }
 
   async updateProject(id, data) {
     try {
+      const projectId = parseInt(id);
+
+      // Get the current project to know its clientId
+      const currentProject = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { clientId: true },
+      });
+
+      if (!currentProject) {
+        throw new Error("Project not found");
+      }
+
+      // If this project should be default, clear any existing default for this client
+      if (data.isDefault) {
+        await this.prisma.project.updateMany({
+          where: {
+            clientId: currentProject.clientId,
+            id: { not: projectId }, // Don't update the current project
+          },
+          data: { isDefault: false },
+        });
+      }
+
       const project = await this.prisma.project.update({
-        where: { id: parseInt(id) },
+        where: { id: projectId },
         data: {
           name: data.name,
-          hourlyRate: data.hourlyRate || null
+          hourlyRate: data.hourlyRate || null,
+          isDefault: data.isDefault !== undefined ? data.isDefault : undefined,
         },
         include: {
           client: true,
-          tasks: true
-        }
+          tasks: true,
+        },
       });
 
       return project;
     } catch (error) {
-      console.error('Error updating project:', error);
+      console.error("Error updating project:", error);
       throw error;
     }
   }
@@ -789,12 +931,32 @@ class DatabaseService {
   async deleteProject(id) {
     try {
       const project = await this.prisma.project.delete({
-        where: { id: parseInt(id) }
+        where: { id: parseInt(id) },
       });
 
       return project;
     } catch (error) {
-      console.error('Error deleting project:', error);
+      console.error("Error deleting project:", error);
+      throw error;
+    }
+  }
+
+  async getDefaultProject(clientId) {
+    try {
+      const project = await this.prisma.project.findFirst({
+        where: {
+          clientId: parseInt(clientId),
+          isDefault: true,
+        },
+        include: {
+          client: true,
+          tasks: true,
+        },
+      });
+
+      return project;
+    } catch (error) {
+      console.error("Error getting default project:", error);
       throw error;
     }
   }
@@ -805,25 +967,25 @@ class DatabaseService {
       // console.log('[DATABASE] getTasks called with projectId:', projectId);
       const where = projectId ? { projectId: parseInt(projectId) } : {};
       // console.log('[DATABASE] Query where clause:', where);
-      
+
       const tasks = await this.prisma.task.findMany({
         where,
         include: {
           project: {
             include: {
-              client: true
-            }
-          }
+              client: true,
+            },
+          },
         },
         orderBy: {
-          name: 'asc'
-        }
+          name: "asc",
+        },
       });
 
       // console.log('[DATABASE] Found', tasks.length, 'tasks');
       return tasks;
     } catch (error) {
-      console.error('Error getting tasks:', error);
+      console.error("Error getting tasks:", error);
       throw error;
     }
   }
@@ -834,20 +996,20 @@ class DatabaseService {
         data: {
           name: data.name,
           projectId: parseInt(data.projectId),
-          description: data.description || null
+          description: data.description || null,
         },
         include: {
           project: {
             include: {
-              client: true
-            }
-          }
-        }
+              client: true,
+            },
+          },
+        },
       });
 
       return task;
     } catch (error) {
-      console.error('Error creating task:', error);
+      console.error("Error creating task:", error);
       throw error;
     }
   }
@@ -858,20 +1020,20 @@ class DatabaseService {
         where: { id: parseInt(id) },
         data: {
           name: data.name,
-          description: data.description || null
+          description: data.description || null,
         },
         include: {
           project: {
             include: {
-              client: true
-            }
-          }
-        }
+              client: true,
+            },
+          },
+        },
       });
 
       return task;
     } catch (error) {
-      console.error('Error updating task:', error);
+      console.error("Error updating task:", error);
       throw error;
     }
   }
@@ -879,12 +1041,12 @@ class DatabaseService {
   async deleteTask(id) {
     try {
       const task = await this.prisma.task.delete({
-        where: { id: parseInt(id) }
+        where: { id: parseInt(id) },
       });
 
       return task;
     } catch (error) {
-      console.error('Error deleting task:', error);
+      console.error("Error deleting task:", error);
       throw error;
     }
   }
@@ -893,12 +1055,12 @@ class DatabaseService {
   async getSetting(key) {
     try {
       const setting = await this.prisma.setting.findUnique({
-        where: { key }
+        where: { key },
       });
 
       return setting ? setting.value : null;
     } catch (error) {
-      console.error('Error getting setting:', error);
+      console.error("Error getting setting:", error);
       throw error;
     }
   }
@@ -908,12 +1070,12 @@ class DatabaseService {
       const setting = await this.prisma.setting.upsert({
         where: { key },
         update: { value: String(value) },
-        create: { key, value: String(value) }
+        create: { key, value: String(value) },
       });
 
       return setting;
     } catch (error) {
-      console.error('Error setting value:', error);
+      console.error("Error setting value:", error);
       throw error;
     }
   }
@@ -930,20 +1092,20 @@ class DatabaseService {
               project: true,
               task: {
                 include: {
-                  project: true
-                }
-              }
-            }
-          }
+                  project: true,
+                },
+              },
+            },
+          },
         },
         orderBy: {
-          createdAt: 'desc'
-        }
+          createdAt: "desc",
+        },
       });
 
       return invoices;
     } catch (error) {
-      console.error('Error getting invoices:', error);
+      console.error("Error getting invoices:", error);
       throw error;
     }
   }
@@ -960,17 +1122,17 @@ class DatabaseService {
               project: true,
               task: {
                 include: {
-                  project: true
-                }
-              }
-            }
-          }
-        }
+                  project: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       return invoice;
     } catch (error) {
-      console.error('Error getting invoice by ID:', error);
+      console.error("Error getting invoice by ID:", error);
       throw error;
     }
   }
@@ -982,17 +1144,17 @@ class DatabaseService {
           invoiceNumber: data.invoiceNumber,
           clientId: parseInt(data.clientId),
           totalAmount: parseFloat(data.totalAmount),
-          status: data.status || 'draft',
-          dueDate: data.dueDate ? new Date(data.dueDate) : null
+          status: data.status || "draft",
+          dueDate: data.dueDate ? new Date(data.dueDate) : null,
         },
         include: {
-          timeEntries: true
-        }
+          timeEntries: true,
+        },
       });
 
       return invoice;
     } catch (error) {
-      console.error('Error creating invoice:', error);
+      console.error("Error creating invoice:", error);
       throw error;
     }
   }
@@ -1004,19 +1166,19 @@ class DatabaseService {
         where: { invoiceId: parseInt(id) },
         data: {
           isInvoiced: false,
-          invoiceId: null
-        }
+          invoiceId: null,
+        },
       });
 
       // Then delete the invoice
       const invoice = await this.prisma.invoice.delete({
-        where: { id: parseInt(id) }
+        where: { id: parseInt(id) },
       });
 
-      console.log('[DATABASE] Invoice deleted and time entries unmarked:', id);
+      console.log("[DATABASE] Invoice deleted and time entries unmarked:", id);
       return invoice;
     } catch (error) {
-      console.error('Error deleting invoice:', error);
+      console.error("Error deleting invoice:", error);
       throw error;
     }
   }
@@ -1024,16 +1186,16 @@ class DatabaseService {
   async getSettings() {
     try {
       const settings = await this.prisma.setting.findMany();
-      
+
       // Convert array of settings to object
       const settingsObj = {};
-      settings.forEach(setting => {
+      settings.forEach((setting) => {
         settingsObj[setting.key] = setting.value;
       });
-      
+
       return settingsObj;
     } catch (error) {
-      console.error('Error getting settings:', error);
+      console.error("Error getting settings:", error);
       throw error;
     }
   }
@@ -1043,23 +1205,23 @@ class DatabaseService {
       // Load the entries to determine client and amount
       const entries = await this.prisma.timeEntry.findMany({
         where: {
-          id: { in: entryIds }
+          id: { in: entryIds },
         },
         include: {
           client: true,
-          project: true
-        }
+          project: true,
+        },
       });
 
       if (!entries || entries.length === 0) {
-        throw new Error('No time entries provided to mark as invoiced');
+        throw new Error("No time entries provided to mark as invoiced");
       }
 
       // Ensure all entries are for the same client
       const clientId = entries[0].clientId;
-      const multipleClients = entries.some(e => e.clientId !== clientId);
+      const multipleClients = entries.some((e) => e.clientId !== clientId);
       if (multipleClients) {
-        throw new Error('Cannot create invoice for multiple clients at once');
+        throw new Error("Cannot create invoice for multiple clients at once");
       }
 
       // Calculate total amount using project rate fallback to client rate
@@ -1070,10 +1232,10 @@ class DatabaseService {
       }, 0);
 
       // Determine billing period from entries
-      const dates = entries.map(e => new Date(e.startTime));
+      const dates = entries.map((e) => new Date(e.startTime));
       const minDate = new Date(Math.min.apply(null, dates));
       const maxDate = new Date(Math.max.apply(null, dates));
-      const toYMD = d => d.toISOString().split('T')[0];
+      const toYMD = (d) => d.toISOString().split("T")[0];
 
       // Create invoice
       const invoice = await this.prisma.invoice.create({
@@ -1083,19 +1245,19 @@ class DatabaseService {
           totalAmount: parseFloat(totalAmount.toFixed(2)),
           periodStart: toYMD(minDate),
           periodEnd: toYMD(maxDate),
-          status: 'generated'
-        }
+          status: "generated",
+        },
       });
 
       // Mark entries as invoiced and associate invoiceId
       await this.prisma.timeEntry.updateMany({
         where: { id: { in: entryIds } },
-        data: { isInvoiced: true, invoiceId: invoice.id }
+        data: { isInvoiced: true, invoiceId: invoice.id },
       });
 
       return invoice;
     } catch (error) {
-      console.error('Error marking entries as invoiced:', error);
+      console.error("Error marking entries as invoiced:", error);
       throw error;
     }
   }

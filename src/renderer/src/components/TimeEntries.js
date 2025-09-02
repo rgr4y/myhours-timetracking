@@ -719,6 +719,19 @@ const TimeEntries = () => {
     setLocalSelectedTask(null);
     // Do not clear preloaded projects/tasks; we filter from cached lists
     
+    // Check for default project
+    if (client && window.electronAPI) {
+      try {
+        const defaultProject = await window.electronAPI.projects.getDefault(client.id);
+        if (defaultProject) {
+          console.log('Auto-selecting default project:', defaultProject);
+          setLocalSelectedProject(defaultProject);
+        }
+      } catch (error) {
+        console.error('Error getting default project:', error);
+      }
+    }
+    
     if (isRunning && activeTimer) {
       try {
         await updateTimerClient(client);
