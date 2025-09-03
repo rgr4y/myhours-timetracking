@@ -459,8 +459,22 @@ class InvoiceGenerator {
         throw new Error('No template data found for this invoice');
       }
       
-      // Parse stored template data
-      const templateData = JSON.parse(invoice.data);
+      // Parse stored template data with safety checks
+      let templateData;
+      try {
+        templateData = JSON.parse(invoice.data || '{}');
+      } catch (parseError) {
+        console.error('Error parsing invoice data:', parseError);
+        throw new Error('Invalid invoice data format');
+      }
+      
+      // Ensure required fields exist with fallbacks
+      if (!templateData.clientName && invoice.client) {
+        templateData.clientName = invoice.client.name;
+      }
+      if (!templateData.clientName) {
+        templateData.clientName = 'Unknown Client';
+      }
       
       // Ensure the invoice ID is included for filename generation
       templateData.invoiceId = invoice.id;
@@ -578,8 +592,11 @@ class InvoiceGenerator {
 
   // Centralized invoice filename creation with sanitized client name
   createInvoiceFilename(clientName, invoiceNumber, invoiceId = null, includeTimestamp = false) {
+    // Handle undefined/null/empty clientName safely
+    const safeClientName = (clientName || 'Unknown Client').toString();
+    
     // Sanitize client name: strip non-filename friendly chars, replace spaces with ., dashes with .
-    const sanitizedClientName = clientName
+    const sanitizedClientName = safeClientName
       .trim() // Trim first to handle whitespace-only strings
       .replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename characters
       .replace(/\s+/g, '.') // Replace spaces with dots

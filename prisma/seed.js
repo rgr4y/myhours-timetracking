@@ -308,7 +308,7 @@ async function main() {
   ]);
   console.log('📋 Created tasks');
 
-  // Create sample invoices
+  // Create sample invoices with proper template data
   // Invoices for last month (entries from last month will be marked invoiced)
   const invoices = await Promise.all([
     prisma.invoice.create({
@@ -321,6 +321,35 @@ async function main() {
         status: 'generated',
         dueDate: addDays(lastMonth.end, 14),
         createdAt: lastMonth.start,
+        data: JSON.stringify({
+          invoiceId: 1,
+          invoiceNumber: invNum(lastMonth.start, 1),
+          clientName: clients[0].name,
+          clientEmail: clients[0].email,
+          periodStart: ymd(lastMonth.start),
+          periodEnd: ymd(lastMonth.end),
+          dueDate: ymd(addDays(lastMonth.end, 14)),
+          totalAmount: 8750.0,
+          companyName: 'Your Company Name',
+          companyEmail: 'hello@yourcompany.com',
+          companyPhone: '+1 (555) 123-4567',
+          companyWebsite: 'www.yourcompany.com',
+          terms: 'Net 30',
+          items: [
+            {
+              description: 'E-commerce Platform Development',
+              hours: 25.5,
+              rate: 175.0,
+              amount: 4462.5
+            },
+            {
+              description: 'Mobile App Development',
+              hours: 15.5,
+              rate: 150.0,
+              amount: 2325.0
+            }
+          ]
+        })
       },
     }),
     prisma.invoice.create({
@@ -333,6 +362,35 @@ async function main() {
         status: 'generated',
         dueDate: addDays(lastMonth.end, 14),
         createdAt: addDays(lastMonth.start, 14),
+        data: JSON.stringify({
+          invoiceId: 2,
+          invoiceNumber: invNum(addDays(lastMonth.start, 14), 2),
+          clientName: clients[1].name,
+          clientEmail: clients[1].email,
+          periodStart: ymd(lastMonth.start),
+          periodEnd: ymd(lastMonth.end),
+          dueDate: ymd(addDays(lastMonth.end, 14)),
+          totalAmount: 5250.0,
+          companyName: 'Your Company Name',
+          companyEmail: 'hello@yourcompany.com',
+          companyPhone: '+1 (555) 123-4567',
+          companyWebsite: 'www.yourcompany.com',
+          terms: 'Net 30',
+          items: [
+            {
+              description: 'SaaS Dashboard Development',
+              hours: 24.0,
+              rate: 140.0,
+              amount: 3360.0
+            },
+            {
+              description: 'API Integration',
+              hours: 15.0,
+              rate: 125.0,
+              amount: 1875.0
+            }
+          ]
+        })
       },
     }),
     prisma.invoice.create({
@@ -345,6 +403,35 @@ async function main() {
         status: 'generated',
         dueDate: addDays(lastMonth.end, 14),
         createdAt: addDays(lastMonth.start, 1),
+        data: JSON.stringify({
+          invoiceId: 3,
+          invoiceNumber: invNum(addDays(lastMonth.start, 1), 3),
+          clientName: clients[2].name,
+          clientEmail: clients[2].email,
+          periodStart: ymd(lastMonth.start),
+          periodEnd: ymd(lastMonth.end),
+          dueDate: ymd(addDays(lastMonth.end, 14)),
+          totalAmount: 3600.0,
+          companyName: 'Your Company Name',
+          companyEmail: 'hello@yourcompany.com',
+          companyPhone: '+1 (555) 123-4567',
+          companyWebsite: 'www.yourcompany.com',
+          terms: 'Net 30',
+          items: [
+            {
+              description: 'Brand Identity Design',
+              hours: 7.0,
+              rate: 100.0,
+              amount: 700.0
+            },
+            {
+              description: 'Website Redesign',
+              hours: 32.0,
+              rate: 90.0,
+              amount: 2880.0
+            }
+          ]
+        })
       },
     }),
   ]);
