@@ -4,33 +4,6 @@
 
 **myHours** is an Electron-based time tracking application with a React frontend, SQLite/Prisma backend, and PDF invoice generation. The app follows a strict main/renderer process separation with IPC communication.
 
-### Project Structure
-
-```
-src/
-├── main/                   # Electron main process
-│   ├── main.js            # App initialization & IPC handlers
-│   ├── database-service.js # Prisma ORM wrapper
-│   ├── preload.js         # Context bridge for renderer
-│   ├── invoice-generator.js # PDF generation with Puppeteer
-│   ├── services/          # Platform-specific services
-│   │   └── tray-macos.js  # macOS tray integration
-│   └── templates/         # Handlebars invoice templates
-├── renderer/              # React app (Create React App)
-│   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── context/       # TimerContext for global state
-│   │   ├── hooks/         # Custom React hooks
-│   │   ├── ui/           # Styled-components design system
-│   │   └── utils/        # Utility functions
-└── prisma/               # Database schema & migrations
-assets/                   # App assets (icons, etc.)
-├── icon.svg              # Primary app icon
-├── tray-icon.svg         # Vector tray icon
-├── tray-icon.png         # 16x16 tray icon
-└── tray-icon@2x.png      # 32x32 retina tray icon
-```
-
 ### Icon Assets
 
 - **App Icons**: See `assets/ICON_GUIDE.md` for complete icon management
@@ -62,6 +35,11 @@ assets/                   # App assets (icons, etc.)
 - **Active Timer**: Only one TimeEntry with `isActive: true` at a time
 - **Key pattern**: Foreign keys use `clientId`, `projectId`, `taskId` (camelCase)
 - **Auto-seeding**: Empty database gets populated with sample data on first run
+
+### Testing / Unit Tests
+
+- Use builtin runTests MCP first
+- See `tests/README.md` & `tests/AGENTS.md`
 
 ### IPC Communication Pattern
 
@@ -108,32 +86,13 @@ You MUST use the safe electronAPI pattern to avoid race conditions.
 - Verify useEffect dependencies in Timer component
 - Check active timer persistence via `db:getActiveTimer`
 
-### Invoice Generation
-
-- **Templates**: Handlebars templates in `src/main/templates/`
-- **PDF**: Puppeteer generates PDFs from rendered HTML
-- **Data flow**: Renderer → IPC → InvoiceGenerator → File system
-
 ### Console Logging
 
 - **Renderer logs**: Forward to main process via preload.js for terminal visibility
 - **Debug pattern**: `[MAIN]`, `[RENDERER-LOG]`, `[DATABASE]` prefixes for log identification
-- **Custom logger**: Projects.js has enhanced logger that triggers DB calls for terminal output
+- **Custom logger**: Use `logger.js` for consistent log formatting - logger.debug, logger.warn, etc. Use only on main process, do not use on renderer.
 
 ## Common Debugging Approaches
-
-### IPC Communication Issues
-
-1. Check preload.js exposes the needed API methods
-2. Verify main.js has corresponding IPC handlers
-3. Check database-service.js for actual implementation
-4. Look for `electronAPI not available` errors in console. Use useElectronAPI.js pattern.
-
-### Database Issues
-
-1. Use `npx prisma studio` to inspect SQLite database
-2. Check console for `[DATABASE]` prefixed logs
-3. Verify foreign key relationships (Client → Project → Task)
 
 ### Build Issues
 
@@ -142,7 +101,7 @@ You MUST use the safe electronAPI pattern to avoid race conditions.
 
 ### Misc Issues
 
-1. Use vscode-editor-mcp to send undo commands if you break a file. 
+1. Use vscode-editor-mcp's MCP tools for doing special file operations, like Undo.
 2. If you break a file and want to reset it completely, use the `vscode-editor-mcp` -> `reset_file` tool to empty the file. Do this instead of sending `rm` to the terminal.
 3. If that doesn't work, go ahead with your normal flow.
 
@@ -152,5 +111,7 @@ You MUST use the safe electronAPI pattern to avoid race conditions.
 2. DRY! Don't repeat yourself.
 3. Keep components small and focused.
 4. Don't echo random notes to the terminal.
+5. No new files in project root unless I explicitly OK it.
+6. Docs go in @/docs only (.md files). Do not put implementation summaries. Only documentation.
 
-Remember: This is a single-user desktop app with local SQLite storage - no authentication, API calls, or cloud sync.
+Remember: This is a single-user desktop app with local SQLite storage.

@@ -60,15 +60,26 @@ class DatabaseService {
   }
 
   async ensureLatestMigration() {
-    // Simple check - just ensure the isDefault column exists
+    // Check for isDefault column (previous migration)
     try {
       await this.prisma.$queryRaw`SELECT is_default FROM projects LIMIT 1`;
-      logger.database("info", "Latest migration already applied");
+      logger.database("info", "Previous migration (isDefault) already applied");
     } catch (error) {
       logger.database("info", "Adding isDefault column to projects table");
       await this.prisma
         .$executeRaw`ALTER TABLE "projects" ADD COLUMN "is_default" BOOLEAN NOT NULL DEFAULT false`;
-      logger.database("info", "Migration applied successfully");
+      logger.database("info", "isDefault migration applied successfully");
+    }
+
+    // Check for data column in invoices table (new migration)
+    try {
+      await this.prisma.$queryRaw`SELECT data FROM invoices LIMIT 1`;
+      logger.database("info", "Latest migration (invoice data field) already applied");
+    } catch (error) {
+      logger.database("info", "Adding data column to invoices table");
+      await this.prisma
+        .$executeRaw`ALTER TABLE "invoices" ADD COLUMN "data" TEXT DEFAULT '{}'`;
+      logger.database("info", "Invoice data field migration applied successfully");
     }
   }
 
@@ -1237,7 +1248,7 @@ class DatabaseService {
     }
   }
 
-  async markAsInvoiced(entryIds, invoiceNumber) {
+  async markAsInvoiced(entryIds, invoiceNumber, templateData = null) {
     try {
       // Load the entries to determine client and amount
       const entries = await this.prisma.timeEntry.findMany({
@@ -1274,7 +1285,7 @@ class DatabaseService {
       const maxDate = new Date(Math.max.apply(null, dates));
       const toYMD = (d) => d.toISOString().split("T")[0];
 
-      // Create invoice
+      // Create invoice with template data
       const invoice = await this.prisma.invoice.create({
         data: {
           invoiceNumber,
@@ -1283,6 +1294,7 @@ class DatabaseService {
           periodStart: toYMD(minDate),
           periodEnd: toYMD(maxDate),
           status: "generated",
+          data: templateData ? JSON.stringify(templateData) : "{}"
         },
       });
 

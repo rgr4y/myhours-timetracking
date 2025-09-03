@@ -100,7 +100,7 @@ const GeneratedInvoices = ({
                   onClick={() => handleDownloadInvoice(invoice.id)}
                 >
                   <Download size={14} />
-                  {downloadingIds.has(invoice.id) ? 'Downloading...' : 'Download'}
+                  {downloadingIds.has(invoice.id) ? 'Regenerating...' : 'Regenerate'}
                 </Button>
               </FlexBox>
             </Card>

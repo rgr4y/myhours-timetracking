@@ -130,9 +130,9 @@ class InvoiceGenerator {
       // Generate PDF
       const pdfPath = await this.generatePDF(templateData);
       
-      // Mark entries as invoiced
+      // Mark entries as invoiced and save template data
       const entryIds = timeEntries.map(entry => entry.id);
-      await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber);
+      await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber, templateData);
 
       return pdfPath;
     } catch (error) {
@@ -245,9 +245,9 @@ class InvoiceGenerator {
       // Generate PDF
       const pdfPath = await this.generatePDF(templateData);
       
-      // Mark entries as invoiced
+      // Mark entries as invoiced and save template data
       const entryIds = timeEntries.map(entry => entry.id);
-      await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber);
+      await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber, templateData);
 
       return pdfPath;
     } catch (error) {
@@ -325,11 +325,13 @@ class InvoiceGenerator {
     }
   }
 
+  // Generate PDF directly to temp file without user dialog - used for automated invoice operations
   async generatePDFToFile(templateData) {
     const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
     const html = template(templateData);
     const buffer = await this.renderHtmlToPdf(html);
-    const tempPath = path.join(os.tmpdir(), `invoice-${templateData.invoiceNumber}-${Date.now()}.pdf`);
+    const filename = this.createInvoiceFilename(templateData.clientName, templateData.invoiceNumber, true);
+    const tempPath = path.join(os.tmpdir(), filename);
     fs.writeFileSync(tempPath, buffer);
     return tempPath;
   }
@@ -389,11 +391,13 @@ class InvoiceGenerator {
       });
   }
 
+  // Generate PDF with user save dialog - used for interactive invoice creation
   async generatePDF(templateData) {
     const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
     const html = template(templateData);
+    const defaultFilename = this.createInvoiceFilename(templateData.clientName, templateData.invoiceNumber);
     const result = await dialog.showSaveDialog({
-      defaultPath: `Invoice-${templateData.invoiceNumber}.pdf`,
+      defaultPath: defaultFilename,
       filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
     });
     if (result.canceled || !result.filePath) {
@@ -420,6 +424,22 @@ class InvoiceGenerator {
     const day = String(date.getDate()).padStart(2, '0');
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     return `INV-${year}${month}${day}-${random}`;
+  }
+
+  // Centralized invoice filename creation with sanitized client name
+  createInvoiceFilename(clientName, invoiceNumber, includeTimestamp = false) {
+    // Sanitize client name: remove non-filename friendly characters, replace hyphens, truncate to 25 chars
+    const sanitizedClientName = clientName
+      .trim() // Trim first to handle whitespace-only strings
+      .replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename characters
+      .replace(/[-]/g, '') // Remove hyphens as requested
+      .replace(/\s+/g, '_') // Replace spaces with underscores
+      .substring(0, 25) // Truncate to 25 characters
+    
+    const finalClientName = sanitizedClientName || 'Unknown_Client'; // Fallback if empty after sanitization
+    
+    const timestamp = includeTimestamp ? `-${Date.now()}` : '';
+    return `Invoice-${finalClientName}-${invoiceNumber}${timestamp}.pdf`;
   }
 
   getOldestEntryDate(entries) {

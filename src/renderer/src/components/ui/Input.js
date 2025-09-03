@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+import { transitions, colors } from '../../styles/theme';
 
 export const Input = styled.input`
   background: #404040;
@@ -8,7 +9,7 @@ export const Input = styled.input`
   color: white;
   font-size: 14px;
   width: 100%;
-  transition: border-color 0.2s ease;
+  transition: border-color ${transitions.base};
   
   &:focus {
     outline: none;
@@ -29,7 +30,7 @@ export const Select = styled.select`
   font-size: 14px;
   width: 100%;
   cursor: pointer;
-  transition: border-color 0.2s ease;
+  transition: border-color ${transitions.base};
   
   &:focus {
     outline: none;
@@ -70,4 +71,38 @@ export const Label = styled.label`
   font-weight: 500;
   margin-bottom: 8px;
   display: block;
+`;
+
+export const Chip = styled.button`
+  background: ${props => {
+    if (props.variant === 'active' || props.$active) return colors.primary;
+    return colors.secondary;
+  }};
+  border: none;
+  border-radius: 20px;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  transition: all ${transitions.base};
+  
+  &:hover {
+    background: ${props => {
+      if (props.variant === 'active' || props.$active) return colors.primaryHover;
+      return colors.secondaryHover;
+    }};
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+export const ChipGroup = styled.div`
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 `;

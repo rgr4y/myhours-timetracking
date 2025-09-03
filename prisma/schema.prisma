@@ -95,6 +95,7 @@ model Invoice {
   periodEnd     String?  @map("period_end")
   status        String   @default("draft")
   dueDate       DateTime? @map("due_date")
+  data          String?  @default("{}") // JSON data for template variables
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

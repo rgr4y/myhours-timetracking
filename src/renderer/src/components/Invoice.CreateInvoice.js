@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Filter, DollarSign, RotateCcw } from 'lucide-react';
+import { Filter, DollarSign, RotateCcw, Download, FileText } from 'lucide-react';
 import styled from 'styled-components';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   Card,
   FlexBox,
@@ -50,6 +51,41 @@ const SummaryCard = styled(Card)`
       color: #10b981 !important;
       font-weight: 600;
     }
+  }
+`;
+
+// Export Toolbox
+const ExportToolbox = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #2a2a2a;
+  border: 1px solid #404040;
+  border-radius: 6px;
+`;
+
+const ExportButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #007AFF;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(0, 122, 255, 0.1);
+    color: #0056b3;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
 
@@ -129,7 +165,9 @@ const CreateInvoice = ({
 
   // Filter time entries based on current filters
   useEffect(() => {
-    let filtered = timeEntries.filter(entry => !entry.isInvoiced);
+    let filtered = filters.showInvoicedOnly 
+      ? timeEntries.filter(entry => entry.isInvoiced)
+      : timeEntries.filter(entry => !entry.isInvoiced);
     
     if (filters.dateFrom) {
       const fromDate = new Date(filters.dateFrom);
@@ -160,6 +198,37 @@ const CreateInvoice = ({
     setSelectedEntries(prev => prev.filter(id => visibleIds.includes(id)));
   }, [timeEntries, filters, setFilteredTimeEntries, setSelectedEntries]);
 
+  // Auto-select client when all selected entries have the same client
+  const autoSelectClient = useDebounce((selectedEntryIds, timeEntries, currentClientId) => {
+    // Only auto-select if no client is currently selected
+    if (currentClientId) return;
+    
+    // Only proceed if we have selected entries
+    if (!selectedEntryIds || selectedEntryIds.length === 0) return;
+    
+    // Get the selected time entries
+    const selectedTimeEntries = timeEntries.filter(entry => selectedEntryIds.includes(entry.id));
+    
+    // Check if all selected entries have the same client
+    const clientIds = [...new Set(selectedTimeEntries.map(entry => entry.clientId))];
+    
+    // If all entries have the same client, auto-select it
+    if (clientIds.length === 1 && clientIds[0]) {
+      console.log('[AUTO-SELECT] Auto-selecting client:', clientIds[0]);
+      setFilters(prev => ({ 
+        ...prev, 
+        clientId: clientIds[0].toString(),
+        projectId: '', // Reset project when client changes
+        taskId: '' // Reset task when client changes
+      }));
+    }
+  }, 300); // 300ms debounce
+
+  // Watch for changes in selected entries to trigger auto-client selection
+  useEffect(() => {
+    autoSelectClient(selectedEntries, timeEntries, filters.clientId);
+  }, [selectedEntries, timeEntries, filters.clientId, autoSelectClient]);
+
   // Reset filters function
   const resetFilters = () => {
     setFilters({
@@ -167,7 +236,8 @@ const CreateInvoice = ({
       dateTo: '',
       clientId: '',
       projectId: '',
-      taskId: ''
+      taskId: '',
+      showInvoicedOnly: false
     });
     sessionStorage.removeItem('invoiceFilters');
   };
@@ -272,7 +342,36 @@ const CreateInvoice = ({
       .reduce((total, entry) => total + (entry.duration || 0), 0) / 60;
   }, [filteredTimeEntries, selectedEntries]);
 
-  const hasActiveFilters = filters.dateFrom || filters.dateTo || filters.clientId || filters.projectId || filters.taskId;
+  // Export functions
+  const exportToCSV = async () => {
+    if (window.electronAPI) {
+      try {
+        // Create filters object for the selected entries
+        const exportFilters = {
+          ids: selectedEntries.length > 0 ? selectedEntries : filteredTimeEntries.map(e => e.id)
+        };
+        await window.electronAPI.export.csv(exportFilters);
+      } catch (error) {
+        console.error('Error exporting to CSV:', error);
+      }
+    }
+  };
+
+  const exportToJSON = async () => {
+    if (window.electronAPI) {
+      try {
+        // Create filters object for the selected entries
+        const exportFilters = {
+          ids: selectedEntries.length > 0 ? selectedEntries : filteredTimeEntries.map(e => e.id)
+        };
+        await window.electronAPI.export.json(exportFilters);
+      } catch (error) {
+        console.error('Error exporting to JSON:', error);
+      }
+    }
+  };
+
+  const hasActiveFilters = filters.dateFrom || filters.dateTo || filters.clientId || filters.projectId || filters.taskId || filters.showInvoicedOnly;
 
   return (
     <FlexBox direction="column" gap="24px">
@@ -304,12 +403,32 @@ const CreateInvoice = ({
             <Filter size={20} style={{ marginRight: '10px' }} />
             Filter Time Entries
           </Heading>
-          {hasActiveFilters && (
-            <Button variant="secondary" size="small" onClick={resetFilters}>
-              <RotateCcw size={16} />
-              Reset Filters
-            </Button>
-          )}
+          <FlexBox gap="10px" align="center">
+            {/* Export Toolbox */}
+            <ExportToolbox>
+              <Text size="small" style={{ color: '#888', marginRight: '8px' }}>Export:</Text>
+              <ExportButton 
+                onClick={exportToCSV}
+                title="Export to CSV"
+                disabled={filteredTimeEntries.length === 0}
+              >
+                <FileText size={16} />
+              </ExportButton>
+              <ExportButton 
+                onClick={exportToJSON}
+                title="Export to JSON"
+                disabled={filteredTimeEntries.length === 0}
+              >
+                <Download size={16} />
+              </ExportButton>
+            </ExportToolbox>
+            {hasActiveFilters && (
+              <Button variant="secondary" size="small" onClick={resetFilters}>
+                <RotateCcw size={16} />
+                Reset Filters
+              </Button>
+            )}
+          </FlexBox>
         </FlexBox>
         
         {/* Date Range Filters */}
@@ -344,6 +463,12 @@ const CreateInvoice = ({
                 </Chip>
                 <Chip onClick={() => setDateRange('last2Weeks')}>
                   Last 2 Weeks
+                </Chip>
+                <Chip 
+                  onClick={() => setFilters(prev => ({ ...prev, showInvoicedOnly: !prev.showInvoicedOnly }))}
+                  variant={filters.showInvoicedOnly ? 'active' : 'default'}
+                >
+                  Invoiced
                 </Chip>
               </ChipGroup>
             </FlexBox>
@@ -429,7 +554,7 @@ const CreateInvoice = ({
               <Button 
                 variant="primary" 
                 onClick={handleGenerateFromSelected}
-                disabled={!filters.clientId || selectedEntries.length === 0 || isGenerating}
+                disabled={!filters.clientId || selectedEntries.length === 0 || isGenerating || filters.showInvoicedOnly}
                 style={{ alignSelf: 'flex-end' }}
               >
                 <DollarSign size={16} />

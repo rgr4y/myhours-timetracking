@@ -3,6 +3,7 @@ import { HashRouter as Router, Routes, Route, useNavigate, useLocation, Navigate
 import styled, { createGlobalStyle } from 'styled-components';
 import './App.css';
 import { TimerProvider } from './context/TimerContext';
+import { AnimationProvider } from './context/AnimationContext';
 import { ToastProvider } from './components/ui/Toast';
 import Sidebar from './components/Sidebar';
 import TimeEntries from './components/TimeEntries';
@@ -219,19 +220,20 @@ function App() {
   };
 
   return (
-    <TimerProvider>
-      <ToastProvider>
-        <Router>
-          <GlobalStyle />
-          <VisibilityHandler />
-          <AppContainer>
-            <BackgroundContainer>
-              <BackgroundClockOrbits />
-            </BackgroundContainer>
-            <ContentWrapper>
-              <Sidebar />
-              <MainContent>
-                {updateBanner.visible && (
+    <AnimationProvider>
+      <TimerProvider>
+        <ToastProvider>
+          <Router>
+            <GlobalStyle />
+            <VisibilityHandler />
+            <AppContainer>
+              <BackgroundContainer>
+                <BackgroundClockOrbits />
+              </BackgroundContainer>
+              <ContentWrapper>
+                <Sidebar />
+                <MainContent>
+                  {updateBanner.visible && (
                   <UpdateBar>
                     <UpdateBarText>
                       {updateBanner.version ? `Update v${updateBanner.version} is available.` : 'An update is available.'}
@@ -259,6 +261,7 @@ function App() {
         </Router>
       </ToastProvider>
     </TimerProvider>
+  </AnimationProvider>
   );
 }
 

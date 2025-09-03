@@ -52,7 +52,7 @@ if (isDev) {
 }
 
 const DatabaseService = require('./services/database-service');
-const InvoiceGenerator = require('./invoice-generator');
+const InvoiceGenerator = require('./services/invoice-service');
 
 // Platform-specific tray services
 let TrayService = null;
@@ -986,7 +986,12 @@ class MyHoursApp {
         const { dialog } = require('electron');
         
         // Get time entries based on filters
-        const timeEntries = await this.database.getTimeEntries(filters || {});
+        let timeEntries;
+        if (filters && filters.ids && filters.ids.length > 0) {
+          timeEntries = await this.database.getTimeEntriesByIds(filters.ids);
+        } else {
+          timeEntries = await this.database.getTimeEntries(filters || {});
+        }
         
         // Convert to CSV format
         const csvHeader = 'Date,Client,Project,Task,Description,Duration (hours),Start Time,End Time,Hourly Rate,Amount\n';
@@ -1035,7 +1040,12 @@ class MyHoursApp {
         const { dialog } = require('electron');
         
         // Get time entries based on filters
-        const timeEntries = await this.database.getTimeEntries(filters || {});
+        let timeEntries;
+        if (filters && filters.ids && filters.ids.length > 0) {
+          timeEntries = await this.database.getTimeEntriesByIds(filters.ids);
+        } else {
+          timeEntries = await this.database.getTimeEntries(filters || {});
+        }
         
         // Format data for JSON export
         const exportData = {

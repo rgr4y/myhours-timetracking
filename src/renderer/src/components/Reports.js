@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, DollarSign, Calendar, Download } from 'lucide-react';
+import { Clock, DollarSign, Calendar } from 'lucide-react';
 import { colors } from '../styles/theme';
 import {
   Container,
@@ -10,7 +10,6 @@ import {
   Heading,
   Text,
   BigNumber,
-  Button,
   IconContainer
 } from './ui';
 
@@ -42,26 +41,6 @@ const Reports = () => {
         });
       } catch (error) {
         console.error('Error loading stats:', error);
-      }
-    }
-  };
-
-  const exportToCSV = async () => {
-    if (window.electronAPI) {
-      try {
-        await window.electronAPI.export.csv();
-      } catch (error) {
-        console.error('Error exporting to CSV:', error);
-      }
-    }
-  };
-
-  const exportToJSON = async () => {
-    if (window.electronAPI) {
-      try {
-        await window.electronAPI.export.json();
-      } catch (error) {
-        console.error('Error exporting to JSON:', error);
       }
     }
   };
@@ -112,20 +91,6 @@ const Reports = () => {
           <Text variant="secondary" size="small">This month</Text>
         </Card>
       </Grid>
-
-      <Card>
-        <Heading margin="0 0 20px 0">Export Data</Heading>
-        <FlexBox gap="15px" wrap>
-          <Button variant="primary" onClick={exportToCSV}>
-            <Download size={16} />
-            Export to CSV
-          </Button>
-          <Button variant="secondary" onClick={exportToJSON}>
-            <Download size={16} />
-            Export to JSON
-          </Button>
-        </FlexBox>
-      </Card>
     </Container>
   );
 };

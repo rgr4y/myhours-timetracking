@@ -25,7 +25,7 @@
     "prisma:generate": "prisma generate",
     "prebuild": "node scripts/prepare-db.js && node scripts/prepare-icons.js && npm run build-renderer",
     "build": "cross-env NODE_ENV=production node scripts/run-builder.js",
-    "build:mac": "MAC_TARGET=dmg npm run build && (pkill -f \"myHours\" ; cp -a dist/mac/myHours.app /Applications ; open /Applications/myHours.app)",
+    "build:mac": "MAC_TARGET=dir npm run build && (pkill -f \"myHours\" ; cp -a dist/mac/myHours.app /Applications ; open /Applications/myHours.app)",
     "build-renderer": "cd src/renderer && npm run build",
     "dist": "npm run prebuild && node scripts/run-builder.js --publish=always",
     "dist:local": "npm run prebuild && node scripts/run-builder.js --publish=never",
@@ -64,7 +64,7 @@
     },
     "files": [
       "src/main/**/*",
-      "src/renderer/build/**/*", 
+      "src/renderer/build/**/*",
       "assets/**/*",
       "node_modules/**/*",
       "prisma/**/*"

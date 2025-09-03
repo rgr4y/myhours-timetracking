@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Building, Trash2 } from 'lucide-react';
+import { Save, Building, Trash2, Download, FileText } from 'lucide-react';
 import {
   Container,
   Card,
@@ -151,6 +151,27 @@ const Settings = () => {
   // Check if settings have changed
   const hasUnsavedChanges = () => {
     return JSON.stringify(settings) !== JSON.stringify(originalSettings);
+  };
+
+  // Export functions
+  const exportToCSV = async () => {
+    if (window.electronAPI) {
+      try {
+        await window.electronAPI.export.csv();
+      } catch (error) {
+        console.error('Error exporting to CSV:', error);
+      }
+    }
+  };
+
+  const exportToJSON = async () => {
+    if (window.electronAPI) {
+      try {
+        await window.electronAPI.export.json();
+      } catch (error) {
+        console.error('Error exporting to JSON:', error);
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -440,13 +461,34 @@ const Settings = () => {
           </FlexBox>
         </Card>
 
+        {/* Export Data */}
+        <Card>
+          <Heading margin="0 0 12px 0">Export Data</Heading>
+          <Text variant="secondary" size="small" style={{ marginBottom: '16px' }}>
+            Export all of your time entries into a CSV or JSON file for backup or external analysis.
+          </Text>
+          <FlexBox gap="12px" justify="flex-start">
+            <Button variant="secondary" onClick={exportToCSV}>
+              <FileText size={16} />
+              Export CSV
+            </Button>
+            <Button variant="secondary" onClick={exportToJSON}>
+              <Download size={16} />
+              Export JSON
+            </Button>
+          </FlexBox>
+        </Card>
+
         {/* Danger Zone */}
         <Card>
           <Heading margin="0 0 12px 0">Danger Zone</Heading>
           <Text variant="secondary" size="small" style={{ marginBottom: '12px' }}>
             Removes all data (clients, projects, tasks, time entries, invoices). Your settings are preserved.
           </Text>
-          <FlexBox justify="flex-start">
+          <FlexBox justify="space-between" align="center">
+            <div style={{ flex: 1 }}>
+              {/* Left side intentionally empty for spacing */}
+            </div>
             <Button
               variant="danger"
               onClick={async () => {

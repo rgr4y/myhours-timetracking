@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+import { transitions } from '../../styles/theme';
 
 export const Dropdown = styled.div`
   position: relative;
@@ -20,7 +21,7 @@ export const DropdownButton = styled.button`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: all 0.2s ease;
+  transition: all ${transitions.base};
   
   &:hover {
     background: #505050;
@@ -52,7 +53,7 @@ export const DropdownItem = styled.div`
   color: white;
   cursor: pointer;
   border-bottom: 1px solid #505050;
-  transition: background-color 0.2s ease;
+  transition: background-color ${transitions.base};
   
   &:last-child {
     border-bottom: none;

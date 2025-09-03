@@ -131,12 +131,12 @@ export const breakpoints = {
   '2xl': '1536px',
 };
 
-// Transitions
+// Transitions - now using CSS custom properties for animation control
 export const transitions = {
-  fast: '0.15s ease',
-  base: '0.2s ease',
-  slow: '0.3s ease',
-  bounce: '0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+  fast: 'var(--animation-duration-fast, 0.15s) ease',
+  base: 'var(--animation-duration-base, 0.2s) ease',
+  slow: 'var(--animation-duration-slow, 0.3s) ease',
+  bounce: 'var(--animation-duration-slow, 0.5s) cubic-bezier(0.68, -0.55, 0.265, 1.55)',
 };
 
 // Complete theme object
