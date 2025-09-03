@@ -1,0 +1,16 @@
+{
+	"servers": {
+		"vscode-editor-mcp": {
+			"url": "http://localhost:9797/mcp",
+			"type": "http"
+		},
+		"playwright": {
+			"command": "npx",
+			"args": [
+				"@playwright/mcp@latest"
+			],
+			"type": "stdio"
+		}
+	},
+	"inputs": []
+}

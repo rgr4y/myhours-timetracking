@@ -30,7 +30,7 @@ vi.mock('child_process', async (orig) => {
   }
 })
 
-import VersionService from '@renderer/../../main/services/version-service'
+import VersionService from '@main/services/version-service'
 
 describe.skip('VersionService', () => {
   let vs
