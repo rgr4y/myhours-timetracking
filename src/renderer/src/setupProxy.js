@@ -20,7 +20,7 @@ module.exports = function(app) {
     
     return new Promise((resolve, reject) => {
       if (connectionAttempts >= maxAttempts) {
-        console.log('[SETUP-PROXY] 🟥🟥Max connection attempts reached, will retry on next request');
+        console.error('[SETUP-PROXY] 🟥🟥Max connection attempts reached, will retry on next request');
         connectionAttempts = 0; // Reset for future attempts
         reject(new Error("🟥🟥 Max connection attempts reached"));
         return;
@@ -28,12 +28,12 @@ module.exports = function(app) {
 
       isConnecting = true;
       connectionAttempts++;
-      console.log(`[SETUP-PROXY] 🟥 Attempting to connect to Electron WebSocket server (attempt ${connectionAttempts}/${maxAttempts})...`);
+      console.info(`[SETUP-PROXY] 🟥 Attempting to connect to Electron WebSocket server (attempt ${connectionAttempts}/${maxAttempts})...`);
       
       const ws = new WebSocket('ws://localhost:3001');
       
       ws.on('open', () => {
-        console.log('[SETUP-PROXY] 🟥 Connected to Electron WebSocket server');
+        console.info('[SETUP-PROXY] 🟥 Connected to Electron WebSocket server');
         wsConnection = ws;
         isConnecting = false;
         connectionAttempts = 0; // Reset on successful connection
@@ -55,7 +55,7 @@ module.exports = function(app) {
       });
       
       ws.on('close', () => {
-        console.log('[SETUP-PROXY] 🟥🟥 WebSocket connection closed');
+        console.warn('[SETUP-PROXY] 🟥🟥 WebSocket connection closed');
         wsConnection = null;
         isConnecting = false;
         
@@ -147,7 +147,7 @@ module.exports = function(app) {
   // Initialize connection on startup
   setTimeout(() => {
     connectToElectron().catch(() => {
-      console.log(
+      console.warn(
         "[SETUP-PROXY] 🟥🟥 Initial connection failed, will retry on first request"
       );
     });
