@@ -44,16 +44,16 @@ export const TimerProvider = ({ children }) => {
         api.tray.updateTimerStatus(timerData);
       }
     } catch (error) {
-      console.error('[RENDER->TimerContext] Error updating tray status:', error);
+      console.error('[RNDR->TimerContext] Error updating tray status:', error);
     }
   }, [waitForReady]);
 
   // Check for active timer on initialization
   const checkActiveTimer = useCallback(async () => {
-    // console.log('[RENDER->TimerContext] Checking for active timer...');
+    // console.log('[RNDR->TimerContext] Checking for active timer...');
     // Don't check if we already have an active timer running
     if (isRunning && activeTimer) {
-      // console.log('[RENDER->TimerContext] Skipping check - timer already running');
+      // console.log('[RNDR->TimerContext] Skipping check - timer already running');
       return;
     }
     
@@ -63,25 +63,25 @@ export const TimerProvider = ({ children }) => {
         const timer = await api.invoke('db:getActiveTimer');
         
         if (timer) {
-          console.log('[RENDER->TimerContext] Found active timer:', timer);
+          console.log('[RNDR->TimerContext] Found active timer:', timer);
           setActiveTimer(timer);
           setIsRunning(true);
           
           // Calculate elapsed time using the correct Prisma field names
           try {
             const startTime = new Date(timer.startTime); // Changed from timer.start_time
-            console.log('[RENDER->TimerContext] Start time:', timer.startTime, 'Parsed:', startTime);
+            console.log('[RNDR->TimerContext] Start time:', timer.startTime, 'Parsed:', startTime);
             
             if (isNaN(startTime.getTime())) {
-              console.error('[RENDER->TimerContext] Invalid start time, defaulting to 0');
+              console.error('[RNDR->TimerContext] Invalid start time, defaulting to 0');
               setTime(0);
             } else {
               const elapsed = Math.floor((new Date() - startTime) / 1000);
-              console.log('[RENDER->TimerContext] Calculated elapsed time:', elapsed, 'seconds');
+              console.log('[RNDR->TimerContext] Calculated elapsed time:', elapsed, 'seconds');
               setTime(elapsed);
             }
           } catch (error) {
-            console.error('[RENDER->TimerContext] Error calculating elapsed time:', error);
+            console.error('[RNDR->TimerContext] Error calculating elapsed time:', error);
             setTime(0);
           }
           
@@ -92,11 +92,11 @@ export const TimerProvider = ({ children }) => {
             try {
               if (timer.client) {
                 // Client is already included in the relation
-                console.log('[RENDER->TimerContext] Using included client:', timer.client);
+                console.log('[RNDR->TimerContext] Using included client:', timer.client);
                 setSelectedClient(timer.client);
               } else if (timer.clientId) {
                 // Need to load client by ID
-                console.log('[RENDER->TimerContext] Loading client by ID:', timer.clientId);
+                console.log('[RNDR->TimerContext] Loading client by ID:', timer.clientId);
                 const clients = await api.invoke('db:getClients');
                 const client = clients.find(c => c.id === timer.clientId);
                 if (client) {
@@ -104,7 +104,7 @@ export const TimerProvider = ({ children }) => {
                 }
               }
             } catch (error) {
-              console.error('[RENDER->TimerContext] Error loading client for timer:', error);
+              console.error('[RNDR->TimerContext] Error loading client for timer:', error);
             }
           }
           
@@ -118,7 +118,7 @@ export const TimerProvider = ({ children }) => {
             startTime: timer.startTime
           });
         } else {
-          console.log('[RENDER->TimerContext] No active timer found');
+          console.log('[RNDR->TimerContext] No active timer found');
           // Only reset if we don't currently have a running timer
           if (!isRunning) {
             setIsRunning(false);
@@ -128,7 +128,7 @@ export const TimerProvider = ({ children }) => {
         }
       }
     } catch (error) {
-      console.error('[RENDER->TimerContext] Error waiting for electronAPI:', error);
+      console.error('[RNDR->TimerContext] Error waiting for electronAPI:', error);
     }
   }, [isRunning, activeTimer, waitForReady, updateTrayStatus]);
 
@@ -176,7 +176,7 @@ export const TimerProvider = ({ children }) => {
   }, [recalcElapsed]);
 
   const startTimer = useCallback(async (timerData = {}, timerDescription = '') => {
-    console.log('[RENDER->TimerContext] Starting timer with data:', timerData, 'description:', timerDescription);
+    console.log('[RNDR->TimerContext] Starting timer with data:', timerData, 'description:', timerDescription);
     
     try {
       const api = await waitForReady();
@@ -195,7 +195,7 @@ export const TimerProvider = ({ children }) => {
         });
         
         if (timer) {
-          console.log('[RENDER->TimerContext] Timer started successfully:', timer);
+          console.log('[RNDR->TimerContext] Timer started successfully:', timer);
           setActiveTimer(timer);
           setIsRunning(true);
           setTime(0);
@@ -210,7 +210,7 @@ export const TimerProvider = ({ children }) => {
                 setSelectedClient(client);
               }
             } catch (error) {
-              console.error('[RENDER->TimerContext] Error loading client:', error);
+              console.error('[RNDR->TimerContext] Error loading client:', error);
             }
           } else {
             setSelectedClient(null);
@@ -225,7 +225,7 @@ export const TimerProvider = ({ children }) => {
                 setSelectedProject(project);
               }
             } catch (error) {
-              console.error('[RENDER->TimerContext] Error loading project:', error);
+              console.error('[RNDR->TimerContext] Error loading project:', error);
             }
           } else {
             setSelectedProject(null);
@@ -240,7 +240,7 @@ export const TimerProvider = ({ children }) => {
                 setSelectedTask(task);
               }
             } catch (error) {
-              console.error('[RENDER->TimerContext] Error loading task:', error);
+              console.error('[RNDR->TimerContext] Error loading task:', error);
             }
           } else {
             setSelectedTask(null);
@@ -275,17 +275,17 @@ export const TimerProvider = ({ children }) => {
         throw new Error('electronAPI not available');
       }
     } catch (error) {
-      console.error('[RENDER->TimerContext] Error starting timer:', error);
+      console.error('[RNDR->TimerContext] Error starting timer:', error);
       throw error;
     }
   }, [waitForReady, updateTrayStatus]);
 
   const stopTimer = useCallback(async (roundTo = 15) => {
-    console.log('[RENDER->TimerContext] Stopping timer, roundTo:', roundTo);
+    console.log('[RNDR->TimerContext] Stopping timer, roundTo:', roundTo);
     
     // Prevent multiple simultaneous stop operations
     if (isStoppingTimer) {
-      console.log('[RENDER->TimerContext] Timer stop already in progress, skipping');
+      console.log('[RNDR->TimerContext] Timer stop already in progress, skipping');
       return;
     }
     
@@ -300,34 +300,34 @@ export const TimerProvider = ({ children }) => {
       
       // If we still don't have an active timer, try to get it directly from the database
       if (!currentActiveTimer) {
-        console.log('[RENDER->TimerContext] No active timer in state, checking database directly...');
+        console.log('[RNDR->TimerContext] No active timer in state, checking database directly...');
         try {
           const api = await waitForReady();
           if (api && api.invoke) {
             currentActiveTimer = await api.invoke('db:getActiveTimer');
             if (currentActiveTimer) {
-              console.log('[RENDER->TimerContext] Found active timer in database:', currentActiveTimer);
+              console.log('[RNDR->TimerContext] Found active timer in database:', currentActiveTimer);
               // Update state with the found timer
               setActiveTimer(currentActiveTimer);
               setIsRunning(true);
             }
           }
         } catch (error) {
-          console.error('[RENDER->TimerContext] Error getting active timer from database:', error);
+          console.error('[RNDR->TimerContext] Error getting active timer from database:', error);
         }
       }
       
       if (!currentActiveTimer) {
-        console.log('[RENDER->TimerContext] No active timer to stop');
+        console.log('[RNDR->TimerContext] No active timer to stop');
         return;
       }
       
-      console.log('[RENDER->TimerContext] Stopping timer:', currentActiveTimer.id);
+      console.log('[RNDR->TimerContext] Stopping timer:', currentActiveTimer.id);
       
       const api = await waitForReady();
       if (api && api.invoke) {
         const stoppedEntry = await api.invoke('db:stopTimer', currentActiveTimer.id, roundTo);
-        console.log('[RENDER->TimerContext] Timer stopped successfully:', stoppedEntry);
+        console.log('[RNDR->TimerContext] Timer stopped successfully:', stoppedEntry);
         
         // Only clear state after successful database operation
         setActiveTimer(null);
@@ -349,7 +349,7 @@ export const TimerProvider = ({ children }) => {
         return stoppedEntry;
       }
     } catch (error) {
-      console.error('[RENDER->TimerContext] Error stopping timer:', error);
+      console.error('[RNDR->TimerContext] Error stopping timer:', error);
       // Don't throw error anymore since we made stopTimer more forgiving
       // Just clear the timer state to prevent UI inconsistencies, but keep selection
       setActiveTimer(null);
@@ -372,21 +372,21 @@ export const TimerProvider = ({ children }) => {
       try {
         const api = await waitForReady();
         if (api && api.timeEntries) {
-          console.log('[RENDER->TimerContext] Updating timer description in database:', newDescription);
+          console.log('[RNDR->TimerContext] Updating timer description in database:', newDescription);
           await api.timeEntries.update(activeTimer.id, {
             description: newDescription
           });
-          console.log('[RENDER->TimerContext] Timer description updated successfully');
+          console.log('[RNDR->TimerContext] Timer description updated successfully');
         }
       } catch (error) {
-        console.error('[RENDER->TimerContext] Error updating timer description:', error);
+        console.error('[RNDR->TimerContext] Error updating timer description:', error);
         // Don't throw the error to avoid disrupting the UI
       }
     }
   };
 
   const updateTimerClient = async (client) => {
-    console.log('[RENDER->TimerContext] Updating timer client to:', client);
+    console.log('[RNDR->TimerContext] Updating timer client to:', client);
     setSelectedClient(client);
     
     // If there's an active timer, update it in the database
@@ -397,7 +397,7 @@ export const TimerProvider = ({ children }) => {
           const updatedTimer = await api.invoke('db:updateTimeEntry', activeTimer.id, {
             clientId: client ? client.id : null
           });
-          console.log('[RENDER->TimerContext] Timer client updated in database:', updatedTimer);
+          console.log('[RNDR->TimerContext] Timer client updated in database:', updatedTimer);
           
           // Update the activeTimer state with the new client info
           setActiveTimer(prevTimer => ({
@@ -407,7 +407,7 @@ export const TimerProvider = ({ children }) => {
           }));
         }
       } catch (error) {
-        console.error('[RENDER->TimerContext] Error updating timer client:', error);
+        console.error('[RNDR->TimerContext] Error updating timer client:', error);
         // If database update fails, revert the client selection
         throw error;
       }
@@ -415,7 +415,7 @@ export const TimerProvider = ({ children }) => {
   };
 
   const updateTimerTask = async (task) => {
-    console.log('[RENDER->TimerContext] Updating timer task to:', task);
+    console.log('[RNDR->TimerContext] Updating timer task to:', task);
     
     // Update the selected task state
     setSelectedTask(task);
@@ -428,7 +428,7 @@ export const TimerProvider = ({ children }) => {
           const updatedTimer = await api.invoke('db:updateTimeEntry', activeTimer.id, {
             taskId: task ? task.id : null
           });
-          console.log('[RENDER->TimerContext] Timer task updated in database:', updatedTimer);
+          console.log('[RNDR->TimerContext] Timer task updated in database:', updatedTimer);
           
           // Update the activeTimer state with the new task info
           setActiveTimer(prevTimer => ({
@@ -438,14 +438,14 @@ export const TimerProvider = ({ children }) => {
           }));
         }
       } catch (error) {
-        console.error('[RENDER->TimerContext] Error updating timer task:', error);
+        console.error('[RNDR->TimerContext] Error updating timer task:', error);
         throw error;
       }
     }
   };
 
   const updateTimerProject = async (project) => {
-    console.log('[RENDER->TimerContext] Updating timer project to:', project);
+    console.log('[RNDR->TimerContext] Updating timer project to:', project);
     
     // Update the selected project state and clear task when project changes
     setSelectedProject(project);
@@ -460,7 +460,7 @@ export const TimerProvider = ({ children }) => {
             // Ensure task is cleared if project changes
             taskId: null
           });
-          console.log('[RENDER->TimerContext] Timer project updated in database:', updatedTimer);
+          console.log('[RNDR->TimerContext] Timer project updated in database:', updatedTimer);
           setActiveTimer(prevTimer => ({
             ...prevTimer,
             projectId: project ? project.id : null,
@@ -469,7 +469,7 @@ export const TimerProvider = ({ children }) => {
           }));
         }
       } catch (error) {
-        console.error('[RENDER->TimerContext] Error updating timer project:', error);
+        console.error('[RNDR->TimerContext] Error updating timer project:', error);
         throw error;
       }
     }
@@ -521,14 +521,14 @@ export const TimerProvider = ({ children }) => {
       const api = await waitForReady();
       if (api && api.on) {
         const handleTrayStartTimer = () => {
-          console.log('[RENDER->TimerContext] Start timer requested from tray');
+          console.log('[RNDR->TimerContext] Start timer requested from tray');
           // Emit event that components can listen to show timer modal
           const event = new CustomEvent('show-timer-modal');
           window.dispatchEvent(event);
         };
         
         const handleTrayStopTimer = async () => {
-          console.log('[RENDER->TimerContext] Stop timer requested from tray');
+          console.log('[RNDR->TimerContext] Stop timer requested from tray');
           // stopTimer now handles finding the active timer internally
           try {
             await stopTimer(15); // Use default rounding
@@ -536,12 +536,12 @@ export const TimerProvider = ({ children }) => {
             const refreshEvent = new CustomEvent('refresh-time-entries');
             window.dispatchEvent(refreshEvent);
           } catch (error) {
-            console.error('[RENDER->TimerContext] Error stopping timer from tray:', error);
+            console.error('[RNDR->TimerContext] Error stopping timer from tray:', error);
           }
         };
         
         const handleTrayQuickStartTimer = async (event, data) => {
-          console.log('[RENDER->TimerContext] Quick start timer from tray:', data);
+          console.log('[RNDR->TimerContext] Quick start timer from tray:', data);
           if (data && data.clientId) {
             try {
               await startTimer({
@@ -549,13 +549,13 @@ export const TimerProvider = ({ children }) => {
                 description: `Quick timer for ${data.clientName}`
               });
             } catch (error) {
-              console.error('[RENDER->TimerContext] Error quick starting timer:', error);
+              console.error('[RNDR->TimerContext] Error quick starting timer:', error);
             }
           }
         };
         
         const handleTrayShowTimerSetup = () => {
-          console.log('[RENDER->TimerContext] Show timer setup from tray');
+          console.log('[RNDR->TimerContext] Show timer setup from tray');
           const event = new CustomEvent('show-timer-modal');
           window.dispatchEvent(event);
         };
@@ -567,11 +567,11 @@ export const TimerProvider = ({ children }) => {
         api.on('tray-show-timer-setup', handleTrayShowTimerSetup);
         
         trayListenersSetup.current = true;
-        console.log('[RENDER->TimerContext] Tray event listeners setup complete');
+        console.log('[RNDR->TimerContext] Tray event listeners setup complete');
         
         // Cleanup listeners on unmount
         return () => {
-          console.log('[RENDER->TimerContext] Cleaning up tray event listeners');
+          console.log('[RNDR->TimerContext] Cleaning up tray event listeners');
           api.removeListener('tray-start-timer', handleTrayStartTimer);
           api.removeListener('tray-stop-timer', handleTrayStopTimer);
           api.removeListener('tray-quick-start-timer', handleTrayQuickStartTimer);

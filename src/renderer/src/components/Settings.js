@@ -11,8 +11,15 @@ import {
   Button,
   Input,
   Label,
-  Select
+  Select,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalTitle,
+  ModalCloseButton
 } from './ui';
+import { useModalKeyboard } from '../hooks/useModalKeyboard';
+import { colors } from '../styles/theme';
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -30,6 +37,8 @@ const Settings = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [showClearDataModal, setShowClearDataModal] = useState(false);
+  const [confirmationText, setConfirmationText] = useState('');
   const isDev = process.env.NODE_ENV !== 'production';
 
   // Updater state (macOS only, but harmless elsewhere)
@@ -45,6 +54,35 @@ const Settings = () => {
   // Install state management
   const [isInstalling, setIsInstalling] = useState(false);
   const [installStartTime, setInstallStartTime] = useState(null);
+
+  // Modal keyboard handling
+  useModalKeyboard({
+    isOpen: showClearDataModal,
+    onClose: () => {
+      setShowClearDataModal(false);
+      setConfirmationText('');
+    },
+    onSubmit: async () => {
+      if (confirmationText !== 'yes, clear all data') {
+        alert('Please type the exact confirmation text: "yes, clear all data"');
+        return;
+      }
+      try {
+        setIsRemoving(true);
+        await window.electronAPI.invoke('db:removeDemoData');
+        setShowClearDataModal(false);
+        setConfirmationText('');
+        alert('All data cleared successfully.');
+        navigate('/');
+      } catch (e) {
+        console.error('Failed to clear all data:', e);
+        alert('Failed to clear all data. See console for details.');
+      } finally {
+        setIsRemoving(false);
+      }
+    },
+    formData: { confirmationText }
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -491,21 +529,9 @@ const Settings = () => {
             </div>
             <Button
               variant="danger"
-              onClick={async () => {
+              onClick={() => {
                 if (isRemoving) return;
-                const ok = window.confirm('Reset all data? This will delete all sample clients, projects, tasks, time entries, and invoices. Settings will be kept. This cannot be undone.');
-                if (!ok) return;
-                try {
-                  setIsRemoving(true);
-                  await window.electronAPI.invoke('db:removeDemoData');
-                  alert('All data removed.');
-                  navigate('/');
-                } catch (e) {
-                  console.error('Failed to remove all data:', e);
-                  alert('Failed to remove all data. See console for details.');
-                } finally {
-                  setIsRemoving(false);
-                }
+                setShowClearDataModal(true);
               }}
               disabled={isRemoving}
             >
@@ -538,6 +564,86 @@ const Settings = () => {
           </FlexBox>
         </Card>
       </FlexBox>
+
+      {/* Clear All Data Confirmation Modal */}
+      {showClearDataModal && (
+        <Modal onClick={() => {
+          setShowClearDataModal(false);
+          setConfirmationText('');
+        }}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>Clear All Data</ModalTitle>
+              <ModalCloseButton onClick={() => {
+                setShowClearDataModal(false);
+                setConfirmationText('');
+              }} />
+            </ModalHeader>
+            <div style={{ padding: '20px' }}>
+              <p style={{ marginBottom: '20px', color: colors.danger }}>
+                <strong>Warning:</strong> This will permanently delete all clients, projects, tasks, time entries, and invoices. 
+                This action cannot be undone.
+              </p>
+              <p style={{ marginBottom: '15px' }}>
+                To confirm, please type: <strong>yes, clear all data</strong>
+              </p>
+              <input
+                type="text"
+                value={confirmationText}
+                onChange={(e) => setConfirmationText(e.target.value)}
+                placeholder="Type confirmation text..."
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginBottom: '20px',
+                  border: `1px solid ${colors.secondary}`,
+                  borderRadius: '4px',
+                  backgroundColor: colors.bgSecondary,
+                  color: colors.textPrimary,
+                  fontSize: '14px'
+                }}
+                autoFocus
+              />
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowClearDataModal(false);
+                    setConfirmationText('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={async () => {
+                    if (confirmationText !== 'yes, clear all data') {
+                      alert('Please type the exact confirmation text: "yes, clear all data"');
+                      return;
+                    }
+                    try {
+                      setIsRemoving(true);
+                      await window.electronAPI.invoke('db:removeDemoData');
+                      setShowClearDataModal(false);
+                      setConfirmationText('');
+                      alert('All data cleared successfully.');
+                      navigate('/');
+                    } catch (e) {
+                      console.error('Failed to clear all data:', e);
+                      alert('Failed to clear all data. See console for details.');
+                    } finally {
+                      setIsRemoving(false);
+                    }
+                  }}
+                  disabled={isRemoving || confirmationText !== 'yes, clear all data'}
+                >
+                  {isRemoving ? 'Clearing...' : 'Clear All Data'}
+                </Button>
+              </div>
+            </div>
+          </ModalContent>
+        </Modal>
+      )}
     </Container>
   );
 };

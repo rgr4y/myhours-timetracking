@@ -358,14 +358,14 @@ const TimeEntries = () => {
           setRoundTo(parseInt(settingsData.timer_rounding));
         }
 
-        console.log('All data loaded:', {
+        console.log('[RNDR->TimeEntries] All data loaded:', {
           clients: clientsWithRelationships?.length || 0,
           projects: allProjects.length,
           tasks: allTasks.length,
           timeEntries: timeEntriesData?.length || 0
         });
       } catch (error) {
-        console.error('Error loading data:', error);
+        console.error('[RNDR->TimeEntries] Error loading data:', error);
       }
     }
   }, [waitForReady]);
@@ -434,7 +434,7 @@ const TimeEntries = () => {
   // Sync with TimerContext when timer stops (preserve selectedClient/description)
   useEffect(() => {
     if (!activeTimer && selectedClient) {
-      console.log('[TimeEntries] Timer stopped, syncing preserved client:', selectedClient);
+      console.log('[RNDR->TimeEntries] Timer stopped, syncing preserved client:', selectedClient);
       setLocalSelectedClient(selectedClient);
     }
   }, [activeTimer, selectedClient]);
@@ -442,7 +442,7 @@ const TimeEntries = () => {
   // Sync description when timer stops
   useEffect(() => {
     if (!activeTimer && description) {
-      console.log('[TimeEntries] Timer stopped, syncing preserved description:', description);
+      console.log('[RNDR->TimeEntries] Timer stopped, syncing preserved description:', description);
       setLocalDescription(description);
     }
   }, [activeTimer, description]);
@@ -450,7 +450,7 @@ const TimeEntries = () => {
   // Sync project when timer stops
   useEffect(() => {
     if (!activeTimer && selectedProject) {
-      console.log('[TimeEntries] Timer stopped, syncing preserved project:', selectedProject);
+      console.log('[RNDR->TimeEntries] Timer stopped, syncing preserved project:', selectedProject);
       setLocalSelectedProject(selectedProject);
     }
   }, [activeTimer, selectedProject]);
@@ -458,7 +458,7 @@ const TimeEntries = () => {
   // Sync task when timer stops  
   useEffect(() => {
     if (!activeTimer && selectedTask) {
-      console.log('[TimeEntries] Timer stopped, syncing preserved task:', selectedTask);
+      console.log('[RNDR->TimeEntries] Timer stopped, syncing preserved task:', selectedTask);
       setLocalSelectedTask(selectedTask);
     }
   }, [activeTimer, selectedTask]);
@@ -503,7 +503,7 @@ const TimeEntries = () => {
         try {
           const api = await waitForReady();
           if (api) {
-            console.log('[TimeEntries] Attempting to restore last used client/project/task...');
+            console.log('[RNDR->TimeEntries] Attempting to restore last used client/project/task...');
             
             const [lastClient, lastProject, lastTask] = await Promise.all([
               api.settings.getLastUsedClient(),
@@ -511,31 +511,31 @@ const TimeEntries = () => {
               api.settings.getLastUsedTask()
             ]);
             
-            // console.log('[TimeEntries] Last used values:', JSON.stringify({ lastClient, lastProject, lastTask }, null, 2));
+            // console.log('[RNDR->TimeEntries] Last used values:', JSON.stringify({ lastClient, lastProject, lastTask }, null, 2));
             
             if (lastClient) {
               const clientExists = clients.some(c => c.id === lastClient.id);
-              // console.log('[TimeEntries] Client exists:', clientExists);
+              // console.log('[RNDR->TimeEntries] Client exists:', clientExists);
               
               if (clientExists) {
-                // console.log('[TimeEntries] Restored last client:', lastClient.name);
+                // console.log('[RNDR->TimeEntries] Restored last client:', lastClient.name);
                 setLocalSelectedClient(lastClient);
                 
                 // Since we have all data loaded, we can directly check and set
                 if (lastProject) {
                   const projectExists = projects.some(p => p.id === lastProject.id && p.clientId === lastClient.id);
-                  // console.log('[TimeEntries] Project exists:', projectExists);
+                  // console.log('[RNDR->TimeEntries] Project exists:', projectExists);
                   
                   if (projectExists) {
-                    // console.log('[TimeEntries] Restored last project:', lastProject.name);
+                    // console.log('[RNDR->TimeEntries] Restored last project:', lastProject.name);
                     setLocalSelectedProject(lastProject);
                     
                     if (lastTask) {
                       const taskExists = tasks.some(t => t.id === lastTask.id && t.projectId === lastProject.id);
-                      // console.log('[TimeEntries] Task exists:', taskExists);
+                      // console.log('[RNDR->TimeEntries] Task exists:', taskExists);
 
                       if (taskExists) {
-                        // console.log('[TimeEntries] Restored last task:', lastTask.name);
+                        // console.log('[RNDR->TimeEntries] Restored last task:', lastTask.name);
                         setLocalSelectedTask(lastTask);
                       }
                     }
@@ -587,22 +587,22 @@ const TimeEntries = () => {
   // Listen for events
   useEffect(() => {
     const handleShowTimerModal = () => {
-      console.log('[TimeEntries] Show timer modal requested from tray');
+      console.log('[RNDR->TimeEntries] Show timer modal requested from tray');
       setShowModal(true);
     };
 
     const handleRefreshTimeEntries = () => {
-      console.log('[TimeEntries] Refresh time entries requested');
+      console.log('[RNDR->TimeEntries] Refresh time entries requested');
       loadTimeEntries();
     };
 
     const handleTimerStarted = () => {
-      console.log('[TimeEntries] Timer started - refreshing time entries');
+      console.log('[RNDR->TimeEntries] Timer started - refreshing time entries');
       loadTimeEntries();
     };
 
     const handleTimerStopped = () => {
-      console.log('[TimeEntries] Timer stopped - refreshing time entries');
+      console.log('[RNDR->TimeEntries] Timer stopped - refreshing time entries');
       loadTimeEntries();
     };
 

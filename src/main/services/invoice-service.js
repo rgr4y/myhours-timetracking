@@ -128,12 +128,15 @@ class InvoiceGenerator {
         totalAmount: totalAmount.toFixed(2)
       };
 
-      // Generate PDF
-      const pdfPath = await this.generatePDF(templateData);
-      
-      // Mark entries as invoiced and save template data
+      // Mark entries as invoiced first to get the invoice ID
       const entryIds = timeEntries.map(entry => entry.id);
-      await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber, templateData);
+      const createdInvoice = await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber, templateData);
+      
+      // Update templateData with the invoice ID for filename generation
+      templateData.invoiceId = createdInvoice.id;
+
+      // Generate PDF with correct filename including invoice ID
+      const pdfPath = await this.generatePDF(templateData);
 
       return pdfPath;
     } catch (error) {
@@ -243,12 +246,15 @@ class InvoiceGenerator {
         totalAmount: totalAmount.toFixed(2)
       };
 
-      // Generate PDF
-      const pdfPath = await this.generatePDF(templateData);
-      
-      // Mark entries as invoiced and save template data
+      // Mark entries as invoiced first to get the invoice ID
       const entryIds = timeEntries.map(entry => entry.id);
-      await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber, templateData);
+      const createdInvoice = await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber, templateData);
+      
+      // Update templateData with the invoice ID for filename generation
+      templateData.invoiceId = createdInvoice.id;
+
+      // Generate PDF with correct filename including invoice ID
+      const pdfPath = await this.generatePDF(templateData);
 
       return pdfPath;
     } catch (error) {
@@ -326,12 +332,155 @@ class InvoiceGenerator {
     }
   }
 
+  // Regenerate invoice: void old one and create new from current time entries
+  async regenerateInvoice(invoiceId) {
+    try {
+      // Get the existing invoice
+      const existingInvoice = await this.database.getInvoiceById(invoiceId);
+      if (!existingInvoice) {
+        throw new Error('Invoice not found');
+      }
+      
+      // Void the old invoice
+      await this.database.voidInvoice(invoiceId);
+      
+      // Un-invoice the time entries so they can be re-invoiced
+      const entryIds = existingInvoice.timeEntries.map(entry => entry.id);
+      await this.database.unmarkAsInvoiced(entryIds);
+      
+      // Get current settings for company info
+      const settings = await this.database.getSettings();
+      
+      // Get fresh time entries for the same period and client
+      const timeEntries = await this.database.getTimeEntries({
+        clientId: existingInvoice.clientId,
+        startDate: existingInvoice.periodStart,
+        endDate: existingInvoice.periodEnd,
+        isInvoiced: false
+      });
+
+      if (timeEntries.length === 0) {
+        throw new Error('No uninvoiced time entries found for regeneration');
+      }
+
+      // Validate that all entries have hourly rates
+      const missingRates = [];
+      let totalAmount = 0;
+      
+      for (const entry of timeEntries) {
+        const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
+        
+        if (!hourlyRate || hourlyRate <= 0) {
+          missingRates.push({
+            entryId: entry.id,
+            clientName: entry.client?.name || 'Unknown Client',
+            projectName: entry.project?.name || 'No Project',
+            date: new Date(entry.startTime).toLocaleDateString()
+          });
+        } else {
+          const hours = (entry.duration || 0) / 60;
+          totalAmount += hours * hourlyRate;
+        }
+      }
+      
+      if (missingRates.length > 0) {
+        const errorDetails = missingRates.map(mr => 
+          `• ${mr.date} - ${mr.clientName}/${mr.projectName}`
+        ).join('\n');
+        
+        throw new Error(`Cannot regenerate invoice: The following time entries have no hourly rate set:\n\n${errorDetails}\n\nPlease set hourly rates for the client or project before regenerating.`);
+      }
+
+      // Group entries by day and combine descriptions
+      const lineItems = this.groupEntriesByDay(timeEntries);
+      
+      // Calculate totals with proper hourly rates
+      const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 60;
+      
+      // Get the first entry's client info for the invoice header
+      const clientInfo = timeEntries[0]?.client;
+      
+      // For display, use the most common hourly rate or indicate "varies"
+      const rates = timeEntries.map(entry => entry.project?.hourlyRate || entry.client?.hourlyRate).filter(Boolean);
+      const uniqueRates = [...new Set(rates)];
+      const displayRate = uniqueRates.length === 1 ? uniqueRates[0] : null;
+
+      // Determine actual period from the entries
+      const periodStartDisplay = this.getOldestEntryDate(timeEntries);
+      const periodEndDisplay = this.getNewestEntryDate(timeEntries);
+
+      // Prepare template data (keep same invoice number as original)
+      const templateData = {
+        companyName: settings.company_name || settings.companyName || 'Your Company',
+        companyEmail: settings.company_email || settings.companyEmail || '',
+        companyPhone: settings.company_phone || settings.companyPhone || '',
+        companyWebsite: settings.company_website || settings.companyWebsite || '',
+        invoiceNumber: existingInvoice.invoiceNumber, // Keep same invoice number
+        invoiceDate: new Date().toLocaleDateString(),
+        terms: settings.invoice_terms || settings.invoiceTerms || 'Net 30',
+        dueDate: (() => {
+          const days = this.parseNetDays(settings.invoice_terms || settings.invoiceTerms || 'Net 30');
+          const d = new Date();
+          d.setDate(d.getDate() + days);
+          return d.toLocaleDateString();
+        })(),
+        // Show the true invoice period based on included entries
+        periodStart: periodStartDisplay,
+        periodEnd: periodEndDisplay,
+        clientName: clientInfo?.name || 'Unknown Client',
+        clientEmail: clientInfo?.email || '',
+        lineItems: lineItems,
+        totalHours: totalHours.toFixed(2),
+        hourlyRate: displayRate ? displayRate.toFixed(2) : 'Varies',
+        totalAmount: totalAmount.toFixed(2)
+      };
+
+      // Mark entries as invoiced first to get the new invoice ID
+      const newEntryIds = timeEntries.map(entry => entry.id);
+      const newInvoice = await this.database.markAsInvoiced(newEntryIds, templateData.invoiceNumber, templateData);
+      
+      // Update templateData with the new invoice ID for filename generation
+      templateData.invoiceId = newInvoice.id;
+
+      // Generate PDF with correct filename including new invoice ID
+      const pdfPath = await this.generatePDF(templateData);
+
+      return pdfPath;
+    } catch (error) {
+      console.error('Error regenerating invoice:', error);
+      throw error;
+    }
+  }
+
+  // Generate PDF directly from stored template data - used for View button  
+  async generatePDFFromStoredData(invoice) {
+    try {
+      if (!invoice.data) {
+        throw new Error('No template data found for this invoice');
+      }
+      
+      // Parse stored template data
+      const templateData = JSON.parse(invoice.data);
+      
+      // Ensure the invoice ID is included for filename generation
+      templateData.invoiceId = invoice.id;
+      
+      // Generate PDF directly to temp file without user dialog
+      const filePath = await this.generatePDFToFile(templateData);
+      
+      return filePath;
+    } catch (error) {
+      console.error('Error generating PDF from stored data:', error);
+      throw error;
+    }
+  }
+
   // Generate PDF directly to temp file without user dialog - used for automated invoice operations
   async generatePDFToFile(templateData) {
     const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
     const html = template(templateData);
     const buffer = await this.renderHtmlToPdf(html);
-    const filename = this.createInvoiceFilename(templateData.clientName, templateData.invoiceNumber, true);
+    const filename = this.createInvoiceFilename(templateData.clientName, templateData.invoiceNumber, templateData.invoiceId, true);
     const tempPath = path.join(os.tmpdir(), filename);
     fs.writeFileSync(tempPath, buffer);
     return tempPath;
@@ -396,7 +545,7 @@ class InvoiceGenerator {
   async generatePDF(templateData) {
     const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
     const html = template(templateData);
-    const defaultFilename = this.createInvoiceFilename(templateData.clientName, templateData.invoiceNumber);
+    const defaultFilename = this.createInvoiceFilename(templateData.clientName, templateData.invoiceNumber, templateData.invoiceId);
     const result = await dialog.showSaveDialog({
       defaultPath: defaultFilename,
       filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
@@ -428,19 +577,21 @@ class InvoiceGenerator {
   }
 
   // Centralized invoice filename creation with sanitized client name
-  createInvoiceFilename(clientName, invoiceNumber, includeTimestamp = false) {
-    // Sanitize client name: remove non-filename friendly characters, replace hyphens, truncate to 25 chars
+  createInvoiceFilename(clientName, invoiceNumber, invoiceId = null, includeTimestamp = false) {
+    // Sanitize client name: strip non-filename friendly chars, replace spaces with ., dashes with .
     const sanitizedClientName = clientName
       .trim() // Trim first to handle whitespace-only strings
       .replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename characters
-      .replace(/[-]/g, '') // Remove hyphens as requested
-      .replace(/\s+/g, '_') // Replace spaces with underscores
-      .substring(0, 25) // Truncate to 25 characters
+      .replace(/\s+/g, '.') // Replace spaces with dots
+      .replace(/[-]/g, '.') // Replace dashes with dots
+      .substring(0, 30) // Truncate to 30 characters for better readability
     
-    const finalClientName = sanitizedClientName || 'Unknown_Client'; // Fallback if empty after sanitization
+    const finalClientName = sanitizedClientName || 'Unknown.Client'; // Fallback if empty after sanitization
     
+    // Include invoice number and database ID if available
+    const invoiceIdentifier = invoiceId ? `${invoiceNumber}-${invoiceId}` : invoiceNumber;
     const timestamp = includeTimestamp ? `-${Date.now()}` : '';
-    return `Invoice-${finalClientName}-${invoiceNumber}${timestamp}.pdf`;
+    return `Invoice-${finalClientName}-${invoiceIdentifier}${timestamp}.pdf`;
   }
 
   getOldestEntryDate(entries) {

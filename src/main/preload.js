@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-console.info('[PRELOAD] Script executing...');
+console.info('[RNDR->PRELOAD] Script executing...');
 
 // Constants
 const VALID_TRAY_CHANNELS = [
@@ -88,7 +88,7 @@ const api = {
   
   timeEntries: {
     getAll: (filters = {}) => {
-      console.log('[PRELOAD] timeEntries.getAll called with filters:', filters);
+      console.log('[RNDR->PRELOAD] timeEntries.getAll called with filters:', filters);
       return ipcRenderer.invoke('db:getTimeEntries', filters);
     },
     create: (entry) => ipcRenderer.invoke('db:createTimeEntry', entry),
@@ -118,6 +118,8 @@ const api = {
     generate: (data) => ipcRenderer.invoke('invoice:generate', data),
     generateFromSelected: (data) => ipcRenderer.invoke('invoice:generateFromSelected', data),
     download: (id) => ipcRenderer.invoke('invoice:download', id),
+    view: (id) => ipcRenderer.invoke('invoice:view', id),
+    regenerate: (id) => ipcRenderer.invoke('invoice:regenerate', id),
     delete: (id) => ipcRenderer.invoke('db:deleteInvoice', id)
   },
   
@@ -195,9 +197,9 @@ if (!isDev) {
 contextBridge.exposeInMainWorld('electronAPI', api);
 
 if (isDev) {
-  console.log('[PRELOAD] electronAPI exposed successfully');
+  console.log('[RNDR->PRELOAD] electronAPI exposed successfully');
 
   setTimeout(() => {
-    console.log("[PRELOAD] ✅ electronAPI exposed and ready");
+    console.log("[RNDR->PRELOAD] ✅ electronAPI exposed and ready");
   }, 10);
 }

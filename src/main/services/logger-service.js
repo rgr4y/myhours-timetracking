@@ -165,7 +165,7 @@ class LoggerService {
   }
 
   renderer(level, message, meta = {}) {
-    this.getLogger()[level](`[RENDERER] ${message}`, meta);
+    this.getLogger()[level](`[RNDR] ${message}`, meta);
   }
 
   // Helper methods for common log levels

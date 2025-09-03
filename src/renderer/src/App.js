@@ -3,7 +3,7 @@ import { HashRouter as Router, Routes, Route, useNavigate, useLocation, Navigate
 import styled, { createGlobalStyle } from 'styled-components';
 import './App.css';
 import { TimerProvider } from './context/TimerContext';
-import { AnimationProvider } from './context/AnimationContext';
+import { AnimationProvider, useAnimations } from './context/AnimationContext';
 import { ToastProvider } from './components/ui/Toast';
 import Sidebar from './components/Sidebar';
 import TimeEntries from './components/TimeEntries';
@@ -116,23 +116,21 @@ const VisibilityHandler = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const timeoutRef = useRef(null);
+  const { pauseAnimations, resumeAnimations } = useAnimations();
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // Window became hidden, start 30-second timer
-        timeoutRef.current = setTimeout(() => {
-          // Navigate to Timer page if not already there
-          if (location.pathname !== '/') {
-            navigate('/');
-          }
-        }, 30000); // 30 seconds
+        console.log('[RNDR->APP] Document hidden - pausing animations');
+        pauseAnimations();
       } else {
-        // Window became visible, clear the timer
+        console.log('[RNDR->APP] Document visible - resuming animations');
+        // Window became visible, clear the timer and resume animations
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
         }
+        resumeAnimations();
       }
     };
 
@@ -160,7 +158,7 @@ const VisibilityHandler = () => {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [navigate, location]);
+  }, [navigate, location, pauseAnimations, resumeAnimations]);
 
   return null; // This component doesn't render anything
 };

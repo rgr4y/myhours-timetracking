@@ -1,6 +1,20 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
+
+// Mock database for testing
+class MockDatabase {
+  async getSettings() { return {} }
+}
 
 describe('Invoice Service - Business Logic', () => {
+  let invoiceGenerator
+  let InvoiceGenerator
+
+  beforeEach(async () => {
+    // Dynamically import the CommonJS module
+    const invoiceModule = await import('../../../src/main/services/invoice-service.js')
+    InvoiceGenerator = invoiceModule.default
+    invoiceGenerator = new InvoiceGenerator(new MockDatabase())
+  })
   describe('Invoice data validation', () => {
     it('should validate invoice data structure', () => {
       const isValidInvoiceData = (data) => {
@@ -197,88 +211,45 @@ describe('Invoice Service - Business Logic', () => {
 
   describe('Invoice filename creation', () => {
     it('should create safe invoice filenames', () => {
-      const createInvoiceFilename = (clientName, invoiceNumber, includeTimestamp = false) => {
-        // Sanitize client name: remove non-filename friendly characters, replace hyphens, truncate to 25 chars
-        const sanitizedClientName = clientName
-          .trim() // Trim first to handle whitespace-only strings
-          .replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename characters
-          .replace(/[-]/g, '') // Remove hyphens as requested
-          .replace(/\s+/g, '_') // Replace spaces with underscores
-          .substring(0, 25) // Truncate to 25 characters
-        
-        const finalClientName = sanitizedClientName || 'Unknown_Client'
-        
-        const timestamp = includeTimestamp ? `-${Date.now()}` : '';
-        return `Invoice-${finalClientName}-${invoiceNumber}${timestamp}.pdf`;
-      }
-      
-      expect(createInvoiceFilename('Test Client', 'INV-001')).toBe('Invoice-Test_Client-INV-001.pdf')
-      expect(createInvoiceFilename('Client/Company', 'INV-002')).toBe('Invoice-ClientCompany-INV-002.pdf')
-      expect(createInvoiceFilename('Client-With-Hyphens', 'INV-003')).toBe('Invoice-ClientWithHyphens-INV-003.pdf')
+      expect(invoiceGenerator.createInvoiceFilename('Test Client', 'INV-001')).toBe('Invoice-Test.Client-INV-001.pdf')
+      expect(invoiceGenerator.createInvoiceFilename('Client/Company', 'INV-002')).toBe('Invoice-ClientCompany-INV-002.pdf')
+      expect(invoiceGenerator.createInvoiceFilename('Client-With-Hyphens', 'INV-003')).toBe('Invoice-Client.With.Hyphens-INV-003.pdf')
+      expect(invoiceGenerator.createInvoiceFilename('Test Client', 'INV-001', 123)).toBe('Invoice-Test.Client-INV-001-123.pdf')
     })
 
     it('should handle special characters in client names', () => {
-      const createInvoiceFilename = (clientName, invoiceNumber, includeTimestamp = false) => {
-        const sanitizedClientName = clientName
-          .trim() // Trim first to handle whitespace-only strings
-          .replace(/[<>:"/\\|?*]/g, '')
-          .replace(/[-]/g, '')
-          .replace(/\s+/g, '_')
-          .substring(0, 25)
-        
-        const finalClientName = sanitizedClientName || 'Unknown_Client'
-        
-        const timestamp = includeTimestamp ? `-${Date.now()}` : '';
-        return `Invoice-${finalClientName}-${invoiceNumber}${timestamp}.pdf`;
-      }
-      
-      expect(createInvoiceFilename('Client<>:"\\|?*Name', 'INV-001')).toBe('Invoice-ClientName-INV-001.pdf')
-      expect(createInvoiceFilename('', 'INV-002')).toBe('Invoice-Unknown_Client-INV-002.pdf')
-      expect(createInvoiceFilename('   ', 'INV-003')).toBe('Invoice-Unknown_Client-INV-003.pdf')
+      expect(invoiceGenerator.createInvoiceFilename('Client<>:"\\|?*Name', 'INV-001')).toBe('Invoice-ClientName-INV-001.pdf')
+      expect(invoiceGenerator.createInvoiceFilename('', 'INV-002')).toBe('Invoice-Unknown.Client-INV-002.pdf')
+      expect(invoiceGenerator.createInvoiceFilename('   ', 'INV-003')).toBe('Invoice-Unknown.Client-INV-003.pdf')
     })
 
-    it('should truncate long client names to 25 characters', () => {
-      const createInvoiceFilename = (clientName, invoiceNumber, includeTimestamp = false) => {
-        const sanitizedClientName = clientName
-          .trim() // Trim first to handle whitespace-only strings
-          .replace(/[<>:"/\\|?*]/g, '')
-          .replace(/[-]/g, '')
-          .replace(/\s+/g, '_')
-          .substring(0, 25)
-        
-        const finalClientName = sanitizedClientName || 'Unknown_Client'
-        
-        const timestamp = includeTimestamp ? `-${Date.now()}` : '';
-        return `Invoice-${finalClientName}-${invoiceNumber}${timestamp}.pdf`;
-      }
-      
-      const longClientName = 'This is a very long client company name that exceeds 25 characters'
-      const result = createInvoiceFilename(longClientName, 'INV-001')
+    it('should truncate long client names to 30 characters', () => {
+      const longClientName = 'This is a very long client company name that exceeds 30 characters'
+      const result = invoiceGenerator.createInvoiceFilename(longClientName, 'INV-001')
       const clientPart = result.split('-')[1] // Extract client part
-      expect(clientPart.length).toBeLessThanOrEqual(25)
-      expect(result).toBe('Invoice-This_is_a_very_long_clien-INV-001.pdf')
+      expect(clientPart.length).toBeLessThanOrEqual(30)
+      expect(result).toBe('Invoice-This.is.a.very.long.client.com-INV-001.pdf')
     })
 
     it('should include timestamp when requested', () => {
-      const createInvoiceFilename = (clientName, invoiceNumber, includeTimestamp = false) => {
-        const sanitizedClientName = clientName
-          .trim() // Trim first to handle whitespace-only strings
-          .replace(/[<>:"/\\|?*]/g, '')
-          .replace(/[-]/g, '')
-          .replace(/\s+/g, '_')
-          .substring(0, 25)
-        
-        const finalClientName = sanitizedClientName || 'Unknown_Client'
-        
-        const timestamp = includeTimestamp ? `-${Date.now()}` : '';
-        return `Invoice-${finalClientName}-${invoiceNumber}${timestamp}.pdf`;
-      }
+      const withoutTimestamp = invoiceGenerator.createInvoiceFilename('Test Client', 'INV-001', null, false)
+      const withTimestamp = invoiceGenerator.createInvoiceFilename('Test Client', 'INV-001', null, true)
       
-      const withoutTimestamp = createInvoiceFilename('Test Client', 'INV-001', false)
-      const withTimestamp = createInvoiceFilename('Test Client', 'INV-001', true)
+      expect(withoutTimestamp).toBe('Invoice-Test.Client-INV-001.pdf')
+      expect(withTimestamp).toMatch(/^Invoice-Test\.Client-INV-001-\d+\.pdf$/)
+    })
+
+    it('should include invoice ID when provided', () => {
+      const withoutId = invoiceGenerator.createInvoiceFilename('Test Client', 'INV-001')
+      const withId = invoiceGenerator.createInvoiceFilename('Test Client', 'INV-001', 123)
       
-      expect(withoutTimestamp).toBe('Invoice-Test_Client-INV-001.pdf')
-      expect(withTimestamp).toMatch(/^Invoice-Test_Client-INV-001-\d+\.pdf$/)
+      expect(withoutId).toBe('Invoice-Test.Client-INV-001.pdf')
+      expect(withId).toBe('Invoice-Test.Client-INV-001-123.pdf')
+    })
+
+    it('should include both invoice ID and timestamp when requested', () => {
+      const result = invoiceGenerator.createInvoiceFilename('Test Client', 'INV-001', 123, true)
+      expect(result).toMatch(/^Invoice-Test\.Client-INV-001-123-\d+\.pdf$/)
     })
   })
 })

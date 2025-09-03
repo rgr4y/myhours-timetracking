@@ -1,8 +1,6 @@
 .env
 *.log
-prisma/myhours.db
-prisma/myhours.db*
-prisma/template.db
+prisma/*.db
 build/
 dist/
 node_modules/

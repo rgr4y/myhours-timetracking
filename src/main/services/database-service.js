@@ -175,17 +175,49 @@ class DatabaseService {
     await this.prisma.$disconnect();
   }
 
-  // Danger: remove demo data created by seed script
-  async removeDemoData() {
+  // Dev-only: Nuclear option - completely clear database ignoring FK constraints
+  async nukeDatabase() {
     try {
-      // Delete in FK-safe order
+      logger.database("info", "Starting database nuke operation");
+      
+      // Disable foreign key constraints
+      await this.prisma.$executeRaw`PRAGMA foreign_keys = OFF`;
+      
+      // Clear all data in the correct order (ignore FK constraints)
       await this.prisma.timeEntry.deleteMany();
       await this.prisma.invoice.deleteMany();
       await this.prisma.task.deleteMany();
       await this.prisma.project.deleteMany();
       await this.prisma.client.deleteMany();
+      await this.prisma.setting.deleteMany();
+      
+      // Re-enable foreign key constraints
+      await this.prisma.$executeRaw`PRAGMA foreign_keys = ON`;
+      
+      logger.database("info", "Database nuke completed successfully");
+    } catch (error) {
+      // Always try to re-enable FK constraints even if something failed
+      try {
+        await this.prisma.$executeRaw`PRAGMA foreign_keys = ON`;
+      } catch (fkError) {
+        logger.error("Failed to re-enable foreign key constraints:", fkError);
+      }
+      
+      logger.error("Error during database nuke:", error);
+      throw error;
+    }
+  }
+
+  // Danger: remove demo data created by seed script
+  async removeDemoData() {
+    try {
       // Clear transient settings that reference IDs
       try {
+        await this.prisma.timeEntry.deleteMany();
+        await this.prisma.invoice.deleteMany();
+        await this.prisma.task.deleteMany();
+        await this.prisma.project.deleteMany();
+        await this.prisma.client.deleteMany();
         await this.prisma.setting.delete({
           where: { key: "lastUsedClientId" },
         });
@@ -1131,29 +1163,79 @@ class DatabaseService {
   // Invoice methods
   async getInvoices() {
     try {
-      const invoices = await this.prisma.invoice.findMany({
-        include: {
-          client: true,
-          timeEntries: {
+      // GROUP BY invoiceNumber and get the latest version of each invoice
+      const latestInvoices = await this.prisma.$queryRaw`
+        SELECT i1.*
+        FROM invoices i1
+        INNER JOIN (
+          SELECT invoice_number, MAX(updated_at) as max_updated_at
+          FROM invoices
+          WHERE status != 'voided'
+          GROUP BY invoice_number
+        ) i2 ON i1.invoice_number = i2.invoice_number AND i1.updated_at = i2.max_updated_at
+        ORDER BY i1.updated_at DESC
+      `;
+
+      // Fetch related data for each invoice
+      const invoicesWithRelations = await Promise.all(
+        latestInvoices.map(async (invoice) => {
+          const fullInvoice = await this.prisma.invoice.findUnique({
+            where: { id: invoice.id },
             include: {
               client: true,
-              project: true,
-              task: {
+              timeEntries: {
                 include: {
+                  client: true,
                   project: true,
+                  task: {
+                    include: {
+                      project: true,
+                    },
+                  },
                 },
               },
             },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
+          });
+          return fullInvoice;
+        })
+      );
 
-      return invoices;
+      return invoicesWithRelations;
     } catch (error) {
       logger.error("Error getting invoices:", error);
+      throw error;
+    }
+  }
+
+  async voidInvoice(id) {
+    try {
+      const result = await this.prisma.invoice.update({
+        where: { id: parseInt(id) },
+        data: { status: 'voided' },
+      });
+      logger.debug("[DATABASE] Invoice voided:", id);
+      return result;
+    } catch (error) {
+      logger.error("Error voiding invoice:", error);
+      throw error;
+    }
+  }
+
+  async unmarkAsInvoiced(entryIds) {
+    try {
+      const result = await this.prisma.timeEntry.updateMany({
+        where: {
+          id: { in: entryIds.map(id => parseInt(id)) },
+        },
+        data: {
+          isInvoiced: false,
+          invoiceId: null,
+        },
+      });
+      logger.debug("[DATABASE] Time entries unmarked as invoiced:", entryIds.length);
+      return result;
+    } catch (error) {
+      logger.error("Error unmarking time entries as invoiced:", error);
       throw error;
     }
   }

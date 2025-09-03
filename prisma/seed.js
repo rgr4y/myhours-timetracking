@@ -1,8 +1,51 @@
 const { PrismaClient } = require('@prisma/client');
+const { execSync } = require('child_process');
 
 const prisma = new PrismaClient();
 
+async function ensureMigrations() {
+  // Only run migrations in development
+  // This ensures that the database schema is up-to-date before seeding
+  // In production, migrations should be applied during deployment, not during seeding
+  const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production';
+  
+  if (isDev) {
+    console.log('🔄 Checking database migrations...');
+    try {
+      // When running under Electron (ELECTRON_RUN_AS_NODE is set), we need to use a different approach
+      // because npx prisma may not work properly in the Electron context
+      if (process.env.ELECTRON_RUN_AS_NODE) {
+        console.log('⚡ Running under Electron - using prisma migrate deploy instead of migrate dev');
+        // In Electron context, use migrate deploy which applies all pending migrations
+        // without trying to generate a new one or run the seed script
+        execSync('npx prisma migrate deploy', {
+          stdio: 'inherit',
+          cwd: process.cwd(),
+          env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } // Remove Electron flag for subprocess
+        });
+      } else {
+        // Run migrate dev to ensure database is up to date
+        // This is safe - it only applies missing migrations and won't recreate if already applied
+        // The --skip-seed flag prevents infinite recursion since this seed script calls migrate dev
+        execSync('npx prisma migrate dev --skip-seed', {
+          stdio: 'inherit',
+          cwd: process.cwd()
+        });
+      }
+      console.log('✅ Database migrations are up to date');
+    } catch (error) {
+      console.error('❌ Failed to apply migrations:', error.message);
+      throw error;
+    }
+  } else {
+    console.log('📦 Production mode: Skipping migration check (migrations should be applied during deployment)');
+  }
+}
+
 async function main() {
+  // Ensure migrations are applied before seeding
+  await ensureMigrations();
+  
   console.log('🌱 Starting database seed...');
 
   // ---- Date helpers (relative to today) ----
@@ -29,26 +72,30 @@ async function main() {
   const dayOf = (mi, day) => new Date(mi.start.getFullYear(), mi.start.getMonth(), clampDay(day, mi));
   const invNum = (d, seq) => `INV-${ymd(d).replace(/-/g, '')}-${String(seq).padStart(3, '0')}`;
 
-  // Clear existing data (in reverse order of dependencies)
-  await prisma.timeEntry.deleteMany();
-  await prisma.invoice.deleteMany();
-  await prisma.task.deleteMany();
-  await prisma.project.deleteMany();
-  await prisma.client.deleteMany();
-  await prisma.setting.deleteMany();
+  // Check if database already has data
+  const existingClients = await prisma.client.count();
+  if (existingClients > 0) {
+    console.log('📊 Database already contains data. Skipping seed to avoid duplicates.');
+    console.log(`   Found ${existingClients} existing clients.`);
+    return;
+  }
 
-  console.log('🗑️  Cleared existing data');
-
-  // Create settings
-  await prisma.setting.createMany({
-    data: [
-      { key: 'company_name', value: 'Your Company Name' },
-      { key: 'company_email', value: 'hello@yourcompany.com' },
-      { key: 'company_phone', value: '+1 (555) 123-4567' },
-      { key: 'company_website', value: 'www.yourcompany.com' },
-      { key: 'invoice_terms', value: 'Net 30' },
-    ]
-  });
+  // Create settings (use upsert to handle potential duplicates)
+  const settingsData = [
+    { key: 'company_name', value: 'Your Company Name' },
+    { key: 'company_email', value: 'hello@yourcompany.com' },
+    { key: 'company_phone', value: '+1 (555) 123-4567' },
+    { key: 'company_website', value: 'www.yourcompany.com' },
+    { key: 'invoice_terms', value: 'Net 30' },
+  ];
+  
+  for (const setting of settingsData) {
+    await prisma.setting.upsert({
+      where: { key: setting.key },
+      update: { value: setting.value },
+      create: setting,
+    });
+  }
   console.log('⚙️  Created settings');
 
   // Create clients with different hourly rates

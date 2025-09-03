@@ -111,7 +111,8 @@ You MUST use the safe electronAPI pattern to avoid race conditions.
 2. DRY! Don't repeat yourself.
 3. Keep components small and focused.
 4. Don't echo random notes to the terminal.
-5. No new files in project root unless I explicitly OK it.
-6. Docs go in @/docs only (.md files). Do not put implementation summaries. Only documentation.
+5. Don't echo commands longer than 15 lines into the terminal. It WILL break.
+6. No new files in project root unless I explicitly OK it.
+7. Docs go in @/docs only (.md files). Do not put implementation summaries. Only documentation.
 
 Remember: This is a single-user desktop app with local SQLite storage.

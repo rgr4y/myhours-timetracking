@@ -16,34 +16,38 @@ const GeneratedInvoices = ({
   setShowModal,
   setErrorMessage,
   handleDownloadInvoice,
+  handleViewInvoice,
+  handleRegenerateInvoice,
   handleDeleteInvoice,
   downloadingIds,
+  viewingIds,
+  regeneratingIds,
   formatCurrency
 }) => {
-  const handleQuickGenerate = () => {
-    const today = new Date();
-    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    
-    setInvoiceForm({
-      client_id: '',
-      start_date: firstOfMonth.toISOString().split('T')[0],
-      end_date: lastOfMonth.toISOString().split('T')[0],
-      invoice_number: '',
-      due_date: ''
-    });
-    setShowModal(true);
-    setErrorMessage('');
-  };
+  // const handleQuickGenerate = () => {
+  //   const today = new Date();
+  //   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  //   const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  //   
+  //   setInvoiceForm({
+  //     client_id: '',
+  //     start_date: firstOfMonth.toISOString().split('T')[0],
+  //     end_date: lastOfMonth.toISOString().split('T')[0],
+  //     invoice_number: '',
+  //     due_date: ''
+  //   });
+  //   setShowModal(true);
+  //   setErrorMessage('');
+  // };
 
   return (
     <>
       <FlexBox justify="space-between" align="center" margin="0 0 20px 0">
         <Heading>Your Invoices</Heading>
-        <Button variant="primary" onClick={handleQuickGenerate}>
+        {/* <Button variant="primary" onClick={handleQuickGenerate}>
           <FileText size={16} />
           Quick Generate
-        </Button>
+        </Button> */}
       </FlexBox>
 
       {invoices.length === 0 ? (
@@ -85,7 +89,7 @@ const GeneratedInvoices = ({
               
               <FlexBox gap="10px">
                 <Button 
-                  variant="danger" 
+                  variant="secondary" 
                   size="small" 
                   onClick={() => handleDeleteInvoice(invoice.id)}
                 >
@@ -95,12 +99,21 @@ const GeneratedInvoices = ({
                 <Button 
                   variant="secondary" 
                   size="small" 
-                  style={{ flex: 1 }}
-                  disabled={downloadingIds.has(invoice.id)}
-                  onClick={() => handleDownloadInvoice(invoice.id)}
+                  disabled={regeneratingIds.has(invoice.id)}
+                  onClick={() => handleRegenerateInvoice(invoice.id)}
                 >
                   <Download size={14} />
-                  {downloadingIds.has(invoice.id) ? 'Regenerating...' : 'Regenerate'}
+                  {regeneratingIds.has(invoice.id) ? 'Regenerating...' : 'Regenerate'}
+                </Button>
+                <Button 
+                  variant="primary" 
+                  size="small" 
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  disabled={viewingIds.has(invoice.id)}
+                  onClick={() => handleViewInvoice(invoice.id)}
+                >
+                  <FileText size={14} />
+                  {viewingIds.has(invoice.id) ? 'Viewing...' : 'View'}
                 </Button>
               </FlexBox>
             </Card>

@@ -38,6 +38,8 @@ const Invoice = () => {
   const [showModal, setShowModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadingIds, setDownloadingIds] = useState(new Set());
+  const [viewingIds, setViewingIds] = useState(new Set());
+  const [regeneratingIds, setRegeneratingIds] = useState(new Set());
   const [errorMessage, setErrorMessage] = useState('');
   
   // Loading states for initial data
@@ -356,6 +358,116 @@ const Invoice = () => {
     }
   };
 
+  const handleViewInvoice = async (invoiceId) => {
+    console.log('[FRONTEND] handleViewInvoice called with invoiceId:', invoiceId);
+    
+    if (viewingIds.has(invoiceId)) {
+      console.log('[FRONTEND] View already in progress for invoice:', invoiceId);
+      return;
+    }
+
+    try {
+      setViewingIds(prev => new Set([...prev, invoiceId]));
+      console.log('[FRONTEND] Starting view for invoice:', invoiceId);
+      
+      const api = await waitForReady();
+      if (api && api.invoices) {
+        const result = await api.invoices.view(invoiceId);
+        console.log('[FRONTEND] View result:', result);
+        
+        if (result.success) {
+          // Show success toast
+          addToast({
+            variant: 'success',
+            title: 'View Complete!',
+            message: 'Invoice has been opened successfully.',
+            duration: 3000
+          });
+        } else {
+          console.error('[FRONTEND] View failed:', result.error);
+          addToast({
+            variant: 'error',
+            title: 'View Failed',
+            message: result.error || 'Unknown error occurred during view.',
+            duration: 5000
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[FRONTEND] Error viewing invoice:', error);
+      addToast({
+        variant: 'error',
+        title: 'View Error',
+        message: 'Failed to view invoice: ' + error.message,
+        duration: 5000
+      });
+    } finally {
+      setViewingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(invoiceId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleRegenerateInvoice = async (invoiceId) => {
+    console.log('[FRONTEND] handleRegenerateInvoice called with invoiceId:', invoiceId);
+    
+    if (regeneratingIds.has(invoiceId)) {
+      console.log('[FRONTEND] Regenerate already in progress for invoice:', invoiceId);
+      return;
+    }
+
+    if (window.confirm('Are you sure you want to regenerate this invoice? This will void the current invoice and create a new one with current data.')) {
+      try {
+        setRegeneratingIds(prev => new Set([...prev, invoiceId]));
+        console.log('[FRONTEND] Starting regenerate for invoice:', invoiceId);
+        
+        const api = await waitForReady();
+        if (api && api.invoices) {
+          const result = await api.invoices.regenerate(invoiceId);
+          console.log('[FRONTEND] Regenerate result:', result);
+          
+          if (result.success) {
+            // Refresh invoices list and time entries
+            await loadInvoices();
+            await loadTimeEntries();
+            
+            // Show success toast
+            addToast({
+              variant: 'success',
+              title: 'Invoice Regenerated!',
+              message: 'Invoice has been regenerated with current data.',
+              duration: 4000
+            });
+          } else {
+            console.error('[FRONTEND] Regenerate failed:', result.error);
+            addToast({
+              variant: 'error',
+              title: 'Regenerate Failed',
+              message: result.error || 'Unknown error occurred during regeneration.',
+              duration: 5000
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[FRONTEND] Error regenerating invoice:', error);
+        addToast({
+          variant: 'error',
+          title: 'Regenerate Error',
+          message: 'Failed to regenerate invoice: ' + error.message,
+          duration: 5000
+        });
+      } finally {
+        setRegeneratingIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(invoiceId);
+          return newSet;
+        });
+      }
+    }
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -397,8 +509,12 @@ const Invoice = () => {
             setShowModal={setShowModal}
             setErrorMessage={setErrorMessage}
             handleDownloadInvoice={handleDownloadInvoice}
+            handleViewInvoice={handleViewInvoice}
+            handleRegenerateInvoice={handleRegenerateInvoice}
             handleDeleteInvoice={handleDeleteInvoice}
             downloadingIds={downloadingIds}
+            viewingIds={viewingIds}
+            regeneratingIds={regeneratingIds}
             formatCurrency={formatCurrency}
           />
         </TabPanel>

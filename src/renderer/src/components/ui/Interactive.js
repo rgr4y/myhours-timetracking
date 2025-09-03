@@ -68,14 +68,16 @@ export const DropdownItem = styled.div`
   }
 `;
 
-export const Modal = styled.div`
+export const Modal = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'show'
+})`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.7);
-  display: flex;
+  display: ${props => props.show ? 'flex' : 'none'};
   align-items: center;
   justify-content: center;
   z-index: 2000;

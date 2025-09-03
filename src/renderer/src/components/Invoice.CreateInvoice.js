@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Filter, DollarSign, RotateCcw, Download, FileText } from 'lucide-react';
 import styled from 'styled-components';
 import { useDebounce } from '../hooks/useDebounce';
+import { useAnimations } from '../context/AnimationContext';
 import {
   Card,
   FlexBox,
@@ -111,6 +112,37 @@ const CreateInvoice = ({
 }) => {
   const [showStickyBar, setShowStickyBar] = useState(false);
   const filtersRef = useRef(null);
+  const { pauseAnimations, resumeAnimations } = useAnimations();
+
+  // Handle client dropdown changes with animation pausing when "Invoiced" filter is active
+  const handleClientChange = (value) => {
+    if (filters.showInvoicedOnly) {
+      console.log('[ANIMATION] Pausing animations before client dropdown change (Invoiced filter active)');
+      pauseAnimations();
+      
+      // Update the client filter
+      setFilters(prev => ({ 
+        ...prev, 
+        clientId: value, 
+        projectId: '', 
+        taskId: '' 
+      }));
+      
+      // Resume animations after a short delay to allow the change to complete
+      setTimeout(() => {
+        console.log('[ANIMATION] Resuming animations after client dropdown change');
+        resumeAnimations();
+      }, 100);
+    } else {
+      // Normal behavior when Invoiced filter is not active
+      setFilters(prev => ({ 
+        ...prev, 
+        clientId: value, 
+        projectId: '', 
+        taskId: '' 
+      }));
+    }
+  };
 
   // Load filters from sessionStorage on mount
   useEffect(() => {
@@ -480,12 +512,7 @@ const CreateInvoice = ({
               <ClientSelect
                 clients={clients}
                 value={filters.clientId}
-                onChange={(value) => setFilters(prev => ({ 
-                  ...prev, 
-                  clientId: value, 
-                  projectId: '', 
-                  taskId: '' 
-                }))}
+                onChange={handleClientChange}
                 label="Client"
               />
             </div>

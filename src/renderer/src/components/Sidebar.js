@@ -78,7 +78,7 @@ const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [appVersion, setAppVersion] = useState('');
-  const [setEasterClicks] = useState(0);
+  const [, setEasterClicks] = useState(0);
   const [showYay, setShowYay] = useState(false);
   const resetTimerRef = useRef(null);
 
@@ -132,20 +132,7 @@ const Sidebar = () => {
       </NavScroll>
       <VersionFooter>
         <FooterRow>
-        <VersionLink
-          onClick={() => {
-            if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-            setEasterClicks((currentClicks) => {
-              const next = currentClicks + 1;
-              if (next >= 5) {
-                setShowYay(true);
-                return 0;
-              }
-              resetTimerRef.current = setTimeout(() => setEasterClicks(0), 1200);
-              return next;
-            });
-          }}
-        >
+        <VersionLink>
           {appVersion || '—'}
         </VersionLink>
         <span>•</span>

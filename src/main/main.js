@@ -844,13 +844,45 @@ class MyHoursApp {
     });
 
     // Danger ops: remove demo/seed data
-    ipcMain.handle('db:removeDemoData', async () => {
+    ipcMain.handle('db:removeDemoData', async (event, confirmationText) => {
       try {
-        const result = await this.database.removeDemoData();
-        return result;
+        logger.debug('[MAIN] db:removeDemoData: Checking confirmation text');
+        
+        // Check if confirmation text matches exactly
+        if (confirmationText !== 'yes, clear all data') {
+          logger.debug('[MAIN] db:removeDemoData: Invalid confirmation text:', confirmationText);
+          return { 
+            success: false, 
+            error: 'Confirmation text must match exactly: "yes, clear all data"' 
+          };
+        }
+        
+        // Show final warning dialog
+        const finalConfirm = await dialog.showMessageBox(this.mainWindow, {
+          type: 'error',
+          title: 'FINAL WARNING',
+          message: 'This will PERMANENTLY DELETE ALL DATA.\n\nClients, Projects, Tasks, Time Entries, Invoices - EVERYTHING will be lost.',
+          detail: 'This action cannot be undone.',
+          buttons: ['Cancel', 'Yes, Delete Everything'],
+          defaultId: 0,
+          cancelId: 0
+        });
+        
+        if (finalConfirm.response !== 1) {
+          logger.debug('[MAIN] db:removeDemoData: User cancelled at final confirmation');
+          return { success: false, error: 'Operation cancelled by user' };
+        }
+        
+        logger.debug('[MAIN] db:removeDemoData: User confirmed, proceeding with nuke');
+        
+        // Use the nuclear option to clear all data
+        await this.database.nukeDatabase();
+        
+        logger.debug('[MAIN] db:removeDemoData: Database cleared successfully');
+        return { success: true };
       } catch (error) {
-        logger.error('[MAIN] Error removing demo data:', error);
-        throw error;
+        logger.error('[MAIN] Error clearing all data:', error);
+        return { success: false, error: error.message };
       }
     });
 
@@ -874,6 +906,20 @@ class MyHoursApp {
         if (app.isPackaged) {
           throw new Error('Seeding is only available in development.');
         }
+        
+        logger.debug('[MAIN] dev:runSeed: Starting database nuke and reseed');
+        
+        // First, nuke the database (ignore FK constraints)
+        try {
+          logger.debug('[MAIN] dev:runSeed: Nuking database...');
+          await this.database.nukeDatabase();
+          logger.debug('[MAIN] dev:runSeed: Database nuked successfully');
+        } catch (nukeError) {
+          logger.error('[MAIN] dev:runSeed: Error nuking database:', nukeError);
+          throw new Error('Failed to clear database: ' + nukeError.message);
+        }
+        
+        // Then run the seed
         const { execFile } = require('child_process');
         const path = require('path');
         const projectRoot = path.join(__dirname, '..', '..');
@@ -881,8 +927,10 @@ class MyHoursApp {
         const env = {
           ...process.env,
           ELECTRON_RUN_AS_NODE: '1',
-          DATABASE_URL: `file:${path.join(projectRoot, 'prisma', MAIN_DB)}`,
+          DATABASE_URL: `file:${path.join(projectRoot, 'prisma', process.env.MAIN_DB ?? 'myhours.db')}`,
         };
+        
+        logger.debug('[MAIN] dev:runSeed: Running seed script...');
         await new Promise((resolve, reject) => {
           const child = execFile(process.execPath, [seedPath], { env, cwd: projectRoot }, (err) => {
             if (err) return reject(err);
@@ -891,6 +939,8 @@ class MyHoursApp {
           child.stdout?.on('data', (d) => logger.debug('[SEED]', d.toString().trim()));
           child.stderr?.on('data', (d) => logger.error('[SEED]', d.toString().trim()));
         });
+        
+        logger.debug('[MAIN] dev:runSeed: Completed successfully');
         return { success: true };
       } catch (error) {
         logger.error('[MAIN] dev:runSeed error:', error);
@@ -955,10 +1005,16 @@ class MyHoursApp {
         // Generate the PDF using the existing invoice data
         const filePath = await this.invoiceGenerator.generateInvoicePDF(invoice);
         
+        // Use centralized filename generation with client name
+        const defaultFilename = this.invoiceGenerator.createInvoiceFilename(
+          invoice.client?.name || 'Unknown Client', 
+          invoice.invoiceNumber
+        );
+        
         // Show save dialog
         const result = await dialog.showSaveDialog(this.mainWindow, {
           title: 'Save Invoice',
-          defaultPath: `Invoice-${invoice.invoiceNumber}.pdf`,
+          defaultPath: defaultFilename,
           filters: [
             { name: 'PDF Files', extensions: ['pdf'] }
           ]
@@ -976,6 +1032,63 @@ class MyHoursApp {
         }
       } catch (error) {
         logger.error('[MAIN] Error downloading invoice:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('invoice:view', async (event, invoiceId) => {
+      try {
+        logger.debug('[MAIN] invoice:view called with invoiceId:', invoiceId);
+        // Get the invoice data from database
+        const invoice = await this.database.getInvoiceById(invoiceId);
+        if (!invoice) {
+          throw new Error('Invoice not found');
+        }
+
+        // Generate the PDF from stored template data without showing save dialog
+        const filePath = await this.invoiceGenerator.generatePDFFromStoredData(invoice);
+        
+        // Use centralized filename generation with client name
+        const defaultFilename = this.invoiceGenerator.createInvoiceFilename(
+          invoice.client?.name || 'Unknown Client', 
+          invoice.invoiceNumber
+        );
+        
+        // Show save dialog
+        const result = await dialog.showSaveDialog(this.mainWindow, {
+          title: 'Save Invoice',
+          defaultPath: defaultFilename,
+          filters: [
+            { name: 'PDF Files', extensions: ['pdf'] }
+          ]
+        });
+
+        if (!result.canceled && result.filePath) {
+          // Copy the generated file to the chosen location
+          const fs = require('fs').promises;
+          await fs.copyFile(filePath, result.filePath);
+          logger.debug('[MAIN] invoice:view completed successfully');
+          return { success: true, filePath: result.filePath };
+        } else {
+          logger.debug('[MAIN] invoice:view cancelled by user');
+          return { success: false, error: 'Download cancelled' };
+        }
+      } catch (error) {
+        logger.error('[MAIN] Error viewing invoice:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('invoice:regenerate', async (event, invoiceId) => {
+      try {
+        logger.debug('[MAIN] invoice:regenerate called with invoiceId:', invoiceId);
+        
+        const filePath = await this.invoiceGenerator.regenerateInvoice(invoiceId);
+        
+        logger.debug('[MAIN] invoice:regenerate completed successfully');
+        return { success: true, filePath };
+      } catch (error) {
+        logger.error('[MAIN] Error regenerating invoice:', error);
         return { success: false, error: error.message };
       }
     });

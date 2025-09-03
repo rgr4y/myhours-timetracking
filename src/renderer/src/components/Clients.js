@@ -97,7 +97,7 @@ const Clients = () => {
   });
 
   useEffect(() => {
-    console.log('[RENDER->CLIENTS] Component mounted, electronAPI available:', !!window.electronAPI);
+    console.log('[RNDR->CLIENTS] Component mounted, electronAPI available:', !!window.electronAPI);
     const loadData = async () => {
       if (window.electronAPI) {
         // console.log('Loading clients from electronAPI...');
