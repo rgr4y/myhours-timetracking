@@ -503,6 +503,16 @@ async function main() {
     createTimeEntry(clients[3].id, projects[6].id, tasks[13].id, dayOf(thisMonth, 22), 5, 'Theme customization'),
     createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOf(thisMonth, 26), 2, 'Final testing'),
 
+    // Create some partially invoiced days to test the "Partially Invoiced" feature
+    // Day with mixed invoice status
+    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(thisMonth, 21), 4, 'Morning work - invoiced', true),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[1].id, dayOf(thisMonth, 21), 3, 'Afternoon work - not invoiced', false),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(thisMonth, 21), 2, 'Evening work - not invoiced', false),
+    
+    // Another day with mixed invoice status
+    createTimeEntry(clients[2].id, projects[4].id, tasks[8].id, dayOf(thisMonth, 23), 5, 'Design work - invoiced', true),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOf(thisMonth, 23), 3, 'Development work - not invoiced', false),
+
     // Recent entries (last few days of this month)
     createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(thisMonth, Math.max(1, today.getDate() - 2)), 4, 'Code review and cleanup'),
     createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(thisMonth, Math.max(1, today.getDate() - 1)), 6, 'Dashboard final touches'),

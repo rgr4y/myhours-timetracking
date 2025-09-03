@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Clock, Folder, BarChart, FileInput, Settings, Info } from 'lucide-react';
 import { Text, Modal, ModalContent, ModalHeader, ModalTitle, ModalCloseButton } from './ui';
@@ -78,9 +78,7 @@ const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [appVersion, setAppVersion] = useState('');
-  const [, setEasterClicks] = useState(0);
   const [showYay, setShowYay] = useState(false);
-  const resetTimerRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;

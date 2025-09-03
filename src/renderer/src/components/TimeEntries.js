@@ -215,6 +215,25 @@ const ActiveBadge = styled(Text)`
   font-weight: bold;
 `;
 
+const InvoiceBadge = styled(Text)`
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  background-color: ${colors.warning};
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+`;
+
+const DayInvoiceBadge = styled(Text)`
+  padding: 2px 8px;
+  border-radius: 12px;
+  background-color: ${props => props.$variant === 'partial' ? colors.warning : colors.info};
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+`;
+
 const ClientIcon = styled(Building)`
   margin-right: 4px;
   vertical-align: text-bottom;
@@ -1054,6 +1073,16 @@ const TimeEntries = () => {
     return formatDurationHumanFriendly(totalMinutes);
   }, [currentTime]);
 
+  // Helper functions for invoice status
+  const getDayInvoiceStatus = useCallback((entries) => {
+    const invoicedCount = entries.filter(entry => entry.isInvoiced).length;
+    const totalCount = entries.length;
+    
+    if (invoicedCount === 0) return null;
+    if (invoicedCount === totalCount) return 'invoiced';
+    return 'partial';
+  }, []);
+
   const toggleDayCollapse = (date) => {
     setCollapsedDays(prev => {
       const newSet = new Set(prev);
@@ -1276,17 +1305,29 @@ const TimeEntries = () => {
                     onClick={() => toggleDayCollapse(date)}
                   >
                     <FlexBox justify="space-between" align="center">
-                      <FlexBox align="center" gap="10px">
+                      <FlexBox align="center" gap="10px" style={{ minWidth: '100px' }}>
                         {collapsedDays.has(date) ? (
                           <ChevronDown size={20} />
                         ) : (
                           <ChevronUp size={20} />
                         )}
-                        <Heading size="medium">{date}</Heading>
                       </FlexBox>
-                      <DayTotalText size="medium" variant="success">
-                        {calculateDayTotal(entries)}
-                      </DayTotalText>
+                      <FlexBox align="center" gap="10px" style={{ flex: 1, justifyContent: 'center' }}>
+                        <Heading size="medium">{date}</Heading>
+                        {(() => {
+                          const invoiceStatus = getDayInvoiceStatus(entries);
+                          return invoiceStatus && (
+                            <DayInvoiceBadge $variant={invoiceStatus}>
+                              {invoiceStatus === 'partial' ? 'Partially Invoiced' : 'Invoiced'}
+                            </DayInvoiceBadge>
+                          );
+                        })()}
+                      </FlexBox>
+                      <FlexBox align="center" justify="flex-end" style={{ minWidth: '100px' }}>
+                        <DayTotalText size="medium" variant="success">
+                          {calculateDayTotal(entries)}
+                        </DayTotalText>
+                      </FlexBox>
                     </FlexBox>
                   </DayHeaderCard>
 
@@ -1316,6 +1357,11 @@ const TimeEntries = () => {
                                   <ActiveBadge size="small" variant="success">
                                     ACTIVE
                                   </ActiveBadge>
+                                )}
+                                {entry.isInvoiced && (
+                                  <InvoiceBadge size="small">
+                                    INVOICED
+                                  </InvoiceBadge>
                                 )}
                               </FlexBox>
                               <Text variant="secondary" size="small">
