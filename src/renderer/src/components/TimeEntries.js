@@ -1304,16 +1304,14 @@ const TimeEntries = () => {
                     $collapsed={collapsedDays.has(date)}
                     onClick={() => toggleDayCollapse(date)}
                   >
-                    <FlexBox justify="space-between" align="center">
-                      <FlexBox align="center" gap="10px" style={{ minWidth: '100px' }}>
+                    <FlexBox align="center">
+                      <FlexBox align="center" gap="10px">
                         {collapsedDays.has(date) ? (
                           <ChevronDown size={20} />
                         ) : (
                           <ChevronUp size={20} />
                         )}
-                      </FlexBox>
-                      <FlexBox align="center" gap="10px" style={{ flex: 1, justifyContent: 'flex-start' }}>
-                        <Heading size="medium">{date}</Heading>
+                        <Heading size="medium" margin="0">{date}</Heading>
                         {(() => {
                           const invoiceStatus = getDayInvoiceStatus(entries);
                           return invoiceStatus && (
@@ -1323,7 +1321,7 @@ const TimeEntries = () => {
                           );
                         })()}
                       </FlexBox>
-                      <FlexBox align="center" justify="flex-end" style={{ minWidth: '100px' }}>
+                      <FlexBox align="center" justify="flex-end" style={{ flex: 1 }}>
                         <DayTotalText size="medium" variant="success">
                           {calculateDayTotal(entries)}
                         </DayTotalText>
