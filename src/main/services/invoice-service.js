@@ -7,7 +7,8 @@ const { dialog, BrowserWindow } = require('electron');
 class InvoiceGenerator {
   constructor(database) {
     this.database = database;
-    this.templatePath = path.join(__dirname, 'templates', 'invoice.hbs');
+    // Template is in src/main/templates, not src/main/services/templates
+    this.templatePath = path.join(__dirname, '..', 'templates', 'invoice.hbs');
     this.ensureTemplateDirectory();
   }
 
@@ -22,7 +23,7 @@ class InvoiceGenerator {
   }
 
   ensureTemplateDirectory() {
-    const templateDir = path.join(__dirname, 'templates');
+    const templateDir = path.join(__dirname, '..', 'templates');
     if (!fs.existsSync(templateDir)) {
       throw new Error(`Template directory not found: ${templateDir}. Please ensure the templates directory is included in the build.`);
     }
