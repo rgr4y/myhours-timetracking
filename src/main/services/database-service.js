@@ -520,9 +520,15 @@ class DatabaseService {
       }
 
       if (filters.startDate && filters.endDate) {
+        const startDate = new Date(filters.startDate);
+        const endDate = new Date(filters.endDate);
+        
+        // Set endDate to end of day (23:59:59.999) to include all entries on that day
+        endDate.setHours(23, 59, 59, 999);
+        
         where.startTime = {
-          gte: new Date(filters.startDate),
-          lte: new Date(filters.endDate),
+          gte: startDate,
+          lte: endDate,
         };
       }
 

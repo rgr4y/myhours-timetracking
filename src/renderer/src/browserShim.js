@@ -100,6 +100,7 @@ class BrowserElectronAPI {
   invoices = {
     getAll: () => this.invoke('db:getInvoices'),
     generate: (data) => this.invoke('invoice:generate', data),
+    regenerate: (id) => this.invoke('invoice:regenerate', id),
     download: (id) => this.invoke('invoice:download', id),
     delete: (id) => this.invoke('db:deleteInvoice', id)
   };
