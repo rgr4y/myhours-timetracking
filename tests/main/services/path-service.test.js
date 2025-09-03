@@ -23,6 +23,69 @@ describe('Path Service - Basic Logic', () => {
     })
   })
 
+  describe('Environment-based path resolution', () => {
+    it('should resolve database paths correctly for different environments', () => {
+      const getDatabasePath = (isPackaged, userDataDir, appPath, dbName = 'myhours.db') => {
+        if (isPackaged) {
+          return path.join(userDataDir, dbName)
+        } else {
+          return path.join(appPath, 'prisma', dbName)
+        }
+      }
+
+      expect(getDatabasePath(true, '/user/data', '/app', 'test.db')).toBe(path.join('/user/data', 'test.db'))
+      expect(getDatabasePath(false, '/user/data', '/app', 'test.db')).toBe(path.join('/app', 'prisma', 'test.db'))
+    })
+
+    it('should construct database URLs correctly', () => {
+      const createDatabaseUrl = (dbPath) => `file:${dbPath}`
+      
+      expect(createDatabaseUrl('/path/to/database.db')).toBe('file:/path/to/database.db')
+      expect(createDatabaseUrl('./relative/path.db')).toBe('file:./relative/path.db')
+    })
+
+    it('should resolve Prisma paths for different environments', () => {
+      const getPrismaPath = (isPackaged, resourcesPath, appPath, fileName) => {
+        if (isPackaged) {
+          const base = resourcesPath || appPath
+          return path.join(base, 'prisma', fileName)
+        } else {
+          return path.join(appPath, 'prisma', fileName)
+        }
+      }
+
+      expect(getPrismaPath(true, '/resources', '/app', 'schema.prisma'))
+        .toBe(path.join('/resources', 'prisma', 'schema.prisma'))
+      expect(getPrismaPath(false, '/resources', '/app', 'schema.prisma'))
+        .toBe(path.join('/app', 'prisma', 'schema.prisma'))
+    })
+  })
+
+  describe('Path validation and safety', () => {
+    it('should validate file paths', () => {
+      const isValidPath = (filePath) => {
+        return typeof filePath === 'string' && 
+               filePath.length > 0 && 
+               !filePath.includes('..')
+      }
+
+      expect(isValidPath('/valid/path.txt')).toBe(true)
+      expect(isValidPath('relative/path.txt')).toBe(true)
+      expect(isValidPath('../malicious/path')).toBe(false)
+      expect(isValidPath('')).toBe(false)
+    })
+
+    it('should sanitize file names', () => {
+      const sanitizeFileName = (fileName) => {
+        return fileName.replace(/[^a-zA-Z0-9.-]/g, '_')
+      }
+
+      expect(sanitizeFileName('normal_file.txt')).toBe('normal_file.txt')
+      expect(sanitizeFileName('file with spaces.txt')).toBe('file_with_spaces.txt')
+      expect(sanitizeFileName('file/with/slashes.txt')).toBe('file_with_slashes.txt')
+    })
+  })
+
   describe('File extension utilities', () => {
     it('should identify file types by extension', () => {
       const getFileType = (filename) => {

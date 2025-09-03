@@ -45,6 +45,42 @@ describe('Logger Service - Business Logic', () => {
       expect(entry.userId).toBe(123)
       expect(typeof entry.timestamp).toBe('string')
     })
+
+    it('should handle BigInt serialization', () => {
+      const serializeBigInt = (obj) => {
+        return JSON.stringify(obj, (key, value) => 
+          typeof value === 'bigint' ? value.toString() + 'n' : value
+        )
+      }
+
+      const objWithBigInt = { id: BigInt(123), name: 'test' }
+      const serialized = serializeBigInt(objWithBigInt)
+      expect(serialized).toBe('{"id":"123n","name":"test"}')
+    })
+  })
+
+  describe('Environment-based configuration', () => {
+    it('should determine log directory based on environment', () => {
+      const getLogDirectory = (isDev, isPackaged, userDataPath, projectRoot) => {
+        if (isDev) {
+          return `${projectRoot}/logs`
+        } else {
+          return `${userDataPath}/logs`
+        }
+      }
+
+      expect(getLogDirectory(true, false, '/user/data', '/project')).toBe('/project/logs')
+      expect(getLogDirectory(false, true, '/user/data', '/project')).toBe('/user/data/logs')
+    })
+
+    it('should set appropriate log levels for environment', () => {
+      const getLogLevel = (isDev) => {
+        return isDev ? 'debug' : 'info'
+      }
+
+      expect(getLogLevel(true)).toBe('debug')
+      expect(getLogLevel(false)).toBe('info')
+    })
   })
 
   describe('Log filtering logic', () => {

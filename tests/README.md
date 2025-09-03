@@ -4,15 +4,30 @@ This directory contains comprehensive unit tests for the myHours time tracking a
 
 ## Structure
 
-- `timer/` - Tests for Timer component and TimerContext functionality
-- `setup/` - Test setup files and mocks
-- `helpers/` - Test utility functions
+- **`main/`** - Tests for main process (Electron backend)
+  - `services/` - Service layer tests (IPC, database, logger, path, auto-updater)
+- **`renderer/`** - Tests for renderer process (React frontend)
+  - `components/` - Component tests
+  - `context/` - React context tests
+  - `hooks/` - Custom hook tests
+  - `utils/` - Utility function tests
+  - `timer/` - Timer-specific tests
+  - `helpers/` - Test helper utilities
+  - `integration/` - Integration tests
+- **`setup/`** - Test setup files and global mocks
 
 ## Test Files
 
-### Timer Tests
-- `TimerContextLogic.test.js` - Tests for timer context state management, operations, and logic
-- `TimerUtils.test.js` - Tests for timer utility functions including time formatting, validation, and calculations
+### Main Process Tests
+- **Service Tests** - IPC handlers, database operations, logging, path resolution, auto-updater
+- **Integration Tests** - Cross-service functionality
+
+### Renderer Process Tests  
+- **Component Tests** - UI component logic and behavior
+- **Context Tests** - React context state management
+- **Hook Tests** - Custom React hook functionality
+- **Timer Tests** - Timer-specific component and logic tests
+- **Integration Tests** - Cross-component interactions
 
 ## Running Tests
 
