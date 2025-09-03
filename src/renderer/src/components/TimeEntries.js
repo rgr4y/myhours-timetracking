@@ -1312,7 +1312,7 @@ const TimeEntries = () => {
                           <ChevronUp size={20} />
                         )}
                       </FlexBox>
-                      <FlexBox align="center" gap="10px" style={{ flex: 1, justifyContent: 'center' }}>
+                      <FlexBox align="center" gap="10px" style={{ flex: 1, justifyContent: 'flex-start' }}>
                         <Heading size="medium">{date}</Heading>
                         {(() => {
                           const invoiceStatus = getDayInvoiceStatus(entries);
