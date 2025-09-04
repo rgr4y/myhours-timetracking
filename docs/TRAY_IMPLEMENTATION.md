@@ -39,7 +39,7 @@ This implementation adds a complete macOS menu bar (system tray) integration for
 ### Modified Files
 - `/src/main/main.js` - Added tray service initialization and platform detection
 - `/src/main/preload.js` - Added tray-related IPC methods and event listeners
-- `/src/renderer/src/context/TimerContext.js` - Added tray status updates
+- `/src/renderer/src/context/TimerContext.jsx` - Added tray status updates
 - `/src/renderer/src/components/TimeEntries.js` - Added tray event handlers
 
 ## Architecture

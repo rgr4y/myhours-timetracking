@@ -80,7 +80,7 @@
       "assets/**/*",
       "node_modules/**/*",
       "prisma/schema.prisma",
-      "prisma/seed.js", 
+      "prisma/seed.js",
       "prisma/template.db",
       "prisma/migrations/**/*",
       "!prisma/myhours.db"
@@ -139,6 +139,9 @@
     "electronmon": "^2.0.3",
     "express": "^5.1.0",
     "jsdom": "^26.1.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "styled-components": "^6.1.19",
     "vitest": "^3.2.4",
     "wait-on": "^7.0.1",
     "ws": "^8.18.3"

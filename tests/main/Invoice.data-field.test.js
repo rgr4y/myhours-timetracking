@@ -12,10 +12,10 @@ const __dirname = path.dirname(__filename);
 const testDbPath = path.join(__dirname, '../../prisma/test-invoice-data.db');
 process.env.DATABASE_URL = `file:${testDbPath}`;
 
-/* 
 describe('Invoice Data Field', () => {
   let prisma;
-
+  it.skip('should be implemented');
+/*
   beforeEach(async () => {
     // Clean up any existing test database
     if (fs.existsSync(testDbPath)) {
@@ -242,5 +242,5 @@ describe('Invoice Data Field', () => {
     expect(parsedData.lineItems[0].description).toContain('Line item 0');
     expect(parsedData.lineItems[99].tags).toContain('tag-99');
   });
+  */
 });
-*/

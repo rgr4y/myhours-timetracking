@@ -2,11 +2,14 @@ import '@testing-library/jest-dom'
 import { vi, beforeEach } from 'vitest'
 import React from 'react'
 
-// Mock React for tests
+// Ensure React is properly set up globally
 global.React = React
-
-// Mock window.electronAPI
 global.window = global.window || {}
+
+// Make sure React is available in the global scope for JSX
+if (typeof globalThis !== 'undefined') {
+  globalThis.React = React
+}
 global.window.electronAPI = {
   clients: {
     getAll: vi.fn(() => Promise.resolve([])),

@@ -12,6 +12,7 @@ export default defineConfig({
     testTimeout: 10000,
   },
   resolve: {
+    dedupe: ['react', 'react-dom'],
     alias: {
       '@': resolve(__dirname, './src'),
       '@main': resolve(__dirname, './src/main'),
@@ -24,5 +25,12 @@ export default defineConfig({
   esbuild: {
     target: 'node18',
     jsx: 'automatic'
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      loader: {
+        '.js': 'jsx'
+      }
+    }
   }
 })
