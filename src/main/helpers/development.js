@@ -110,12 +110,6 @@ async function setupWebSocketServer() {
 function configureDevelopment() {
   logger.main('info', '[MAIN-DEV] Configuring development environment');
 
-  // Disable GPU acceleration for better stability in development
-  app.commandLine.appendSwitch('disable-gpu');
-  app.commandLine.appendSwitch('disable-software-rasterizer');
-  app.commandLine.appendSwitch('disable-gpu-compositing');
-  logger.main('warn', '[MAIN-DEV] GPU acceleration disabled for development');
-
   // Enhanced logging for development
   if (process.env.ELECTRON_ENABLE_LOGGING) {
     logger.debug('[MAIN-DEV] Enhanced logging enabled');

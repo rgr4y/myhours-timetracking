@@ -20,6 +20,12 @@ if (isDev) {
   configureDevelopment();
 }
 
+// Disable GPU acceleration for better stability (My GPU has major issues)
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+logger.main('warn', '[MAIN-DEV] GPU acceleration disabled for development');
+
 // Single instance lock to prevent multiple app launches
 const gotTheLock = app.requestSingleInstanceLock();
 
