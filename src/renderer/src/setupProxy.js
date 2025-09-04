@@ -1,6 +1,20 @@
 const WebSocket = require('ws');
+let connectionAttempts = 0;
 
 module.exports = function(app) {
+  // Extra safety: only run in development
+  if (process.env.NODE_ENV !== 'development') {
+    console.warn('[SETUP-PROXY] 🟡 Skipping proxy setup in non-development environment');
+    return;
+  }
+  
+  // Skip proxy setup if running in Electron (since it has direct IPC access)
+  const isElectron = process.versions && process.versions.electron;
+  if (isElectron) {
+    console.info('[SETUP-PROXY] 🔵 Detected Electron environment - skipping proxy setup (using direct IPC)');
+    return;
+  }
+  
   console.info(
     "[RNDR->SETUP-PROXY] 🟥 IPC forwarding proxy middleware initialized"
   );
@@ -11,7 +25,6 @@ module.exports = function(app) {
   // Store WebSocket connection
   let wsConnection = null;
   let isConnecting = false;
-  let connectionAttempts = 0;
   const maxAttempts = 3;
 
   // Connect to Electron's WebSocket server
@@ -28,7 +41,7 @@ module.exports = function(app) {
 
       isConnecting = true;
       connectionAttempts++;
-      console.info(`[SETUP-PROXY] 🟥 Attempting to connect to Electron WebSocket server (attempt ${connectionAttempts}/${maxAttempts})...`);
+      console.info(`[SETUP-PROXY] 🟥 Attempting to connect to Electron WebSocket server (port 3001) (attempt ${connectionAttempts}/${maxAttempts})...`);
       
       const ws = new WebSocket('ws://localhost:3001');
       
@@ -61,7 +74,6 @@ module.exports = function(app) {
         
         // Auto-reconnect after a delay
         setTimeout(() => {
-          connectionAttempts = 0; // Reset attempts for reconnection
           connectToElectron().catch(() => {});
         }, 2000);
       });

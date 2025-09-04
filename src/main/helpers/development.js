@@ -4,6 +4,13 @@ const logger = require('../services/logger-service');
 /**
  * Wait for the CRA dev server to be reachable before loading it in Electron
  */
+
+
+if (process.env.NODE_ENV !== 'development') {
+  console.warn('[development.js] 🟡 Skipping setup in non-development environment');
+  return;
+}
+
 async function waitForDevServer(url, timeoutMs = 15000, intervalMs = 250) {
   const { URL } = require('url');
   const parsed = new URL(url);
