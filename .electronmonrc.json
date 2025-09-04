@@ -1,10 +1,12 @@
 {
   "watch": [
     "src/main",
-    "src/main/services"
+    "src/main/services",
+    "src/main/helpers"
   ],
   "ignore": [
     "node_modules",
+    "prisma/*",
     "src/renderer",
     "build",
     "dist",

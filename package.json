@@ -55,8 +55,20 @@
         "to": "node_modules/.prisma"
       },
       {
-        "from": "prisma",
-        "to": "prisma"
+        "from": "prisma/schema.prisma",
+        "to": "prisma/schema.prisma"
+      },
+      {
+        "from": "prisma/seed.js",
+        "to": "prisma/seed.js"
+      },
+      {
+        "from": "prisma/template.db",
+        "to": "prisma/template.db"
+      },
+      {
+        "from": "prisma/migrations",
+        "to": "prisma/migrations"
       }
     ],
     "directories": {
@@ -67,7 +79,11 @@
       "src/renderer/build/**/*",
       "assets/**/*",
       "node_modules/**/*",
-      "prisma/**/*"
+      "prisma/schema.prisma",
+      "prisma/seed.js", 
+      "prisma/template.db",
+      "prisma/migrations/**/*",
+      "!prisma/myhours.db"
     ],
     "mac": {
       "category": "public.app-category.productivity",
