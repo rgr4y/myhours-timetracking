@@ -154,6 +154,13 @@ const CreateInvoice = ({
       } catch (error) {
         console.error('Error parsing saved filters:', error);
       }
+    } else {
+      // Set default dateTo to today's date if no saved filters exist
+      const today = new Date();
+      setFilters(prev => ({
+        ...prev,
+        dateTo: today.toISOString().split('T')[0]
+      }));
     }
   }, [setFilters]);
 
@@ -263,9 +270,10 @@ const CreateInvoice = ({
 
   // Reset filters function
   const resetFilters = () => {
+    const today = new Date();
     setFilters({
       dateFrom: '',
-      dateTo: '',
+      dateTo: today.toISOString().split('T')[0], // Set to today's date
       clientId: '',
       projectId: '',
       taskId: '',

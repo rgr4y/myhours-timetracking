@@ -377,12 +377,14 @@ const TimeEntries = () => {
           setRoundTo(parseInt(settingsData.timer_rounding));
         }
 
+        /*
         console.log('[RNDR->TimeEntries] All data loaded:', {
           clients: clientsWithRelationships?.length || 0,
           projects: allProjects.length,
           tasks: allTasks.length,
           timeEntries: timeEntriesData?.length || 0
         });
+        */
       } catch (error) {
         console.error('[RNDR->TimeEntries] Error loading data:', error);
       }
@@ -522,7 +524,7 @@ const TimeEntries = () => {
         try {
           const api = await waitForReady();
           if (api) {
-            console.log('[RNDR->TimeEntries] Attempting to restore last used client/project/task...');
+            // console.log('[RNDR->TimeEntries] Attempting to restore last used client/project/task...');
             
             const [lastClient, lastProject, lastTask] = await Promise.all([
               api.settings.getLastUsedClient(),

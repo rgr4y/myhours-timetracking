@@ -73,9 +73,9 @@ class IpcService {
 
     ipcMain.handle('db:getClientsWithRelationships', async () => {
       try {
-        logger.main('debug', 'IPC: Getting clients with relationships');
+        // logger.main('debug', 'IPC: Getting clients with relationships');
         const clients = await this.database.getClients();
-        logger.main('info', 'IPC: Retrieved clients', { count: clients.length });
+        // logger.main('info', 'IPC: Retrieved clients', { count: clients.length });
         return clients;
       } catch (error) {
         logger.main('error', 'IPC: Error getting clients with relationships', { error: error.message, stack: error.stack });
@@ -200,9 +200,9 @@ class IpcService {
     // Time entry operations
     ipcMain.handle('db:getTimeEntries', async (event, filters) => {
       try {
-        logger.main('debug', 'IPC: Getting time entries', { filters });
+        // logger.main('debug', 'IPC: Getting time entries', { filters });
         const entries = await this.database.getTimeEntries(filters);
-        logger.main('info', 'IPC: Retrieved time entries', { count: entries.length });
+        // logger.main('info', 'IPC: Retrieved time entries', { count: entries.length });
         return entries;
       } catch (error) {
         logger.main('error', 'IPC: Error getting time entries', { error: error.message, stack: error.stack });
@@ -212,7 +212,7 @@ class IpcService {
     
     ipcMain.handle('db:createTimeEntry', async (event, data) => {
       try {
-        logger.debug('[MAIN] IPC: Creating time entry with data:', data);
+        // logger.debug('[MAIN] IPC: Creating time entry with data:', data);
         return await this.database.createTimeEntry(data);
       } catch (error) {
         logger.error('[MAIN] IPC: Error creating time entry:', error);

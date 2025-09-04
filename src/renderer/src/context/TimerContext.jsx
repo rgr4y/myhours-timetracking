@@ -26,6 +26,8 @@ export const TimerProvider = ({ children }) => {
   // Refs to avoid stale closures in event handlers
   const activeTimerRef = useRef(activeTimer);
   const isStoppingTimerRef = useRef(isStoppingTimer);
+  const startTimerRef = useRef(null);
+  const stopTimerRef = useRef(null);
 
   // Update refs when state changes
   useEffect(() => {
@@ -364,6 +366,15 @@ export const TimerProvider = ({ children }) => {
     }
   }, [waitForReady, updateTrayStatus, isStoppingTimer, checkActiveTimer]);
 
+  // Update refs when timer functions change
+  useEffect(() => {
+    startTimerRef.current = startTimer;
+  }, [startTimer]);
+
+  useEffect(() => {
+    stopTimerRef.current = stopTimer;
+  }, [stopTimer]);
+
   const updateTimerDescription = async (newDescription) => {
     setDescription(newDescription);
     
@@ -531,7 +542,11 @@ export const TimerProvider = ({ children }) => {
           console.log('[RNDR->TimerContext] Stop timer requested from tray');
           // stopTimer now handles finding the active timer internally
           try {
-            await stopTimer(15); // Use default rounding
+            // Use the current stopTimer function from context
+            const currentStopTimer = stopTimerRef.current;
+            if (currentStopTimer) {
+              await currentStopTimer(15); // Use default rounding
+            }
             // Emit event to refresh time entries
             const refreshEvent = new CustomEvent('refresh-time-entries');
             window.dispatchEvent(refreshEvent);
@@ -544,10 +559,14 @@ export const TimerProvider = ({ children }) => {
           console.log('[RNDR->TimerContext] Quick start timer from tray:', data);
           if (data && data.clientId) {
             try {
-              await startTimer({
-                clientId: data.clientId,
-                description: `Quick timer for ${data.clientName}`
-              });
+              // Use the current startTimer function from context
+              const currentStartTimer = startTimerRef.current;
+              if (currentStartTimer) {
+                await currentStartTimer({
+                  clientId: data.clientId,
+                  description: `Quick timer for ${data.clientName}`
+                });
+              }
             } catch (error) {
               console.error('[RNDR->TimerContext] Error quick starting timer:', error);
             }
@@ -582,7 +601,8 @@ export const TimerProvider = ({ children }) => {
     };
 
     setupTrayEventListeners();
-  }, [waitForReady, startTimer, stopTimer]); // Include the functions we now use directly
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount, use refs to access latest functions
 
   return (
     <TimerContext.Provider value={value}>

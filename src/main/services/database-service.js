@@ -511,7 +511,7 @@ class DatabaseService {
 
   async getTimeEntries(filters = {}) {
     try {
-      logger.database("debug", "Getting time entries", { filters });
+      // logger.database("debug", "Getting time entries", { filters });
 
       const where = {};
 
@@ -554,11 +554,11 @@ class DatabaseService {
         },
       });
 
-      logger.database("info", "Retrieved time entries", {
-        count: timeEntries.length,
-        firstEntryId: timeEntries[0]?.id || null,
-        hasData: timeEntries.length > 0,
-      });
+      // logger.database("info", "Retrieved time entries", {
+      //   count: timeEntries.length,
+      //   firstEntryId: timeEntries[0]?.id || null,
+      //   hasData: timeEntries.length > 0,
+      // });
 
       return timeEntries;
     } catch (error) {
@@ -572,7 +572,7 @@ class DatabaseService {
 
   async getTimeEntriesByIds(entryIds) {
     try {
-      logger.database("debug", "Getting time entries by IDs", { entryIds });
+      // logger.database("debug", "Getting time entries by IDs", { entryIds });
 
       const timeEntries = await this.prisma.timeEntry.findMany({
         where: {
@@ -592,10 +592,10 @@ class DatabaseService {
         },
       });
 
-      logger.database("info", "Retrieved time entries by IDs", {
-        count: timeEntries.length,
-        requestedIds: entryIds.length,
-      });
+      // logger.database("info", "Retrieved time entries by IDs", {
+      //   count: timeEntries.length,
+      //   requestedIds: entryIds.length,
+      // });
 
       return timeEntries;
     } catch (error) {
@@ -845,6 +845,7 @@ class DatabaseService {
         },
       });
 
+      /*
       logger.database("info", "Retrieved clients", {
         count: clients.length,
         clientNames: clients.map((c) => c.name),
@@ -853,7 +854,8 @@ class DatabaseService {
           projects: c.projects.length,
         })),
       });
-
+      */
+     
       return clients;
     } catch (error) {
       logger.database("error", "Error getting clients", {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { HashRouter as Router, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import styled, { createGlobalStyle } from 'styled-components';
 import './App.css';
 import { TimerProvider } from './context/TimerContext';
@@ -111,37 +111,23 @@ const UpdateBarActions = styled.div`
   gap: 8px;
 `;
 
-// Component to handle window visibility detection
-const VisibilityHandler = () => {
+// Component to handle tray navigation (needs to be inside Router)
+const TrayNavigationHandler = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const timeoutRef = useRef(null);
-  const { pauseAnimations, resumeAnimations } = useAnimations();
+  const navigateRef = useRef(navigate);
 
+  // Keep navigateRef updated
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log('[RNDR->APP] Document hidden - pausing animations');
-        pauseAnimations();
-      } else {
-        console.log('[RNDR->APP] Document visible - resuming animations');
-        // Window became visible, clear the timer and resume animations
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        resumeAnimations();
-      }
-    };
+    navigateRef.current = navigate;
+  }, [navigate]);
 
+  // Set up tray event listeners once
+  useEffect(() => {
     // Handle tray events for navigation
     const handleTrayOpenSettings = () => {
       console.log('[App] Navigate to settings from tray');
-      navigate('/settings');
+      navigateRef.current('/settings');
     };
-
-    // Add event listener for visibility changes
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Add tray event listeners
     if (window.electronAPI && window.electronAPI.on) {
@@ -150,15 +136,47 @@ const VisibilityHandler = () => {
 
     // Cleanup function
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (window.electronAPI && window.electronAPI.removeListener) {
         window.electronAPI.removeListener('tray-open-settings', handleTrayOpenSettings);
       }
+    };
+  }, []); // Run only once on mount
+
+  return null; // This component doesn't render anything
+};
+
+// Component to handle window visibility detection (needs to be inside Router)
+const AppLogic = () => {
+  const timeoutRef = useRef(null);
+  const { pauseAnimations, resumeAnimations } = useAnimations();
+
+  // Set up visibility change detection
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('[RNDR->APP] Document hidden - pausing animations');
+        pauseAnimations();
+      } else {
+        console.log('[RNDR->APP] Document visible - resuming animations');
+        // Small delay to let the window properly focus
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        timeoutRef.current = setTimeout(() => {
+          resumeAnimations();
+        }, 100);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [navigate, location, pauseAnimations, resumeAnimations]);
+  }, [pauseAnimations, resumeAnimations]);
 
   return null; // This component doesn't render anything
 };
@@ -222,8 +240,9 @@ function App() {
       <TimerProvider>
         <ToastProvider>
           <Router>
+            <TrayNavigationHandler />
             <GlobalStyle />
-            <VisibilityHandler />
+            <AppLogic />
             <AppContainer>
               <BackgroundContainer>
                 <BackgroundClockOrbits />
