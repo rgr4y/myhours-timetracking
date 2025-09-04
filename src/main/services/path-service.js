@@ -1,4 +1,4 @@
-const { app } = require('electron');
+const electronBuiltin = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -7,10 +7,11 @@ const fs = require('fs');
  * Handles cross-platform paths for development and production environments
  */
 class PathService {
-  constructor() {
-    this.isPackaged = app.isPackaged;
-    this.appPath = app.getAppPath();
-    this.userDataDir = app.getPath('userData');
+  constructor(electronModule) {
+    this.electron = electronModule || electronBuiltin;
+    this.isPackaged = this.electron.app.isPackaged;
+    this.appPath = this.electron.app.getAppPath();
+    this.userDataDir = this.electron.app.getPath('userData');
     this.resourcesPath = process.resourcesPath;
   }
 

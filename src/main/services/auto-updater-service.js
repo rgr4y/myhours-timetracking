@@ -1,12 +1,13 @@
-const { ipcMain, dialog } = require('electron');
-const { autoUpdater } = require('electron-updater');
+const electronBuiltin = require('electron');
 const logger = require('./logger-service');
 
 class AutoUpdaterService {
-  constructor(mainWindow, versionService, isDev) {
+  constructor(mainWindow, versionService, isDev, electronModule) {
     this.mainWindow = mainWindow;
     this.versionService = versionService;
     this.isDev = isDev;
+    this.electron = electronModule || electronBuiltin;
+    this._autoUpdater = null; // lazy-loaded in native setup
     this.updater = {
       mode: null, // 'mock' | 'native' | 'disabled'
       lastInfo: null,
@@ -96,7 +97,7 @@ class AutoUpdaterService {
     };
 
     // IPC handlers for mock updater
-    ipcMain.handle('update:check', async () => {
+    this.electron.ipcMain.handle('update:check', async () => {
       try {
         sendEvent('checking-for-update');
         const info = await fetchJson(this.updater.feedUrl);
@@ -116,11 +117,11 @@ class AutoUpdaterService {
       }
     });
 
-    ipcMain.handle('update:getFeedUrl', async () => {
+    this.electron.ipcMain.handle('update:getFeedUrl', async () => {
       return { url: this.updater.feedUrl };
     });
 
-    ipcMain.handle('update:setFeedUrl', async (_e, url) => {
+    this.electron.ipcMain.handle('update:setFeedUrl', async (_e, url) => {
       try {
         if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
           throw new Error('Invalid URL');
@@ -133,7 +134,7 @@ class AutoUpdaterService {
       }
     });
 
-    ipcMain.handle('update:download', async () => {
+    this.electron.ipcMain.handle('update:download', async () => {
       // Simulate download progress
       if (!this.updater.lastInfo) return { error: 'No update info. Call update:check first.' };
       if (this.updater.inProgress) return { error: 'Download already in progress' };
@@ -152,7 +153,7 @@ class AutoUpdaterService {
         sendEvent('update-downloaded', { version: this.updater.lastInfo.version });
         // Prompt to install (dev mock)
         try {
-          const res = await dialog.showMessageBox(this.mainWindow, {
+          const res = await this.electron.dialog.showMessageBox(this.mainWindow, {
             type: 'question',
             buttons: ['Install Now', 'Later'],
             defaultId: 0,
@@ -171,7 +172,7 @@ class AutoUpdaterService {
       }
     });
 
-    ipcMain.handle('update:install', async () => {
+    this.electron.ipcMain.handle('update:install', async () => {
       // In dev, just simulate a relaunch
       sendEvent('will-install');
       logger.debug('[UPDATER] (mock) install triggered');
@@ -181,20 +182,23 @@ class AutoUpdaterService {
 
   setupNativeUpdater() {
     try {
+      // Lazy load electron-updater only in native setup
+      const { autoUpdater } = require('electron-updater');
+      this._autoUpdater = autoUpdater;
       // Configure auto-updater
-      autoUpdater.logger = console;
-      if (autoUpdater.logger.transports && autoUpdater.logger.transports.file) {
-        autoUpdater.logger.transports.file.level = 'info';
+      this._autoUpdater.logger = console;
+      if (this._autoUpdater.logger.transports && this._autoUpdater.logger.transports.file) {
+        this._autoUpdater.logger.transports.file.level = 'info';
       }
       // Prod: check-only, do not auto-download
-      try { autoUpdater.autoDownload = false; } catch (_) {}
-      try { autoUpdater.autoInstallOnAppQuit = true; } catch (_) {}
+      try { this._autoUpdater.autoDownload = false; } catch (_) {}
+      try { this._autoUpdater.autoInstallOnAppQuit = true; } catch (_) {}
       this.updater.mode = 'native';
       logger.debug('[UPDATER] Setting up electron-updater (macOS) ...');
 
       // Explicitly point to GitHub releases (also embedded via app-update.yml)
       try {
-        autoUpdater.setFeedURL({
+        this._autoUpdater.setFeedURL({
           provider: 'github',
           owner: 'rgr4y',
           repo: 'myhours-timetracking',
@@ -207,42 +211,42 @@ class AutoUpdaterService {
 
       // Diagnostics
       try {
-        logger.debug('[UPDATER] updateConfigPath:', autoUpdater.updateConfigPath);
+        logger.debug('[UPDATER] updateConfigPath:', this._autoUpdater.updateConfigPath);
       } catch (_) {}
 
       const forward = (type, payload = {}) => {
         try { this.mainWindow?.webContents?.send('updater:event', { type, payload }); } catch (_) {}
       };
 
-      autoUpdater.on('checking-for-update', () => {
+      this._autoUpdater.on('checking-for-update', () => {
         logger.debug('[UPDATER] Checking for update...');
         forward('checking-for-update');
       });
-      autoUpdater.on('update-available', (info) => {
+      this._autoUpdater.on('update-available', (info) => {
         const version = info?.version;
         const notes = info?.releaseNotes;
         const notesUrl = version ? `https://github.com/rgr4y/myhours-timetracking/releases/tag/v${version}` : undefined;
         logger.debug('[UPDATER] Update available:', version);
         forward('update-available', { version, notes, notesUrl });
       });
-      autoUpdater.on('update-not-available', (info) => {
+      this._autoUpdater.on('update-not-available', (info) => {
         logger.debug('[UPDATER] Update not available:', info?.version);
         forward('update-not-available', { version: info?.version });
       });
-      autoUpdater.on('error', (err) => {
+      this._autoUpdater.on('error', (err) => {
         logger.debug('[UPDATER] Error in auto-updater:', err);
         forward('error', { message: err?.message || String(err) });
       });
-      autoUpdater.on('download-progress', (progressObj) => {
+      this._autoUpdater.on('download-progress', (progressObj) => {
         forward('download-progress', progressObj);
       });
-      autoUpdater.on('update-downloaded', async (info) => {
+      this._autoUpdater.on('update-downloaded', async (info) => {
         const version = info?.version;
         logger.debug('[UPDATER] Update downloaded:', version);
         forward('update-downloaded', { version });
         // Prompt to install now
         try {
-          const res = await dialog.showMessageBox(this.mainWindow, {
+          const res = await this.electron.dialog.showMessageBox(this.mainWindow, {
             type: 'question',
             buttons: ['Install Now', 'Later'],
             defaultId: 0,
@@ -251,7 +255,7 @@ class AutoUpdaterService {
             message: `Version ${version || ''} has been downloaded. Install now?`
           });
           if (res.response === 0) {
-            autoUpdater.quitAndInstall();
+            this._autoUpdater.quitAndInstall();
           }
         } catch (e) {
           logger.warn('[UPDATER] Install prompt failed:', e);
@@ -260,15 +264,15 @@ class AutoUpdaterService {
 
       // IPC wrappers to control native updater too
       ipcMain.handle('update:check', async () => {
-        try { await autoUpdater.checkForUpdates(); return { started: true }; } catch (e) { return { error: e.message }; }
+        try { await this._autoUpdater.checkForUpdates(); return { started: true }; } catch (e) { return { error: e.message }; }
       });
       ipcMain.handle('update:download', async () => {
-        try { await autoUpdater.downloadUpdate(); return { started: true }; } catch (e) { return { error: e.message }; }
+        try { await this._autoUpdater.downloadUpdate(); return { started: true }; } catch (e) { return { error: e.message }; }
       });
       ipcMain.handle('update:install', async () => {
         try { 
           forward('will-install');
-          autoUpdater.quitAndInstall(); 
+          this._autoUpdater.quitAndInstall(); 
           return { quitting: true }; 
         } catch (e) { 
           return { error: e.message }; 
@@ -281,9 +285,9 @@ class AutoUpdaterService {
   }
 
   async checkForUpdates() {
-    if (!this.isDev && process.platform === 'darwin' && this.updater.mode === 'native') {
+    if (!this.isDev && process.platform === 'darwin' && this.updater.mode === 'native' && this._autoUpdater) {
       try {
-        await autoUpdater.checkForUpdates(); // check-only (no auto download)
+        await this._autoUpdater.checkForUpdates(); // check-only (no auto download)
       } catch (e) {
         logger.warn('[UPDATER] checkForUpdates failed:', e.message);
       }

@@ -1,11 +1,13 @@
-const { execSync } = require('child_process');
+const childProcess = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { app } = require('electron');
+const electronBuiltin = require('electron');
 
 class VersionService {
-  constructor() {
+  constructor(electronModule, options = {}) {
+    this.electron = electronModule || electronBuiltin;
     this.packageJsonPath = path.join(process.cwd(), 'package.json');
+    this.execSync = options.execSync || childProcess.execSync;
   }
 
   /**
@@ -14,8 +16,8 @@ class VersionService {
   getBaseVersion() {
     try {
       // For packaged builds, use Electron's built-in version
-      if (app.isPackaged) {
-        const version = app.getVersion();
+      if (this.electron.app && this.electron.app.isPackaged) {
+        const version = this.electron.app.getVersion();
         console.log('[VERSION] Using packaged app version:', version);
         return version;
       }
@@ -29,7 +31,7 @@ class VersionService {
       console.error('[VERSION] Failed to get base version:', error);
       // Fallback to app.getVersion() if package.json fails
       try {
-        return app.getVersion();
+        return this.electron.app.getVersion();
       } catch (e) {
         console.error('[VERSION] Fallback to app.getVersion() also failed:', e);
         return '0.0.0';
@@ -43,7 +45,7 @@ class VersionService {
   getCurrentCommitHash() {
     try {
       // Git may not be available in packaged builds
-      return execSync('git rev-parse --short=6 HEAD', { encoding: 'utf8' }).trim();
+      return this.execSync('git rev-parse --short=6 HEAD', { encoding: 'utf8' }).trim();
     } catch (error) {
       console.log('[VERSION] Git not available or not in a git repository:', error.message);
       return null;
@@ -56,10 +58,10 @@ class VersionService {
   getLatestTag() {
     try {
       // Git may not be available in packaged builds
-      const tag = execSync('git describe --tags --abbrev=0', { encoding: 'utf8' }).trim();
+      const tag = this.execSync('git describe --tags --abbrev=0', { encoding: 'utf8' }).trim();
       
       // Get the commit hash of that tag (6 characters)
-      const tagCommitHash = execSync(`git rev-list -n 1 ${tag}`, { encoding: 'utf8' }).trim();
+      const tagCommitHash = this.execSync(`git rev-list -n 1 ${tag}`, { encoding: 'utf8' }).trim();
       const shortTagCommitHash = tagCommitHash.substring(0, 6); // Get 6-char hash
       
       return {
@@ -81,7 +83,7 @@ class VersionService {
     const baseVersion = this.getBaseVersion();
     
     // For packaged builds, just return the app version (git info not available)
-    if (app.isPackaged) {
+    if (this.electron.app && this.electron.app.isPackaged) {
       console.log('[VERSION] Packaged build, using app version:', baseVersion);
       return baseVersion;
     }

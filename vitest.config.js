@@ -17,6 +17,9 @@ export default defineConfig({
       '@': resolve(__dirname, './src'),
       '@main': resolve(__dirname, './src/main'),
       '@renderer': resolve(__dirname, './src/renderer/src'),
+      electron: resolve(__dirname, './tests/mocks/electron.js'),
+      // Ensure tests never load real electron-updater; map to test mock
+      'electron-updater': resolve(__dirname, './tests/mocks/electron-updater.js'),
     },
   },
   define: {
