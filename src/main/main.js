@@ -222,7 +222,7 @@ class MyHoursApp {
     logger.debug('[MAIN] Database initialized');
     
     // Initialize invoice generator
-    this.invoiceGenerator = new InvoiceGenerator(this.database);
+    this.invoiceGenerator = new InvoiceGenerator({ database: this.database });
     
     // Setup IPC handlers
     this.setupIPC();

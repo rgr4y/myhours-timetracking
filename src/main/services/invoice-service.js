@@ -5,11 +5,55 @@ const os = require('os');
 const { dialog, BrowserWindow } = require('electron');
 
 class InvoiceGenerator {
-  constructor(database) {
-    this.database = database;
-    // Template is in src/main/templates, not src/main/services/templates
-    this.templatePath = path.join(__dirname, '..', 'templates', 'invoice.hbs');
+  constructor(dependencies = {}) {
+    // Validate dependencies first
+    if (!dependencies.database) {
+      throw new Error('Database dependency is required');
+    }
+    
+    // Inject dependencies with defaults for production use
+    this.database = dependencies.database;
+    this.fileSystem = dependencies.fileSystem || {
+      readFileSync: fs.readFileSync,
+      writeFileSync: fs.writeFileSync,
+      existsSync: fs.existsSync
+    };
+    this.pathUtil = dependencies.pathUtil || {
+      join: path.join,
+      tmpdir: os.tmpdir
+    };
+    this.dialogService = dependencies.dialogService || {
+      showSaveDialog: dialog.showSaveDialog
+    };
+    this.pdfRenderer = dependencies.pdfRenderer || this.createDefaultPdfRenderer();
+    this.templateCompiler = dependencies.templateCompiler || handlebars;
+    this.dateProvider = dependencies.dateProvider || (() => new Date());
+    
+    // Template path configuration
+    this.templatePath = dependencies.templatePath || 
+      this.pathUtil.join(__dirname, '..', 'templates', 'invoice.hbs');
+    
     this.ensureTemplateDirectory();
+  }
+
+  createDefaultPdfRenderer() {
+    return {
+      renderHtmlToPdf: async (html) => {
+        const win = new BrowserWindow({ 
+          show: false, 
+          webPreferences: { sandbox: true } 
+        });
+        await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+        await new Promise(r => setTimeout(r, 50));
+        const pdf = await win.webContents.printToPDF({ 
+          printBackground: true, 
+          pageSize: 'A4', 
+          landscape: false 
+        });
+        win.destroy();
+        return pdf;
+      }
+    };
   }
 
   // Parse common NET terms into a number of days (default 30)
@@ -23,121 +67,26 @@ class InvoiceGenerator {
   }
 
   ensureTemplateDirectory() {
-    const templateDir = path.join(__dirname, '..', 'templates');
-    if (!fs.existsSync(templateDir)) {
+    const templateDir = this.pathUtil.join(__dirname, '..', 'templates');
+    if (!this.fileSystem.existsSync(templateDir)) {
       throw new Error(`Template directory not found: ${templateDir}. Please ensure the templates directory is included in the build.`);
     }
     
-    if (!fs.existsSync(this.templatePath)) {
+    if (!this.fileSystem.existsSync(this.templatePath)) {
       throw new Error(`Invoice template not found: ${this.templatePath}. Please ensure invoice.hbs is included in the build.`);
     }
   }
 
   async generateInvoice(data) {
     try {
-      // Get settings for company info
       const settings = await this.database.getSettings();
+      const timeEntries = await this.getUninvoicedTimeEntries(data);
       
-      // Convert the form data to the correct filter format
-      const filters = {
-        clientId: parseInt(data.client_id),
-        startDate: data.start_date,
-        endDate: data.end_date
-      };
+      this.validateTimeEntriesForInvoicing(timeEntries);
       
-      // Get uninvoiced time entries for the specified filters
-      const timeEntries = await this.database.getTimeEntries({
-        ...filters,
-        isInvoiced: false
-      });
-
-      if (timeEntries.length === 0) {
-        throw new Error('No uninvoiced time entries found for the specified criteria');
-      }
-
-      // Validate that all entries have hourly rates
-      const missingRates = [];
-      let totalAmount = 0;
+      const invoiceData = await this.createInvoiceData(timeEntries, settings, data);
+      const pdfPath = await this.generatePDF(invoiceData);
       
-      for (const entry of timeEntries) {
-        // Try to get hourly rate from project, then client
-        const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
-        
-        if (!hourlyRate || hourlyRate <= 0) {
-          missingRates.push({
-            entryId: entry.id,
-            clientName: entry.client?.name || 'Unknown Client',
-            projectName: entry.project?.name || 'No Project',
-            date: new Date(entry.startTime).toLocaleDateString()
-          });
-        } else {
-          const hours = (entry.duration || 0) / 60;
-          totalAmount += hours * hourlyRate;
-        }
-      }
-      
-      if (missingRates.length > 0) {
-        const errorDetails = missingRates.map(mr => 
-          `• ${mr.date} - ${mr.clientName}/${mr.projectName}`
-        ).join('\n');
-        
-        throw new Error(`Cannot generate invoice: The following time entries have no hourly rate set:\n\n${errorDetails}\n\nPlease set hourly rates for the client or project before generating an invoice.`);
-      }
-
-      // Group entries by day and combine descriptions
-      const lineItems = this.groupEntriesByDay(timeEntries);
-      
-      // Calculate totals with proper hourly rates
-      const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 60;
-      
-      // Get the first entry's client info for the invoice header
-      const clientInfo = timeEntries[0]?.client;
-      
-      // For display, use the most common hourly rate or indicate "varies"
-      const rates = timeEntries.map(entry => entry.project?.hourlyRate || entry.client?.hourlyRate).filter(Boolean);
-      const uniqueRates = [...new Set(rates)];
-      const displayRate = uniqueRates.length === 1 ? uniqueRates[0] : null;
-
-      // Determine actual period from the entries (not the raw filter)
-      const periodStartDisplay = this.getOldestEntryDate(timeEntries);
-      const periodEndDisplay = this.getNewestEntryDate(timeEntries);
-
-      // Prepare template data (support snake_case and camelCase settings)
-      const templateData = {
-        companyName: settings.company_name || settings.companyName || 'Your Company',
-        companyEmail: settings.company_email || settings.companyEmail || '',
-        companyPhone: settings.company_phone || settings.companyPhone || '',
-        companyWebsite: settings.company_website || settings.companyWebsite || '',
-        invoiceNumber: data.invoice_number || this.generateInvoiceNumber(),
-        invoiceDate: new Date().toLocaleDateString(),
-        terms: settings.invoice_terms || settings.invoiceTerms || 'Net 30',
-        dueDate: (() => {
-          const days = this.parseNetDays(settings.invoice_terms || settings.invoiceTerms || 'Net 30');
-          const d = new Date();
-          d.setDate(d.getDate() + days);
-          return d.toLocaleDateString();
-        })(),
-        // Always show the true invoice period based on included entries
-        periodStart: periodStartDisplay,
-        periodEnd: periodEndDisplay,
-        clientName: clientInfo?.name || 'Unknown Client',
-        clientEmail: clientInfo?.email || '',
-        lineItems: lineItems,
-        totalHours: totalHours.toFixed(2),
-        hourlyRate: displayRate ? displayRate.toFixed(2) : 'Varies',
-        totalAmount: totalAmount.toFixed(2)
-      };
-
-      // Mark entries as invoiced first to get the invoice ID
-      const entryIds = timeEntries.map(entry => entry.id);
-      const createdInvoice = await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber, templateData);
-      
-      // Update templateData with the invoice ID for filename generation
-      templateData.invoiceId = createdInvoice.id;
-
-      // Generate PDF with correct filename including invoice ID
-      const pdfPath = await this.generatePDF(templateData);
-
       return pdfPath;
     } catch (error) {
       console.error('Error generating invoice:', error);
@@ -145,121 +94,165 @@ class InvoiceGenerator {
     }
   }
 
+  async getUninvoicedTimeEntries(data) {
+    const filters = {
+      clientId: parseInt(data.client_id),
+      startDate: data.start_date,
+      endDate: data.end_date
+    };
+    
+    const timeEntries = await this.database.getTimeEntries({
+      ...filters,
+      isInvoiced: false
+    });
+
+    if (timeEntries.length === 0) {
+      throw new Error('No uninvoiced time entries found for the specified criteria');
+    }
+
+    return timeEntries;
+  }
+
+  validateTimeEntriesForInvoicing(timeEntries) {
+    const missingRates = [];
+    
+    for (const entry of timeEntries) {
+      const hourlyRate = this.getHourlyRateForEntry(entry);
+      
+      if (!hourlyRate || hourlyRate <= 0) {
+        missingRates.push({
+          entryId: entry.id,
+          clientName: entry.client?.name || 'Unknown Client',
+          projectName: entry.project?.name || 'No Project',
+          date: new Date(entry.startTime).toLocaleDateString()
+        });
+      }
+    }
+    
+    if (missingRates.length > 0) {
+      const errorDetails = missingRates.map(mr => 
+        `• ${mr.date} - ${mr.clientName}/${mr.projectName}`
+      ).join('\n');
+      
+      throw new Error(`Cannot generate invoice: The following time entries have no hourly rate set:\n\n${errorDetails}\n\nPlease set hourly rates for the client or project before generating an invoice.`);
+    }
+  }
+
+  getHourlyRateForEntry(entry) {
+    return entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
+  }
+
+  async createInvoiceData(timeEntries, settings, inputData) {
+    const lineItems = this.groupEntriesByDay(timeEntries);
+    const totalHours = this.calculateTotalHours(timeEntries);
+    const totalAmount = this.calculateTotalAmount(timeEntries);
+    const clientInfo = timeEntries[0]?.client;
+    const displayRate = this.getDisplayRate(timeEntries);
+    
+    const periodStartDisplay = this.getOldestEntryDate(timeEntries);
+    const periodEndDisplay = this.getNewestEntryDate(timeEntries);
+    
+    const invoiceNumber = inputData.invoice_number || this.generateInvoiceNumber();
+    const currentDate = this.dateProvider();
+    
+    const templateData = {
+      companyName: settings.company_name || settings.companyName || 'Your Company',
+      companyEmail: settings.company_email || settings.companyEmail || '',
+      companyPhone: settings.company_phone || settings.companyPhone || '',
+      companyWebsite: settings.company_website || settings.companyWebsite || '',
+      invoiceNumber: invoiceNumber,
+      invoiceDate: currentDate.toLocaleDateString(),
+      terms: settings.invoice_terms || settings.invoiceTerms || 'Net 30',
+      dueDate: this.calculateDueDate(settings, currentDate),
+      periodStart: periodStartDisplay,
+      periodEnd: periodEndDisplay,
+      clientName: clientInfo?.name || 'Unknown Client',
+      clientEmail: clientInfo?.email || '',
+      lineItems: lineItems,
+      totalHours: totalHours.toFixed(2),
+      hourlyRate: displayRate ? displayRate.toFixed(2) : 'Varies',
+      totalAmount: totalAmount.toFixed(2)
+    };
+
+    // Mark entries as invoiced and get invoice ID
+    const entryIds = timeEntries.map(entry => entry.id);
+    const createdInvoice = await this.database.markAsInvoiced(entryIds, invoiceNumber, templateData);
+    templateData.invoiceId = createdInvoice.id;
+
+    return templateData;
+  }
+
+  calculateTotalHours(timeEntries) {
+    return timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 60;
+  }
+
+  calculateTotalAmount(timeEntries) {
+    return timeEntries.reduce((sum, entry) => {
+      const hours = (entry.duration || 0) / 60;
+      const hourlyRate = this.getHourlyRateForEntry(entry);
+      return sum + (hours * hourlyRate);
+    }, 0);
+  }
+
+  getDisplayRate(timeEntries) {
+    const rates = timeEntries
+      .map(entry => this.getHourlyRateForEntry(entry))
+      .filter(Boolean);
+    const uniqueRates = [...new Set(rates)];
+    return uniqueRates.length === 1 ? uniqueRates[0] : null;
+  }
+
+  calculateDueDate(settings, invoiceDate = null) {
+    const baseDate = invoiceDate || this.dateProvider();
+    const days = this.parseNetDays(settings.invoice_terms || settings.invoiceTerms || 'Net 30');
+    const dueDate = new Date(baseDate);
+    dueDate.setDate(dueDate.getDate() + days);
+    return dueDate.toLocaleDateString();
+  }
+
   async generateInvoiceFromSelectedEntries(data) {
     try {
-      // Get settings for company info
       const settings = await this.database.getSettings();
+      const timeEntries = await this.getSelectedTimeEntries(data);
       
-      if (!data.selectedEntryIds || data.selectedEntryIds.length === 0) {
-        throw new Error('No time entries selected for invoice generation');
-      }
-
-      // Get the selected time entries by ID
-      const timeEntries = await this.database.getTimeEntriesByIds(data.selectedEntryIds);
-
-      if (timeEntries.length === 0) {
-        throw new Error('No time entries found for the selected IDs');
-      }
-
-      // Ensure all entries are uninvoiced
-      const invoicedEntries = timeEntries.filter(entry => entry.isInvoiced);
-      if (invoicedEntries.length > 0) {
-        throw new Error('Some selected time entries have already been invoiced');
-      }
-
-      // Ensure all entries belong to the same client
-      const clientIds = [...new Set(timeEntries.map(entry => entry.clientId))];
-      if (clientIds.length > 1) {
-        throw new Error('Cannot generate invoice for time entries from multiple clients');
-      }
-
-      // Validate that all entries have hourly rates
-      const missingRates = [];
-      let totalAmount = 0;
+      this.validateSelectedEntries(timeEntries);
+      this.validateTimeEntriesForInvoicing(timeEntries);
       
-      for (const entry of timeEntries) {
-        // Try to get hourly rate from project, then client
-        const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
-        
-        if (!hourlyRate || hourlyRate <= 0) {
-          missingRates.push({
-            entryId: entry.id,
-            clientName: entry.client?.name || 'Unknown Client',
-            projectName: entry.project?.name || 'No Project',
-            date: new Date(entry.startTime).toLocaleDateString()
-          });
-        } else {
-          const hours = (entry.duration || 0) / 60;
-          totalAmount += hours * hourlyRate;
-        }
-      }
+      const invoiceData = await this.createInvoiceData(timeEntries, settings, data);
+      const pdfPath = await this.generatePDF(invoiceData);
       
-      if (missingRates.length > 0) {
-        const errorDetails = missingRates.map(mr => 
-          `• ${mr.date} - ${mr.clientName}/${mr.projectName}`
-        ).join('\n');
-        
-        throw new Error(`Cannot generate invoice: The following time entries have no hourly rate set:\n\n${errorDetails}\n\nPlease set hourly rates for the client or project before generating an invoice.`);
-      }
-
-      // Group entries by day and combine descriptions
-      const lineItems = this.groupEntriesByDay(timeEntries);
-      
-      // Calculate totals with proper hourly rates
-      const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 60;
-      
-      // Get the first entry's client info for the invoice header
-      const clientInfo = timeEntries[0]?.client;
-      
-      // For display, use the most common hourly rate or indicate "varies"
-      const rates = timeEntries.map(entry => entry.project?.hourlyRate || entry.client?.hourlyRate).filter(Boolean);
-      const uniqueRates = [...new Set(rates)];
-      const displayRate = uniqueRates.length === 1 ? uniqueRates[0] : null;
-
-      // Determine actual period from the entries
-      const periodStartDisplay = this.getOldestEntryDate(timeEntries);
-      const periodEndDisplay = this.getNewestEntryDate(timeEntries);
-
-      // Prepare template data (support snake_case and camelCase settings)
-      const templateData = {
-        companyName: settings.company_name || settings.companyName || 'Your Company',
-        companyEmail: settings.company_email || settings.companyEmail || '',
-        companyPhone: settings.company_phone || settings.companyPhone || '',
-        companyWebsite: settings.company_website || settings.companyWebsite || '',
-        invoiceNumber: data.invoice_number || this.generateInvoiceNumber(),
-        invoiceDate: new Date().toLocaleDateString(),
-        terms: settings.invoice_terms || settings.invoiceTerms || 'Net 30',
-        dueDate: (() => {
-          const days = this.parseNetDays(settings.invoice_terms || settings.invoiceTerms || 'Net 30');
-          const d = new Date();
-          d.setDate(d.getDate() + days);
-          return d.toLocaleDateString();
-        })(),
-        // Show the true invoice period based on included entries
-        periodStart: periodStartDisplay,
-        periodEnd: periodEndDisplay,
-        clientName: clientInfo?.name || 'Unknown Client',
-        clientEmail: clientInfo?.email || '',
-        lineItems: lineItems,
-        totalHours: totalHours.toFixed(2),
-        hourlyRate: displayRate ? displayRate.toFixed(2) : 'Varies',
-        totalAmount: totalAmount.toFixed(2)
-      };
-
-      // Mark entries as invoiced first to get the invoice ID
-      const entryIds = timeEntries.map(entry => entry.id);
-      const createdInvoice = await this.database.markAsInvoiced(entryIds, templateData.invoiceNumber, templateData);
-      
-      // Update templateData with the invoice ID for filename generation
-      templateData.invoiceId = createdInvoice.id;
-
-      // Generate PDF with correct filename including invoice ID
-      const pdfPath = await this.generatePDF(templateData);
-
       return pdfPath;
     } catch (error) {
       console.error('Error generating invoice from selected entries:', error);
       throw error;
+    }
+  }
+
+  async getSelectedTimeEntries(data) {
+    if (!data.selectedEntryIds || data.selectedEntryIds.length === 0) {
+      throw new Error('No time entries selected for invoice generation');
+    }
+
+    const timeEntries = await this.database.getTimeEntriesByIds(data.selectedEntryIds);
+
+    if (timeEntries.length === 0) {
+      throw new Error('No time entries found for the selected IDs');
+    }
+
+    return timeEntries;
+  }
+
+  validateSelectedEntries(timeEntries) {
+    // Ensure all entries are uninvoiced
+    const invoicedEntries = timeEntries.filter(entry => entry.isInvoiced);
+    if (invoicedEntries.length > 0) {
+      throw new Error('Some selected time entries have already been invoiced');
+    }
+
+    // Ensure all entries belong to the same client
+    const clientIds = [...new Set(timeEntries.map(entry => entry.clientId))];
+    if (clientIds.length > 1) {
+      throw new Error('Cannot generate invoice for time entries from multiple clients');
     }
   }
 
@@ -278,7 +271,7 @@ class InvoiceGenerator {
       
       invoice.timeEntries.forEach(entry => {
         totalHours += (entry.duration || 0) / 60;
-        const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
+        const hourlyRate = this.getHourlyRateForEntry(entry);
         if (hourlyRate > 0) {
           ratesUsed.add(hourlyRate);
         }
@@ -363,84 +356,14 @@ class InvoiceGenerator {
         throw new Error('No uninvoiced time entries found for regeneration');
       }
 
-      // Validate that all entries have hourly rates
-      const missingRates = [];
-      let totalAmount = 0;
-      
-      for (const entry of timeEntries) {
-        const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
-        
-        if (!hourlyRate || hourlyRate <= 0) {
-          missingRates.push({
-            entryId: entry.id,
-            clientName: entry.client?.name || 'Unknown Client',
-            projectName: entry.project?.name || 'No Project',
-            date: new Date(entry.startTime).toLocaleDateString()
-          });
-        } else {
-          const hours = (entry.duration || 0) / 60;
-          totalAmount += hours * hourlyRate;
-        }
-      }
-      
-      if (missingRates.length > 0) {
-        const errorDetails = missingRates.map(mr => 
-          `• ${mr.date} - ${mr.clientName}/${mr.projectName}`
-        ).join('\n');
-        
-        throw new Error(`Cannot regenerate invoice: The following time entries have no hourly rate set:\n\n${errorDetails}\n\nPlease set hourly rates for the client or project before regenerating.`);
-      }
+      this.validateTimeEntriesForInvoicing(timeEntries);
 
-      // Group entries by day and combine descriptions
-      const lineItems = this.groupEntriesByDay(timeEntries);
-      
-      // Calculate totals with proper hourly rates
-      const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 60;
-      
-      // Get the first entry's client info for the invoice header
-      const clientInfo = timeEntries[0]?.client;
-      
-      // For display, use the most common hourly rate or indicate "varies"
-      const rates = timeEntries.map(entry => entry.project?.hourlyRate || entry.client?.hourlyRate).filter(Boolean);
-      const uniqueRates = [...new Set(rates)];
-      const displayRate = uniqueRates.length === 1 ? uniqueRates[0] : null;
-
-      // Determine actual period from the entries
-      const periodStartDisplay = this.getOldestEntryDate(timeEntries);
-      const periodEndDisplay = this.getNewestEntryDate(timeEntries);
-
-      // Prepare template data (keep same invoice number as original)
-      const templateData = {
-        companyName: settings.company_name || settings.companyName || 'Your Company',
-        companyEmail: settings.company_email || settings.companyEmail || '',
-        companyPhone: settings.company_phone || settings.companyPhone || '',
-        companyWebsite: settings.company_website || settings.companyWebsite || '',
-        invoiceNumber: existingInvoice.invoiceNumber, // Keep same invoice number
-        invoiceDate: new Date().toLocaleDateString(),
-        terms: settings.invoice_terms || settings.invoiceTerms || 'Net 30',
-        dueDate: (() => {
-          const days = this.parseNetDays(settings.invoice_terms || settings.invoiceTerms || 'Net 30');
-          const d = new Date();
-          d.setDate(d.getDate() + days);
-          return d.toLocaleDateString();
-        })(),
-        // Show the true invoice period based on included entries
-        periodStart: periodStartDisplay,
-        periodEnd: periodEndDisplay,
-        clientName: clientInfo?.name || 'Unknown Client',
-        clientEmail: clientInfo?.email || '',
-        lineItems: lineItems,
-        totalHours: totalHours.toFixed(2),
-        hourlyRate: displayRate ? displayRate.toFixed(2) : 'Varies',
-        totalAmount: totalAmount.toFixed(2)
-      };
-
-      // Mark entries as invoiced first to get the new invoice ID
-      const newEntryIds = timeEntries.map(entry => entry.id);
-      const newInvoice = await this.database.markAsInvoiced(newEntryIds, templateData.invoiceNumber, templateData);
-      
-      // Update templateData with the new invoice ID for filename generation
-      templateData.invoiceId = newInvoice.id;
+      // Create regenerated invoice data
+      const templateData = await this.createRegeneratedInvoiceData(
+        timeEntries, 
+        settings, 
+        existingInvoice
+      );
 
       // Generate PDF with correct filename including new invoice ID
       const pdfPath = await this.generatePDF(templateData);
@@ -450,6 +373,45 @@ class InvoiceGenerator {
       console.error('Error regenerating invoice:', error);
       throw error;
     }
+  }
+
+  async createRegeneratedInvoiceData(timeEntries, settings, existingInvoice) {
+    const lineItems = this.groupEntriesByDay(timeEntries);
+    const totalHours = this.calculateTotalHours(timeEntries);
+    const totalAmount = this.calculateTotalAmount(timeEntries);
+    const clientInfo = timeEntries[0]?.client;
+    const displayRate = this.getDisplayRate(timeEntries);
+    
+    const periodStartDisplay = this.getOldestEntryDate(timeEntries);
+    const periodEndDisplay = this.getNewestEntryDate(timeEntries);
+    
+    const currentDate = this.dateProvider();
+    
+    const templateData = {
+      companyName: settings.company_name || settings.companyName || 'Your Company',
+      companyEmail: settings.company_email || settings.companyEmail || '',
+      companyPhone: settings.company_phone || settings.companyPhone || '',
+      companyWebsite: settings.company_website || settings.companyWebsite || '',
+      invoiceNumber: existingInvoice.invoiceNumber, // Keep same invoice number
+      invoiceDate: currentDate.toLocaleDateString(),
+      terms: settings.invoice_terms || settings.invoiceTerms || 'Net 30',
+      dueDate: this.calculateDueDate(settings, currentDate),
+      periodStart: periodStartDisplay,
+      periodEnd: periodEndDisplay,
+      clientName: clientInfo?.name || 'Unknown Client',
+      clientEmail: clientInfo?.email || '',
+      lineItems: lineItems,
+      totalHours: totalHours.toFixed(2),
+      hourlyRate: displayRate ? displayRate.toFixed(2) : 'Varies',
+      totalAmount: totalAmount.toFixed(2)
+    };
+
+    // Mark entries as invoiced and get new invoice ID
+    const newEntryIds = timeEntries.map(entry => entry.id);
+    const newInvoice = await this.database.markAsInvoiced(newEntryIds, templateData.invoiceNumber, templateData);
+    templateData.invoiceId = newInvoice.id;
+
+    return templateData;
   }
 
   // Generate PDF directly from stored template data - used for View button  
@@ -491,12 +453,12 @@ class InvoiceGenerator {
 
   // Generate PDF directly to temp file without user dialog - used for automated invoice operations
   async generatePDFToFile(templateData) {
-    const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
+    const template = this.templateCompiler.compile(this.fileSystem.readFileSync(this.templatePath, 'utf8'));
     const html = template(templateData);
-    const buffer = await this.renderHtmlToPdf(html);
+    const buffer = await this.pdfRenderer.renderHtmlToPdf(html);
     const filename = this.createInvoiceFilename(templateData.clientName, templateData.invoiceNumber, templateData.invoiceId, true);
-    const tempPath = path.join(os.tmpdir(), filename);
-    fs.writeFileSync(tempPath, buffer);
+    const tempPath = this.pathUtil.join(this.pathUtil.tmpdir(), filename);
+    this.fileSystem.writeFileSync(tempPath, buffer);
     return tempPath;
   }
 
@@ -507,7 +469,7 @@ class InvoiceGenerator {
       const entryDate = new Date(entry.startTime);
       const dayKey = entryDate.toISOString().split('T')[0]; // YYYY-MM-DD format
       
-      const hourlyRate = entry.project?.hourlyRate || entry.client?.hourlyRate || 0;
+      const hourlyRate = this.getHourlyRateForEntry(entry);
       
       if (!days[dayKey]) {
         days[dayKey] = {
@@ -557,32 +519,23 @@ class InvoiceGenerator {
 
   // Generate PDF with user save dialog - used for interactive invoice creation
   async generatePDF(templateData) {
-    const template = handlebars.compile(fs.readFileSync(this.templatePath, 'utf8'));
+    const template = this.templateCompiler.compile(this.fileSystem.readFileSync(this.templatePath, 'utf8'));
     const html = template(templateData);
     const defaultFilename = this.createInvoiceFilename(templateData.clientName, templateData.invoiceNumber, templateData.invoiceId);
-    const result = await dialog.showSaveDialog({
+    const result = await this.dialogService.showSaveDialog({
       defaultPath: defaultFilename,
       filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
     });
     if (result.canceled || !result.filePath) {
       throw new Error('PDF generation canceled by user');
     }
-    const buffer = await this.renderHtmlToPdf(html);
-    fs.writeFileSync(result.filePath, buffer);
+    const buffer = await this.pdfRenderer.renderHtmlToPdf(html);
+    this.fileSystem.writeFileSync(result.filePath, buffer);
     return result.filePath;
   }
 
-  async renderHtmlToPdf(html) {
-    const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
-    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
-    await new Promise(r => setTimeout(r, 50));
-    const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4', landscape: false });
-    win.destroy();
-    return pdf;
-  }
-
   generateInvoiceNumber() {
-    const date = new Date();
+    const date = this.dateProvider();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -598,7 +551,7 @@ class InvoiceGenerator {
     // Sanitize client name: strip non-filename friendly chars, replace spaces with ., dashes with .
     const sanitizedClientName = safeClientName
       .trim() // Trim first to handle whitespace-only strings
-      .replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename characters
+      .replace(/[<>:"/\\|?*&]/g, '') // Remove invalid filename characters including &
       .replace(/\s+/g, '.') // Replace spaces with dots
       .replace(/[-]/g, '.') // Replace dashes with dots
       .substring(0, 30) // Truncate to 30 characters for better readability

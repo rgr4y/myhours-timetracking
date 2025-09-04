@@ -33,10 +33,10 @@ class WindowsTrayService extends TrayService {
   }
 
   initialize() {
-    logger.log('[TRAY-WINDOWS] Initializing Windows tray...');
+    logger.info('[TRAY-WINDOWS] Initializing Windows tray...');
     
     try {
-      logger.log('[TRAY-WINDOWS] Icon path exists:', fs.existsSync(this.iconPath));
+      logger.info('[TRAY-WINDOWS] Icon path exists:', fs.existsSync(this.iconPath));
       
       const icon = this.loadIcon();
       if (!icon) {
@@ -53,7 +53,7 @@ class WindowsTrayService extends TrayService {
       // Check for active timer and restore tray state
       this.restoreTimerState();
       
-      logger.log('[TRAY-WINDOWS] Tray initialized successfully');
+      logger.info('[TRAY-WINDOWS] Tray initialized successfully');
       return true;
     } catch (error) {
       logger.error('[TRAY-WINDOWS] Error initializing tray:', error);
@@ -173,10 +173,10 @@ class WindowsTrayService extends TrayService {
   async toggleTimer() {
     try {
       if (this.currentTimer) {
-        logger.log('[TRAY-WINDOWS] Stopping timer from tray');
+        logger.info('[TRAY-WINDOWS] Stopping timer from tray');
         await this.stopTimer();
       } else {
-        logger.log('[TRAY-WINDOWS] Starting timer from tray');
+        logger.info('[TRAY-WINDOWS] Starting timer from tray');
         await this.startTimer();
       }
     } catch (error) {
@@ -185,7 +185,7 @@ class WindowsTrayService extends TrayService {
   }
 
   async openSettings() {
-    logger.log('[TRAY-WINDOWS] Opening settings...');
+    logger.info('[TRAY-WINDOWS] Opening settings...');
     this.showWindow();
     
     // Wait for window to be ready
@@ -244,7 +244,7 @@ class WindowsTrayService extends TrayService {
     try {
       const activeTimer = await this.database.getActiveTimer();
       if (activeTimer) {
-        logger.log('[TRAY-WINDOWS] Restoring timer state:', activeTimer);
+        logger.info('[TRAY-WINDOWS] Restoring timer state:', activeTimer);
         this.updateTimerStatus({
           id: activeTimer.id,
           clientName: activeTimer.client?.name || 'Unknown Client',
@@ -275,7 +275,7 @@ class WindowsTrayService extends TrayService {
   }
 
   destroy() {
-    logger.log('[TRAY-WINDOWS] Destroying Windows tray service');
+    logger.info('[TRAY-WINDOWS] Destroying Windows tray service');
     this.stopTimerUpdates();
     super.destroy();
   }

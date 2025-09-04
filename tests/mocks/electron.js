@@ -20,6 +20,7 @@ const ipcMain = {
 
 const dialog = {
   showMessageBox: async () => ({ response: 1 }),
+  showSaveDialog: async () => ({ canceled: false, filePath: '/mock/path.pdf' }),
 }
 
 const app = {
