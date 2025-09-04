@@ -454,7 +454,7 @@ class IpcService {
     ipcMain.handle('db:getInvoices', async () => {
       try {
         const invoices = await this.database.getInvoices();
-        logger.debug('[MAIN] IPC: Got invoices:', invoices.length);
+        // logger.debug('[MAIN] IPC: Got invoices:', invoices.length);
         return invoices;
       } catch (error) {
         logger.error('[MAIN] IPC: Error getting invoices:', error);
@@ -545,28 +545,57 @@ class IpcService {
 
         const filePath = await this.invoiceGenerator.generatePDFFromStoredData(invoice);
         
-        const defaultFilename = this.invoiceGenerator.createInvoiceFilename(
-          invoice.client?.name || 'Unknown Client', 
-          invoice.invoiceNumber
-        );
+        // Create a new window with Electron's internal PDF viewer
+        const { BrowserWindow } = require('electron');
+        const path = require('path');
         
-        const result = await dialog.showSaveDialog(this.mainWindow, {
-          title: 'Save Invoice',
-          defaultPath: defaultFilename,
-          filters: [
-            { name: 'PDF Files', extensions: ['pdf'] }
-          ]
+        const pdfWindow = new BrowserWindow({
+          width: 1000,
+          height: 800,
+          title: `Invoice ${invoice.invoiceNumber} - ${invoice.client?.name || 'Unknown Client'}`,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            enableRemoteModule: false,
+            plugins: true, // Enable PDF plugin
+            webSecurity: false // Allow local file access for PDF viewing
+          },
+          show: true, // Show immediately instead of waiting for ready-to-show
+          backgroundColor: '#ffffff',
+          autoHideMenuBar: true,
+          icon: path.join(__dirname, '../../../assets/icon.png') // Add app icon if available
         });
 
-        if (!result.canceled && result.filePath) {
-          const fs = require('fs').promises;
-          await fs.copyFile(filePath, result.filePath);
-          logger.debug('[MAIN] invoice:view completed successfully');
-          return { success: true, filePath: result.filePath };
-        } else {
-          logger.debug('[MAIN] invoice:view cancelled by user');
-          return { success: false, error: 'Download cancelled' };
-        }
+        // Load the PDF file using file:// protocol - Electron's internal PDF viewer will handle it
+        const fileUrl = `file://${filePath}`;
+        logger.debug('[MAIN] Loading PDF URL:', fileUrl);
+        await pdfWindow.loadURL(fileUrl);
+        
+        // Ensure window is visible and focused
+        pdfWindow.show();
+        pdfWindow.focus();
+        pdfWindow.moveTop(); // Bring to front on macOS
+
+        // Clean up the temporary file when window is closed
+        pdfWindow.on('closed', () => {
+          const fs = require('fs');
+          try {
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+              logger.debug('[MAIN] Cleaned up temporary PDF file:', filePath);
+            }
+          } catch (cleanupError) {
+            logger.warn('[MAIN] Failed to clean up temporary PDF file:', cleanupError.message);
+          }
+        });
+
+        // Handle any load failures
+        pdfWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+          logger.error('[MAIN] PDF window failed to load:', { errorCode, errorDescription });
+        });
+
+        logger.debug('[MAIN] invoice:view completed successfully - PDF opened in Electron internal viewer');
+        return { success: true, message: 'Invoice opened in new window' };
       } catch (error) {
         logger.error('[MAIN] Error viewing invoice:', error);
         return { success: false, error: error.message };

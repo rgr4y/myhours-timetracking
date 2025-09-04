@@ -373,14 +373,14 @@ const Invoice = () => {
       const api = await waitForReady();
       if (api && api.invoices) {
         const result = await api.invoices.view(invoiceId);
-        console.log('[FRONTEND] View result:', result);
+        console.log('[FRONTEND] View result:', JSON.stringify(result));
         
         if (result.success) {
           // Show success toast
           addToast({
             variant: 'success',
-            title: 'View Complete!',
-            message: 'Invoice has been opened successfully.',
+            title: 'Invoice Opened!',
+            message: 'Invoice is now open in a new window.',
             duration: 3000
           });
         } else {
@@ -398,7 +398,7 @@ const Invoice = () => {
       addToast({
         variant: 'error',
         title: 'View Error',
-        message: 'Failed to view invoice: ' + error.message,
+        message: 'Failed to open invoice: ' + error.message,
         duration: 5000
       });
     } finally {
