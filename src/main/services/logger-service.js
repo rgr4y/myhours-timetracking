@@ -54,9 +54,20 @@ class LoggerService {
       winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
         let log = `${timestamp} [${level.toUpperCase()}] ${message}`;
         
-        // Add metadata if present
+        // Add metadata if present - safely stringify regardless of type
         if (Object.keys(meta).length > 0) {
-          log += ` ${JSON.stringify(meta)}`;
+          try {
+            const serializedMeta = JSON.stringify(meta, (key, value) => {
+              if (typeof value === 'bigint') {
+                return value.toString() + 'n';
+              }
+              return value;
+            });
+            log += ` ${serializedMeta}`;
+          } catch (err) {
+            // Fallback for non-serializable values
+            log += `type=${typeof meta}, ${String(meta)}`;
+          }
         }
         
         // Add stack trace for errors
@@ -170,19 +181,23 @@ class LoggerService {
 
   // Helper methods for common log levels
   info(message, meta = {}) {
-    this.getLogger().info(message, meta);
+    const safeMeta = (meta !== null && typeof meta === 'object') ? meta : { meta };
+    this.getLogger().info(message, safeMeta);
   }
 
   error(message, meta = {}) {
-    this.getLogger().error(message, meta);
+    const safeMeta = (meta !== null && typeof meta === 'object') ? meta : { meta };
+    this.getLogger().error(message, safeMeta);
   }
 
   warn(message, meta = {}) {
-    this.getLogger().warn(message, meta);
+    const safeMeta = (meta !== null && typeof meta === 'object') ? meta : { meta };
+    this.getLogger().warn(message, safeMeta);
   }
 
   debug(message, meta = {}) {
-    this.getLogger().debug(message, meta);
+    const safeMeta = (meta !== null && typeof meta === 'object') ? meta : { meta };
+    this.getLogger().debug(message, safeMeta);
   }
 }
 

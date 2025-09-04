@@ -110,7 +110,7 @@ class VersionService {
     }
 
     // If current commit differs from tag commit, return tag with current hash
-    const versionWithHash = `${latestTag.tag}-${currentHash}`;
+    const versionWithHash = `${baseVersion}-${currentHash}`;
     console.log('[VERSION] Current commit differs from tag, using tag with hash:', versionWithHash);
     return versionWithHash;
   }

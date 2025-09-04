@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+// Import console override to ensure unified logging
 
 // Browser shim for electronAPI - only in development
 if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && !window.electronAPI) {

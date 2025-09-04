@@ -19,49 +19,7 @@ const isDev = (
   Boolean(process.defaultApp)
 );
 
-// Forward console logs to main process using proper one-way IPC
-const originalConsole = {
-  log: console.log,
-  error: console.error,
-  warn: console.warn,
-  info: console.info
-};
-
-// Simple one-way console forwarding
-const formatArgs = (args) => args.map(arg =>
-  typeof arg === 'object' && arg !== null ? JSON.stringify(arg, null, 2) : String(arg)
-);
-
-console.log = (...args) => {
-  const formatted = formatArgs(args);
-  originalConsole.log(...formatted);
-  ipcRenderer.send('console:log', 'log', formatted.join(' '));
-};
-
-console.error = (...args) => {
-  const formatted = formatArgs(args);
-  originalConsole.error(...formatted);
-  ipcRenderer.send('console:log', 'error', formatted.join(' '));
-};
-
-console.warn = (...args) => {
-  const formatted = formatArgs(args);
-  originalConsole.warn(...formatted);
-  ipcRenderer.send('console:log', 'warn', formatted.join(' '));
-};
-
-console.info = (...args) => {
-  const formatted = formatArgs(args);
-  originalConsole.info(...formatted);
-  ipcRenderer.send('console:log', 'info', formatted.join(' '));
-};
-
 const api = {
-  // Console forwarding for logger utility
-  console: {
-    log: (level, ...args) => ipcRenderer.send('console:log', level, ...args)
-  },
-
   // Database operations
   clients: {
     getAll: () => ipcRenderer.invoke('db:getClients'),
@@ -88,7 +46,7 @@ const api = {
   
   timeEntries: {
     getAll: (filters = {}) => {
-      console.log('[RNDR->PRELOAD] timeEntries.getAll called with filters:', filters);
+      // logger.log('[RNDR->PRELOAD] timeEntries.getAll called with filters:', filters);
       return ipcRenderer.invoke('db:getTimeEntries', filters);
     },
     create: (entry) => ipcRenderer.invoke('db:createTimeEntry', entry),
@@ -163,7 +121,16 @@ const api = {
   },
 
   // Direct IPC invoke method for flexibility
-  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
+  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+
+  // Console forwarding for renderer logger
+  console: {
+    log: (...args) => ipcRenderer.send('console:log', 'log', ...args),
+    info: (...args) => ipcRenderer.send('console:log', 'info', ...args),
+    warn: (...args) => ipcRenderer.send('console:log', 'warn', ...args),
+    error: (...args) => ipcRenderer.send('console:log', 'error', ...args),
+    debug: (...args) => ipcRenderer.send('console:log', 'debug', ...args)
+  }
 };
 
 // Updater API (macOS only; dev uses mock, prod uses native)
@@ -190,16 +157,16 @@ api.updater = {
 
 // Expose the API to the renderer process
 if (!isDev) {
-  console.log('Exposing electronAPI to main world...');
-  console.log('API object:', JSON.stringify(Object.keys(api), null, 2));
+  api.console.log('Exposing electronAPI to main world...');
+  api.console.log('API object:', JSON.stringify(Object.keys(api), null, 2));
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api);
 
 if (isDev) {
-  console.log('[RNDR->PRELOAD] electronAPI exposed successfully');
+  api.console.log('[RNDR->PRELOAD] electronAPI exposed successfully');
 
   setTimeout(() => {
-    console.log("[RNDR->PRELOAD] ✅ electronAPI exposed and ready");
+    api.console.log("[RNDR->PRELOAD] ✅ electronAPI exposed and ready");
   }, 10);
 }

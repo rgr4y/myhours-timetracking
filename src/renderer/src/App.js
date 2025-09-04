@@ -14,6 +14,7 @@ import About from './components/About';
 import Invoice from './components/Invoice';
 import BackgroundClockOrbits from './components/BackgroundClockOrbits';
 import { Button } from './components/ui';
+import logger from './utils/logger';
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -125,7 +126,7 @@ const TrayNavigationHandler = () => {
   useEffect(() => {
     // Handle tray events for navigation
     const handleTrayOpenSettings = () => {
-      console.log('[App] Navigate to settings from tray');
+      logger.log('[App] Navigate to settings from tray');
       navigateRef.current('/settings');
     };
 
@@ -154,10 +155,10 @@ const AppLogic = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        console.log('[RNDR->APP] Document hidden - pausing animations');
+        logger.log('[APP] Document hidden - pausing animations');
         pauseAnimations();
       } else {
-        console.log('[RNDR->APP] Document visible - resuming animations');
+        logger.log('[APP] Document visible - resuming animations');
         // Small delay to let the window properly focus
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);

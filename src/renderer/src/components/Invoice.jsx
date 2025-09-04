@@ -546,7 +546,7 @@ const Invoice = () => {
 
       {/* Quick Generate Invoice Modal */}
       {showModal && (
-        <Modal onClick={() => setShowModal(false)}>
+        <Modal show={showModal} onClick={() => setShowModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
               <ModalTitle>Quick Generate Invoice</ModalTitle>

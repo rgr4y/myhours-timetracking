@@ -175,10 +175,10 @@ class DatabaseService {
     await this.prisma.$disconnect();
   }
 
-  // Dev-only: Nuclear option - completely clear database ignoring FK constraints
-  async nukeDatabase() {
+  // Danger: remove demo data created by seed script
+  async removeDemoData() {
     try {
-      logger.database("info", "Starting database nuke operation");
+      logger.database("info", "Starting database clear operation");
       
       // Disable foreign key constraints
       await this.prisma.$executeRaw`PRAGMA foreign_keys = OFF`;
@@ -189,12 +189,29 @@ class DatabaseService {
       await this.prisma.task.deleteMany();
       await this.prisma.project.deleteMany();
       await this.prisma.client.deleteMany();
-      await this.prisma.setting.deleteMany();
+      
+      // Clear transient settings that reference IDs
+      try {
+        await this.prisma.setting.delete({
+          where: { key: "lastUsedClientId" },
+        });
+      } catch (_) {}
+      try {
+        await this.prisma.setting.delete({
+          where: { key: "lastUsedProjectId" },
+        });
+      } catch (_) {}
+      try {
+        await this.prisma.setting.delete({
+          where: { key: "lastUsedTaskId" },
+        });
+      } catch (_) {}
       
       // Re-enable foreign key constraints
       await this.prisma.$executeRaw`PRAGMA foreign_keys = ON`;
       
-      logger.database("info", "Database nuke completed successfully");
+      logger.database("info", "Database clear completed successfully");
+      return { success: true };
     } catch (error) {
       // Always try to re-enable FK constraints even if something failed
       try {
@@ -203,27 +220,6 @@ class DatabaseService {
         logger.error("Failed to re-enable foreign key constraints:", fkError);
       }
       
-      logger.error("Error during database nuke:", error);
-      throw error;
-    }
-  }
-
-  // Danger: remove demo data created by seed script
-  async removeDemoData() {
-    try {
-      // Clear transient settings that reference IDs
-      try {
-        await this.prisma.timeEntry.deleteMany();
-        await this.prisma.invoice.deleteMany();
-        await this.prisma.task.deleteMany();
-        await this.prisma.project.deleteMany();
-        await this.prisma.client.deleteMany();
-        await this.prisma.setting.delete({
-          where: { key: "lastUsedClientId" },
-        });
-      } catch (_) {}
-      return { success: true };
-    } catch (error) {
       logger.error("[DATABASE] Error removing demo data:", error);
       throw error;
     }

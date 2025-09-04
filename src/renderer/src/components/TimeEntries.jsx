@@ -44,6 +44,7 @@ import {
 } from './ui';
 import { colors, COLORS } from '../styles/theme';
 import { formatDurationHumanFriendly, formatTime, formatTimeForForm, formatDateForForm, calculateDuration } from '../utils/dateHelpers';
+import logger from '../utils/logger';
 
 // Styled components for Timer section (horizontal layout)
 const TimerSection = styled.div`
@@ -251,6 +252,7 @@ const TimeIcon = styled(Clock)`
 const DisabledIconButton = styled(IconButton)`
   opacity: ${props => props.disabled ? 0.5 : 1};
   cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+  pointer-events: ${props => props.disabled ? 'none' : 'auto'};
 `;
 
 const FlexForm = styled(FlexBox)`
@@ -378,7 +380,7 @@ const TimeEntries = () => {
         }
 
         /*
-        console.log('[RNDR->TimeEntries] All data loaded:', {
+        logger.log('[TimeEntries] All data loaded:', {
           clients: clientsWithRelationships?.length || 0,
           projects: allProjects.length,
           tasks: allTasks.length,
@@ -386,21 +388,21 @@ const TimeEntries = () => {
         });
         */
       } catch (error) {
-        console.error('[RNDR->TimeEntries] Error loading data:', error);
+        logger.error('[TimeEntries] Error loading data:', error);
       }
     }
   }, [waitForReady]);
 
   const loadTimeEntries = useCallback(async () => {
-    console.log('Loading time entries...');
+    logger.log('Loading time entries...');
     const api = await waitForReady();
     if (api) {
       try {
         const entries = await api.timeEntries.getAll();
-        console.log('Time entries loaded:', entries.length, 'entries');
+        logger.log('Time entries loaded:', entries.length, 'entries');
         setTimeEntries(entries);
       } catch (error) {
-        console.error('Error loading time entries:', error);
+        logger.error('Error loading time entries:', error);
       }
     }
   }, [waitForReady]);
@@ -455,7 +457,7 @@ const TimeEntries = () => {
   // Sync with TimerContext when timer stops (preserve selectedClient/description)
   useEffect(() => {
     if (!activeTimer && selectedClient) {
-      console.log('[RNDR->TimeEntries] Timer stopped, syncing preserved client:', selectedClient);
+      logger.log('[TimeEntries] Timer stopped, syncing preserved client:', selectedClient);
       setLocalSelectedClient(selectedClient);
     }
   }, [activeTimer, selectedClient]);
@@ -463,7 +465,7 @@ const TimeEntries = () => {
   // Sync description when timer stops
   useEffect(() => {
     if (!activeTimer && description) {
-      console.log('[RNDR->TimeEntries] Timer stopped, syncing preserved description:', description);
+      logger.log('[TimeEntries] Timer stopped, syncing preserved description:', description);
       setLocalDescription(description);
     }
   }, [activeTimer, description]);
@@ -471,7 +473,7 @@ const TimeEntries = () => {
   // Sync project when timer stops
   useEffect(() => {
     if (!activeTimer && selectedProject) {
-      console.log('[RNDR->TimeEntries] Timer stopped, syncing preserved project:', selectedProject);
+      logger.log('[TimeEntries] Timer stopped, syncing preserved project:', selectedProject);
       setLocalSelectedProject(selectedProject);
     }
   }, [activeTimer, selectedProject]);
@@ -479,7 +481,7 @@ const TimeEntries = () => {
   // Sync task when timer stops  
   useEffect(() => {
     if (!activeTimer && selectedTask) {
-      console.log('[RNDR->TimeEntries] Timer stopped, syncing preserved task:', selectedTask);
+      logger.log('[TimeEntries] Timer stopped, syncing preserved task:', selectedTask);
       setLocalSelectedTask(selectedTask);
     }
   }, [activeTimer, selectedTask]);
@@ -498,7 +500,7 @@ const TimeEntries = () => {
           setIsInitialLoading(false);
         }, 100);
       } catch (error) {
-        console.error('Error loading data:', error);
+        logger.error('Error loading data:', error);
         setIsInitialLoading(false);
       }
     };
@@ -524,7 +526,7 @@ const TimeEntries = () => {
         try {
           const api = await waitForReady();
           if (api) {
-            // console.log('[RNDR->TimeEntries] Attempting to restore last used client/project/task...');
+            // logger.log('[TimeEntries] Attempting to restore last used client/project/task...');
             
             const [lastClient, lastProject, lastTask] = await Promise.all([
               api.settings.getLastUsedClient(),
@@ -532,31 +534,31 @@ const TimeEntries = () => {
               api.settings.getLastUsedTask()
             ]);
             
-            // console.log('[RNDR->TimeEntries] Last used values:', JSON.stringify({ lastClient, lastProject, lastTask }, null, 2));
+            // logger.log('[TimeEntries] Last used values:', JSON.stringify({ lastClient, lastProject, lastTask }, null, 2));
             
             if (lastClient) {
               const clientExists = clients.some(c => c.id === lastClient.id);
-              // console.log('[RNDR->TimeEntries] Client exists:', clientExists);
+              // logger.log('[TimeEntries] Client exists:', clientExists);
               
               if (clientExists) {
-                // console.log('[RNDR->TimeEntries] Restored last client:', lastClient.name);
+                // logger.log('[TimeEntries] Restored last client:', lastClient.name);
                 setLocalSelectedClient(lastClient);
                 
                 // Since we have all data loaded, we can directly check and set
                 if (lastProject) {
                   const projectExists = projects.some(p => p.id === lastProject.id && p.clientId === lastClient.id);
-                  // console.log('[RNDR->TimeEntries] Project exists:', projectExists);
+                  // logger.log('[TimeEntries] Project exists:', projectExists);
                   
                   if (projectExists) {
-                    // console.log('[RNDR->TimeEntries] Restored last project:', lastProject.name);
+                    // logger.log('[TimeEntries] Restored last project:', lastProject.name);
                     setLocalSelectedProject(lastProject);
                     
                     if (lastTask) {
                       const taskExists = tasks.some(t => t.id === lastTask.id && t.projectId === lastProject.id);
-                      // console.log('[RNDR->TimeEntries] Task exists:', taskExists);
+                      // logger.log('[TimeEntries] Task exists:', taskExists);
 
                       if (taskExists) {
-                        // console.log('[RNDR->TimeEntries] Restored last task:', lastTask.name);
+                        // logger.log('[TimeEntries] Restored last task:', lastTask.name);
                         setLocalSelectedTask(lastTask);
                       }
                     }
@@ -568,7 +570,7 @@ const TimeEntries = () => {
           // Mark that we've completed restoration
           hasRestoredRef.current = true;
         } catch (error) {
-          console.error('Error loading last used settings:', error);
+          logger.error('Error loading last used settings:', error);
         }
       }
     };
@@ -608,22 +610,22 @@ const TimeEntries = () => {
   // Listen for events
   useEffect(() => {
     const handleShowTimerModal = () => {
-      console.log('[RNDR->TimeEntries] Show timer modal requested from tray');
+      logger.log('[TimeEntries] Show timer modal requested from tray');
       setShowModal(true);
     };
 
     const handleRefreshTimeEntries = () => {
-      console.log('[RNDR->TimeEntries] Refresh time entries requested');
+      logger.log('[TimeEntries] Refresh time entries requested');
       loadTimeEntries();
     };
 
     const handleTimerStarted = () => {
-      console.log('[RNDR->TimeEntries] Timer started - refreshing time entries');
+      logger.log('[TimeEntries] Timer started - refreshing time entries');
       loadTimeEntries();
     };
 
     const handleTimerStopped = () => {
-      console.log('[RNDR->TimeEntries] Timer stopped - refreshing time entries');
+      logger.log('[TimeEntries] Timer stopped - refreshing time entries');
       loadTimeEntries();
     };
 
@@ -697,7 +699,7 @@ const TimeEntries = () => {
 
   // Timer handlers
   const handleStartTimer = async () => {
-    console.log('Starting timer with client:', localSelectedClient?.id, 'task:', localSelectedTask?.id, 'description:', localDescription);
+    logger.log('Starting timer with client:', localSelectedClient?.id, 'task:', localSelectedTask?.id, 'description:', localDescription);
     try {
       const timerData = {
         clientId: localSelectedClient?.id || null,
@@ -715,25 +717,25 @@ const TimeEntries = () => {
         setLocalSelectedTask(timer.task);
       }
     } catch (error) {
-      console.error('Error starting timer:', error);
+      logger.error('Error starting timer:', error);
       alert('Failed to start timer: ' + error.message);
     }
   };
 
   const handleStopTimer = async () => {
-    console.log('Stopping timer with roundTo:', roundTo);
+    logger.log('Stopping timer with roundTo:', roundTo);
     try {
       await stopTimer(roundTo);
       // Preserve local selections and description on stop to avoid flicker
       await loadTimeEntries(); // Refresh time entries after stopping
     } catch (error) {
-      console.error('Error stopping timer:', error);
+      logger.error('Error stopping timer:', error);
       alert('Failed to stop timer: ' + error.message);
     }
   };
 
   const handleClientSelect = async (client) => {
-    console.log('Client selected:', client);
+    logger.log('Client selected:', client);
     setLocalSelectedClient(client);
     setDropdownOpen(false);
     setLocalSelectedProject(null);
@@ -745,20 +747,20 @@ const TimeEntries = () => {
       try {
         const defaultProject = await window.electronAPI.projects.getDefault(client.id);
         if (defaultProject) {
-          console.log('Auto-selecting default project:', defaultProject);
+          logger.log('Auto-selecting default project:', defaultProject);
           setLocalSelectedProject(defaultProject);
         }
       } catch (error) {
-        console.error('Error getting default project:', error);
+        logger.error('Error getting default project:', error);
       }
     }
     
     if (isRunning && activeTimer) {
       try {
         await updateTimerClient(client);
-        console.log('Timer client updated successfully');
+        logger.log('Timer client updated successfully');
       } catch (error) {
-        console.error('Error updating timer client:', error);
+        logger.error('Error updating timer client:', error);
         setLocalSelectedClient(selectedClient);
         alert('Failed to update client: ' + error.message);
       }
@@ -766,7 +768,7 @@ const TimeEntries = () => {
   };
 
   const handleProjectSelect = async (project) => {
-    console.log('Project selected:', project);
+    logger.log('Project selected:', project);
     setLocalSelectedProject(project);
     setProjectDropdownOpen(false);
     setLocalSelectedTask(null);
@@ -775,25 +777,25 @@ const TimeEntries = () => {
       try {
         await updateTimerTask(null);
         await updateTimerProject(project);
-        console.log('Timer project updated successfully');
+        logger.log('Timer project updated successfully');
       } catch (error) {
-        console.error('Error updating timer project:', error);
+        logger.error('Error updating timer project:', error);
         alert('Failed to update project: ' + error.message);
       }
     }
   };
 
   const handleTaskSelect = async (task) => {
-    console.log('Task selected:', task);
+    logger.log('Task selected:', task);
     setLocalSelectedTask(task);
     setTaskDropdownOpen(false);
     
     if (isRunning && activeTimer) {
       try {
         await updateTimerTask(task);
-        console.log('Timer task updated successfully');
+        logger.log('Timer task updated successfully');
       } catch (error) {
-        console.error('Error updating timer task:', error);
+        logger.error('Error updating timer task:', error);
         setLocalSelectedTask(activeTimer.task);
         alert('Failed to update task: ' + error.message);
       }
@@ -807,16 +809,16 @@ const TimeEntries = () => {
     }
 
     try {
-      console.log('Auto-saving description to database:', description);
+      logger.log('Auto-saving description to database:', description);
       await window.electronAPI.timeEntries.update(activeTimer.id, {
         description: description
       });
       
       setOriginalDescription(description);
       setHasUnsavedChanges(false);
-      console.log('Description auto-saved successfully');
+      logger.log('Description auto-saved successfully');
     } catch (error) {
-      console.error('Error auto-saving description:', error);
+      logger.error('Error auto-saving description:', error);
     }
   }, [activeTimer, hasUnsavedChanges]);
 
@@ -847,7 +849,7 @@ const TimeEntries = () => {
         setOriginalDescription(newDescription);
         setHasUnsavedChanges(false);
       } catch (error) {
-        console.error('Error updating description in context:', error);
+        logger.error('Error updating description in context:', error);
       }
     }
 
@@ -909,7 +911,7 @@ const TimeEntries = () => {
 
       if (canResume) {
         const timeSinceStop = canResume ? Math.floor((new Date() - new Date(entry.endTime)) / (1000 * 60)) : null;
-        console.log(`Creating new entry from ${entry.id} (stopped ${timeSinceStop} minutes ago)`);
+        logger.log(`Creating new entry from ${entry.id} (stopped ${timeSinceStop} minutes ago)`);
         
         await startTimer({
           clientId: entry.clientId,
@@ -929,7 +931,7 @@ const TimeEntries = () => {
       });
       await loadTimeEntries();
     } catch (error) {
-      console.error('Error starting timer from entry:', error);
+      logger.error('Error starting timer from entry:', error);
     }
   };
 
@@ -960,7 +962,7 @@ const TimeEntries = () => {
         const updateEvent = new CustomEvent('time-entries-updated');
         window.dispatchEvent(updateEvent);
       } catch (error) {
-        console.error('Error creating time entry:', error);
+        logger.error('Error creating time entry:', error);
       }
     }
   };
@@ -994,7 +996,7 @@ const TimeEntries = () => {
         const updateEvent = new CustomEvent('time-entries-updated');
         window.dispatchEvent(updateEvent);
       } catch (error) {
-        console.error('Error updating time entry:', error);
+        logger.error('Error updating time entry:', error);
       }
     }
   };
@@ -1016,7 +1018,7 @@ const TimeEntries = () => {
         const updateEvent = new CustomEvent('time-entries-updated');
         window.dispatchEvent(updateEvent);
       } catch (error) {
-        console.error('Error deleting time entry:', error);
+        logger.error('Error deleting time entry:', error);
       }
     }
   };
@@ -1436,7 +1438,7 @@ const TimeEntries = () => {
 
       {/* Time Entry Modal */}
       {showModal && (
-        <Modal onClick={() => setShowModal(false)}>
+        <Modal show={showModal} onClick={() => setShowModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
               <ModalTitle>{editingEntry ? 'Edit Time Entry' : 'Manual Time Entry'}</ModalTitle>

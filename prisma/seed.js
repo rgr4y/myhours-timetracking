@@ -70,6 +70,32 @@ async function main() {
   const lastMonth = monthInfo(-1);
   const thisMonth = monthInfo(0);
   const dayOf = (mi, day) => new Date(mi.start.getFullYear(), mi.start.getMonth(), clampDay(day, mi));
+  
+  // Helper to ensure entries are always in the past
+  const daysInThisMonthSoFar = today.getDate();
+  const hasEnoughDaysThisMonth = daysInThisMonthSoFar >= 7;
+  
+  // Counter for distributing entries when we have limited days
+  let thisMonthDayCounter = 1;
+  
+  const dayOfThisMonth = (day) => {
+    if (!hasEnoughDaysThisMonth) {
+      // Limited days in this month - fill the actual past days first, then overflow to lastMonth
+      if (thisMonthDayCounter < daysInThisMonthSoFar) { // Before today
+        const actualDay = thisMonthDayCounter;
+        thisMonthDayCounter++;
+        return dayOf(thisMonth, actualDay);
+      } else {
+        // Overflow entries go to lastMonth with random days
+        const randomDay = Math.floor(Math.random() * 28) + 1; // Random day 1-28 (safe for all months)
+        return dayOf(lastMonth, randomDay);
+      }
+    } else {
+      // Enough days in this month, use before today
+      const targetDay = Math.min(day, today.getDate() - 1); // Always before today
+      return targetDay > 0 ? dayOf(thisMonth, targetDay) : dayOf(lastMonth, day); // Fallback to lastMonth
+    }
+  };
   const invNum = (d, seq) => `INV-${ymd(d).replace(/-/g, '')}-${String(seq).padStart(3, '0')}`;
 
   // Check if database already has data
@@ -477,46 +503,45 @@ async function main() {
     createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, dayOf(lastMonth, 30), 8, 'Frontend implementation', true, invoices[2].id),
 
     // This month entries (NOT invoiced yet - available for new invoices)
-    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(thisMonth, 1), 7, 'React component optimization'),
-    createTimeEntry(clients[0].id, projects[0].id, tasks[1].id, dayOf(thisMonth, 2), 6.5, 'API performance tuning'),
-    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, dayOf(thisMonth, 5), 8, 'iOS bug fixes'),
-    createTimeEntry(clients[0].id, projects[1].id, tasks[4].id, dayOf(thisMonth, 6), 7, 'Android testing'),
-    createTimeEntry(clients[0].id, projects[0].id, tasks[2].id, dayOf(thisMonth, 8), 5, 'Database optimization'),
-    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(thisMonth, 12), 8, 'Frontend testing'),
-    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, dayOf(thisMonth, 15), 6, 'iOS app store preparation'),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOfThisMonth(1), 7, 'React component optimization'),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[1].id, dayOfThisMonth(2), 6.5, 'API performance tuning'),
+    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, dayOfThisMonth(5), 8, 'iOS bug fixes'),
+    createTimeEntry(clients[0].id, projects[1].id, tasks[4].id, dayOfThisMonth(6), 7, 'Android testing'),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[2].id, dayOfThisMonth(8), 5, 'Database optimization'),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOfThisMonth(12), 8, 'Frontend testing'),
+    createTimeEntry(clients[0].id, projects[1].id, tasks[3].id, dayOfThisMonth(15), 6, 'iOS app store preparation'),
 
-    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(thisMonth, 3), 7, 'Dashboard feature additions'),
-    createTimeEntry(clients[1].id, projects[2].id, tasks[6].id, dayOf(thisMonth, 7), 5, 'Advanced analytics'),
-    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, dayOf(thisMonth, 10), 6, 'API documentation'),
-    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(thisMonth, 14), 8, 'User management system'),
-    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, dayOf(thisMonth, 18), 4, 'API testing'),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOfThisMonth(3), 7, 'Dashboard feature additions'),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[6].id, dayOfThisMonth(7), 5, 'Advanced analytics'),
+    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, dayOfThisMonth(10), 6, 'API documentation'),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOfThisMonth(14), 8, 'User management system'),
+    createTimeEntry(clients[1].id, projects[3].id, tasks[7].id, dayOfThisMonth(18), 4, 'API testing'),
 
-    createTimeEntry(clients[2].id, projects[4].id, tasks[8].id, dayOf(thisMonth, 4), 3, 'Logo refinements'),
-    createTimeEntry(clients[2].id, projects[4].id, tasks[9].id, dayOf(thisMonth, 9), 4, 'Brand guidelines finalization'),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOf(thisMonth, 11), 5, 'Responsive design'),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, dayOf(thisMonth, 16), 7, 'Performance optimization'),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOf(thisMonth, 20), 4, 'Mobile optimization'),
+    createTimeEntry(clients[2].id, projects[4].id, tasks[8].id, dayOfThisMonth(4), 3, 'Logo refinements'),
+    createTimeEntry(clients[2].id, projects[4].id, tasks[9].id, dayOfThisMonth(9), 4, 'Brand guidelines finalization'),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOfThisMonth(11), 5, 'Responsive design'),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, dayOfThisMonth(16), 7, 'Performance optimization'),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOfThisMonth(20), 4, 'Mobile optimization'),
 
-    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOf(thisMonth, 5), 4, 'WordPress setup and configuration'),
-    createTimeEntry(clients[3].id, projects[6].id, tasks[13].id, dayOf(thisMonth, 12), 6, 'Custom theme development'),
-    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOf(thisMonth, 19), 3, 'Plugin installation'),
-    createTimeEntry(clients[3].id, projects[6].id, tasks[13].id, dayOf(thisMonth, 22), 5, 'Theme customization'),
-    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOf(thisMonth, 26), 2, 'Final testing'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOfThisMonth(5), 4, 'WordPress setup and configuration'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[13].id, dayOfThisMonth(12), 6, 'Custom theme development'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOfThisMonth(19), 3, 'Plugin installation'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[13].id, dayOfThisMonth(22), 5, 'Theme customization'),
+    createTimeEntry(clients[3].id, projects[6].id, tasks[12].id, dayOfThisMonth(26), 2, 'Final testing'),
 
     // Create some partially invoiced days to test the "Partially Invoiced" feature
     // Day with mixed invoice status
-    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(thisMonth, 21), 4, 'Morning work - invoiced', true),
-    createTimeEntry(clients[0].id, projects[0].id, tasks[1].id, dayOf(thisMonth, 21), 3, 'Afternoon work - not invoiced', false),
-    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(thisMonth, 21), 2, 'Evening work - not invoiced', false),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOfThisMonth(21), 4, 'Morning work - invoiced', true),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[1].id, dayOfThisMonth(21), 3, 'Afternoon work - not invoiced', false),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOfThisMonth(21), 2, 'Evening work - not invoiced', false),
     
     // Another day with mixed invoice status
-    createTimeEntry(clients[2].id, projects[4].id, tasks[8].id, dayOf(thisMonth, 23), 5, 'Design work - invoiced', true),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOf(thisMonth, 23), 3, 'Development work - not invoiced', false),
+    createTimeEntry(clients[2].id, projects[4].id, tasks[8].id, dayOfThisMonth(23), 5, 'Design work - invoiced', true),
+    createTimeEntry(clients[2].id, projects[5].id, tasks[10].id, dayOfThisMonth(23), 3, 'Development work - not invoiced', false),
 
     // Recent entries (last few days of this month)
-    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOf(thisMonth, Math.max(1, today.getDate() - 2)), 4, 'Code review and cleanup'),
-    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOf(thisMonth, Math.max(1, today.getDate() - 1)), 6, 'Dashboard final touches'),
-    createTimeEntry(clients[2].id, projects[5].id, tasks[11].id, dayOf(thisMonth, today.getDate()), 3, 'Launch preparation'),
+    createTimeEntry(clients[0].id, projects[0].id, tasks[0].id, dayOfThisMonth(Math.max(1, today.getDate() - 2)), 4, 'Code review and cleanup'),
+    createTimeEntry(clients[1].id, projects[2].id, tasks[5].id, dayOfThisMonth(Math.max(1, today.getDate() - 1)), 6, 'Dashboard final touches'),
   ];
 
   await prisma.timeEntry.createMany({

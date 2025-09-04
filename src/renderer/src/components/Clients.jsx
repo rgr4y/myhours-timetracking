@@ -701,7 +701,7 @@ const Clients = () => {
 
       {/* Client Modal */}
       {showClientModal && (
-        <Modal onClick={() => setShowClientModal(false)}>
+        <Modal show={showClientModal} onClick={() => setShowClientModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
               <ModalTitle>{editingClient ? 'Edit Client' : 'Add New Client'}</ModalTitle>
@@ -763,7 +763,7 @@ const Clients = () => {
 
       {/* Project Modal */}
       {showProjectModal && (
-        <Modal onClick={() => setShowProjectModal(false)}>
+        <Modal show={showProjectModal} onClick={() => setShowProjectModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
               <ModalTitle>{editingProject ? 'Edit Project' : 'Add New Project'}</ModalTitle>
@@ -846,7 +846,7 @@ const Clients = () => {
 
       {/* Task Modal */}
       {showTaskModal && (
-        <Modal onClick={() => setShowTaskModal(false)}>
+        <Modal show={showTaskModal} onClick={() => setShowTaskModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
               <ModalTitle>{editingTask ? 'Edit Task' : 'Add New Task'}</ModalTitle>
@@ -917,7 +917,7 @@ const Clients = () => {
 
       {/* Client Info/Edit Modal */}
       {showClientInfoModal && editingClient && (
-        <Modal onClick={() => setShowClientInfoModal(false)}>
+        <Modal show={showClientInfoModal} onClick={() => setShowClientInfoModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
               <ModalTitle>Edit Client</ModalTitle>

@@ -1,5 +1,6 @@
 const { ipcMain, dialog, app } = require('electron');
 const logger = require('./logger-service');
+const PathService = require('./path-service');
 
 class IpcService {
   constructor(mainWindow, database, invoiceGenerator, versionService) {
@@ -7,6 +8,7 @@ class IpcService {
     this.database = database;
     this.invoiceGenerator = invoiceGenerator;
     this.versionService = versionService;
+    this.pathService = new PathService();
     this.trayService = null; // Will be set later
   }
 
@@ -42,7 +44,7 @@ class IpcService {
         await shell.openExternal(url);
         return true;
       } catch (error) {
-        logger.error('[MAIN] Error opening external URL:', url, error);
+        logger.error('[IPC] Error opening external URL:', url, error);
         return false;
       }
     });
@@ -66,7 +68,7 @@ class IpcService {
         const clients = await this.database.getClients();
         return clients;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting clients:', error);
+        logger.error('[IPC] Error getting clients:', error);
         throw error;
       }
     });
@@ -84,13 +86,13 @@ class IpcService {
     });
     
     ipcMain.handle('db:createClient', async (event, client) => {
-      logger.debug('[MAIN] IPC: Creating client:', JSON.stringify(client, null, 2));
+      logger.debug('[IPC] Creating client:', JSON.stringify(client, null, 2));
       try {
         const newClient = await this.database.createClient(client);
-        logger.debug('[MAIN] IPC: Client created successfully:', JSON.stringify(newClient, null, 2));
+        logger.debug('[IPC] Client created successfully:', JSON.stringify(newClient, null, 2));
         return newClient;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error creating client:', error);
+        logger.error('[IPC] Error creating client:', error);
         throw error;
       }
     });
@@ -99,7 +101,7 @@ class IpcService {
       try {
         return await this.database.updateClient(id, client);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error updating client:', error);
+        logger.error('[IPC] Error updating client:', error);
         throw error;
       }
     });
@@ -108,7 +110,7 @@ class IpcService {
       try {
         return await this.database.deleteClient(id);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error deleting client:', error);
+        logger.error('[IPC] Error deleting client:', error);
         throw error;
       }
     });
@@ -118,7 +120,7 @@ class IpcService {
       try {
         return await this.database.getProjects(clientId);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting projects:', error);
+        logger.error('[IPC] Error getting projects:', error);
         throw error;
       }
     });
@@ -127,7 +129,7 @@ class IpcService {
       try {
         return await this.database.createProject(project);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error creating project:', error);
+        logger.error('[IPC] Error creating project:', error);
         throw error;
       }
     });
@@ -136,7 +138,7 @@ class IpcService {
       try {
         return await this.database.updateProject(id, project);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error updating project:', error);
+        logger.error('[IPC] Error updating project:', error);
         throw error;
       }
     });
@@ -145,7 +147,7 @@ class IpcService {
       try {
         return await this.database.deleteProject(id);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error deleting project:', error);
+        logger.error('[IPC] Error deleting project:', error);
         throw error;
       }
     });
@@ -154,7 +156,7 @@ class IpcService {
       try {
         return await this.database.getDefaultProject(clientId);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting default project:', error);
+        logger.error('[IPC] Error getting default project:', error);
         throw error;
       }
     });
@@ -165,7 +167,7 @@ class IpcService {
         const tasks = await this.database.getTasks(projectId);
         return tasks;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting tasks:', error);
+        logger.error('[IPC] Error getting tasks:', error);
         throw error;
       }
     });
@@ -174,7 +176,7 @@ class IpcService {
       try {
         return await this.database.createTask(task);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error creating task:', error);
+        logger.error('[IPC] Error creating task:', error);
         throw error;
       }
     });
@@ -183,7 +185,7 @@ class IpcService {
       try {
         return await this.database.updateTask(id, task);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error updating task:', error);
+        logger.error('[IPC] Error updating task:', error);
         throw error;
       }
     });
@@ -192,7 +194,7 @@ class IpcService {
       try {
         return await this.database.deleteTask(id);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error deleting task:', error);
+        logger.error('[IPC] Error deleting task:', error);
         throw error;
       }
     });
@@ -212,20 +214,20 @@ class IpcService {
     
     ipcMain.handle('db:createTimeEntry', async (event, data) => {
       try {
-        // logger.debug('[MAIN] IPC: Creating time entry with data:', data);
+        // logger.debug('[IPC] Creating time entry with data:', data);
         return await this.database.createTimeEntry(data);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error creating time entry:', error);
+        logger.error('[IPC] Error creating time entry:', error);
         throw error;
       }
     });
     
     ipcMain.handle('db:updateTimeEntry', async (event, id, data) => {
       try {
-        logger.debug('[MAIN] IPC: Updating time entry with id:', id, 'data:', data);
+        logger.debug('[IPC] Updating time entry with id:', id, 'data:', data);
         return await this.database.updateTimeEntry(id, data);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error updating time entry:', error);
+        logger.error('[IPC] Error updating time entry:', error);
         throw error;
       }
     });
@@ -234,14 +236,14 @@ class IpcService {
       try {
         return await this.database.deleteTimeEntry(id);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error deleting time entry:', error);
+        logger.error('[IPC] Error deleting time entry:', error);
         throw error;
       }
     });
 
     // Timer operations
     ipcMain.handle('db:startTimer', async (event, data) => {
-      logger.debug('[MAIN] IPC: Starting timer with data:', JSON.stringify(data, null, 2));
+      logger.debug('[IPC] Starting timer with data:', JSON.stringify(data, null, 2));
       try {
         const timer = await this.database.startTimer(data);
         
@@ -257,34 +259,34 @@ class IpcService {
           await this.database.setSetting('lastUsedTaskId', data.taskId.toString());
         }
         
-        logger.debug('[MAIN] IPC: Timer started successfully:', JSON.stringify(timer, null, 2));
+        logger.debug('[IPC] Timer started successfully:', JSON.stringify(timer, null, 2));
         return timer;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error starting timer:', error);
+        logger.error('[IPC] Error starting timer:', error);
         throw error;
       }
     });
     
     ipcMain.handle('db:stopTimer', async (event, entryId, roundTo) => {
-      logger.debug('[MAIN] IPC: Stopping timer with ID:', entryId, 'roundTo:', roundTo);
+      logger.debug('[IPC] Stopping timer with ID:', entryId, 'roundTo:', roundTo);
       try {
         const entry = await this.database.stopTimer(entryId, roundTo);
-        logger.debug('[MAIN] IPC: Timer stopped successfully:', JSON.stringify(entry, null, 2));
+        logger.debug('[IPC] Timer stopped successfully:', JSON.stringify(entry, null, 2));
         return entry;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error stopping timer:', error);
+        logger.error('[IPC] Error stopping timer:', error);
         throw error;
       }
     });
 
     ipcMain.handle('db:resumeTimer', async (event, entryId) => {
-      logger.debug('[MAIN] IPC: Resuming timer with ID:', entryId);
+      logger.debug('[IPC] Resuming timer with ID:', entryId);
       try {
         const entry = await this.database.resumeTimer(entryId);
-        logger.debug('[MAIN] IPC: Timer resumed successfully:', JSON.stringify(entry, null, 2));
+        logger.debug('[IPC] Timer resumed successfully:', JSON.stringify(entry, null, 2));
         return entry;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error resuming timer:', error);
+        logger.error('[IPC] Error resuming timer:', error);
         throw error;
       }
     });
@@ -292,10 +294,10 @@ class IpcService {
     ipcMain.handle('db:getActiveTimer', async () => {
       try {
         const activeTimer = await this.database.getActiveTimer();
-        logger.debug('[MAIN] IPC: Active timer:', activeTimer ? 'found' : 'none');
+        logger.debug('[IPC] activeTimer:', (activeTimer ? 'found' : 'none'));
         return activeTimer;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting active timer:', error);
+        logger.error('[IPC] Error getting active timer:', error);
         throw error;
       }
     });
@@ -310,7 +312,7 @@ class IpcService {
         }
         return null;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting last used client:', error);
+        logger.error('[IPC] Error getting last used client:', error);
         return null;
       }
     });
@@ -327,7 +329,7 @@ class IpcService {
         }
         return null;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting last used project:', error);
+        logger.error('[IPC] Error getting last used project:', error);
         return null;
       }
     });
@@ -346,7 +348,7 @@ class IpcService {
         }
         return null;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting last used task:', error);
+        logger.error('[IPC] Error getting last used task:', error);
         return null;
       }
     });
@@ -356,7 +358,7 @@ class IpcService {
       try {
         return await this.database.getSetting(key);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting setting:', error);
+        logger.error('[IPC] Error getting setting:', error);
         throw error;
       }
     });
@@ -365,7 +367,7 @@ class IpcService {
       try {
         return await this.database.setSetting(key, value);
       } catch (error) {
-        logger.error('[MAIN] IPC: Error setting value:', error);
+        logger.error('[IPC] Error setting value:', error);
         throw error;
       }
     });
@@ -392,7 +394,7 @@ class IpcService {
         
         return settingsObj;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting settings:', error);
+        logger.error('[IPC] Error getting settings:', error);
         throw error;
       }
     });
@@ -405,7 +407,7 @@ class IpcService {
         
         return { success: true };
       } catch (error) {
-        logger.error('[MAIN] IPC: Error updating settings:', error);
+        logger.error('[IPC] Error updating settings:', error);
         throw error;
       }
     });
@@ -413,10 +415,10 @@ class IpcService {
     // Danger operations
     ipcMain.handle('db:removeDemoData', async (event, confirmationText) => {
       try {
-        logger.debug('[MAIN] db:removeDemoData: Checking confirmation text');
+        logger.debug('[IPC] db:removeDemoData: Checking confirmation text');
         
         if (confirmationText !== 'yes, clear all data') {
-          logger.debug('[MAIN] db:removeDemoData: Invalid confirmation text:', confirmationText);
+          logger.debug('[IPC] db:removeDemoData: Invalid confirmation text:', confirmationText);
           return { 
             success: false, 
             error: 'Confirmation text must match exactly: "yes, clear all data"' 
@@ -434,18 +436,17 @@ class IpcService {
         });
         
         if (finalConfirm.response !== 1) {
-          logger.debug('[MAIN] db:removeDemoData: User cancelled at final confirmation');
+          logger.debug('[IPC] db:removeDemoData: User cancelled at final confirmation');
           return { success: false, error: 'Operation cancelled by user' };
         }
         
-        logger.debug('[MAIN] db:removeDemoData: User confirmed, proceeding with nuke');
+        logger.debug('[IPC] db:removeDemoData: User confirmed, proceeding with removal');
+        await this.database.removeDemoData();
         
-        await this.database.nukeDatabase();
-        
-        logger.debug('[MAIN] db:removeDemoData: Database cleared successfully');
+        logger.debug('[IPC] db:removeDemoData: Database cleared successfully');
         return { success: true };
       } catch (error) {
-        logger.error('[MAIN] Error clearing all data:', error);
+        logger.error('[IPC] Error clearing all data:', error);
         return { success: false, error: error.message };
       }
     });
@@ -454,10 +455,10 @@ class IpcService {
     ipcMain.handle('db:getInvoices', async () => {
       try {
         const invoices = await this.database.getInvoices();
-        // logger.debug('[MAIN] IPC: Got invoices:', invoices.length);
+        // logger.debug('[IPC] Got invoices:', invoices.length);
         return invoices;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error getting invoices:', error);
+        logger.error('[IPC] Error getting invoices:', error);
         throw error;
       }
     });
@@ -465,10 +466,10 @@ class IpcService {
     ipcMain.handle('db:deleteInvoice', async (event, id) => {
       try {
         const result = await this.database.deleteInvoice(id);
-        logger.debug('[MAIN] IPC: Invoice deleted:', id);
+        logger.debug('[IPC] Invoice deleted:', id);
         return result;
       } catch (error) {
-        logger.error('[MAIN] IPC: Error deleting invoice:', error);
+        logger.error('[IPC] Error deleting invoice:', error);
         throw error;
       }
     });
@@ -477,29 +478,29 @@ class IpcService {
   setupInvoiceHandlers() {
     ipcMain.handle('invoice:generate', async (event, data) => {
       try {
-        logger.debug('[MAIN] invoice:generate called with data:', data);
+        logger.debug('[IPC] invoice:generate called with data:', data);
         const filePath = await this.invoiceGenerator.generateInvoice(data);
         return { success: true, filePath };
       } catch (error) {
-        logger.debug('[MAIN] invoice:generate error:', error.message);
+        logger.debug('[IPC] invoice:generate error:', error.message);
         return { success: false, error: error.message };
       }
     });
 
     ipcMain.handle('invoice:generateFromSelected', async (event, data) => {
       try {
-        logger.debug('[MAIN] invoice:generateFromSelected called with data:', data);
+        logger.debug('[IPC] invoice:generateFromSelected called with data:', data);
         const filePath = await this.invoiceGenerator.generateInvoiceFromSelectedEntries(data);
         return { success: true, filePath };
       } catch (error) {
-        logger.debug('[MAIN] invoice:generateFromSelected error:', error.message);
+        logger.debug('[IPC] invoice:generateFromSelected error:', error.message);
         return { success: false, error: error.message };
       }
     });
 
     ipcMain.handle('invoice:download', async (event, invoiceId) => {
       try {
-        logger.debug('[MAIN] invoice:download called with invoiceId:', invoiceId);
+        logger.debug('[IPC] invoice:download called with invoiceId:', invoiceId);
         const invoice = await this.database.getInvoiceById(invoiceId);
         if (!invoice) {
           throw new Error('Invoice not found');
@@ -523,21 +524,21 @@ class IpcService {
         if (!result.canceled && result.filePath) {
           const fs = require('fs').promises;
           await fs.copyFile(filePath, result.filePath);
-          logger.debug('[MAIN] invoice:download completed successfully');
+          logger.debug('[IPC] invoice:download completed successfully');
           return { success: true, filePath: result.filePath };
         } else {
-          logger.debug('[MAIN] invoice:download cancelled by user');
+          logger.debug('[IPC] invoice:download cancelled by user');
           return { success: false, error: 'Download cancelled' };
         }
       } catch (error) {
-        logger.error('[MAIN] Error downloading invoice:', error);
+        logger.error('[IPC] Error downloading invoice:', error);
         return { success: false, error: error.message };
       }
     });
 
     ipcMain.handle('invoice:view', async (event, invoiceId) => {
       try {
-        logger.debug('[MAIN] invoice:view called with invoiceId:', invoiceId);
+        logger.debug('[IPC] invoice:view called with invoiceId:', invoiceId);
         const invoice = await this.database.getInvoiceById(invoiceId);
         if (!invoice) {
           throw new Error('Invoice not found');
@@ -568,7 +569,7 @@ class IpcService {
 
         // Load the PDF file using file:// protocol - Electron's internal PDF viewer will handle it
         const fileUrl = `file://${filePath}`;
-        logger.debug('[MAIN] Loading PDF URL:', fileUrl);
+        logger.debug('[IPC] Loading PDF URL:', fileUrl);
         await pdfWindow.loadURL(fileUrl);
         
         // Ensure window is visible and focused
@@ -582,36 +583,36 @@ class IpcService {
           try {
             if (fs.existsSync(filePath)) {
               fs.unlinkSync(filePath);
-              logger.debug('[MAIN] Cleaned up temporary PDF file:', filePath);
+              logger.debug('[IPC] Cleaned up temporary PDF file:', filePath);
             }
           } catch (cleanupError) {
-            logger.warn('[MAIN] Failed to clean up temporary PDF file:', cleanupError.message);
+            logger.warn('[IPC] Failed to clean up temporary PDF file:', cleanupError.message);
           }
         });
 
         // Handle any load failures
         pdfWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-          logger.error('[MAIN] PDF window failed to load:', { errorCode, errorDescription });
+          logger.error('[IPC] PDF window failed to load:', { errorCode, errorDescription });
         });
 
-        logger.debug('[MAIN] invoice:view completed successfully - PDF opened in Electron internal viewer');
+        logger.debug('[IPC] invoice:view completed successfully - PDF opened in Electron internal viewer');
         return { success: true, message: 'Invoice opened in new window' };
       } catch (error) {
-        logger.error('[MAIN] Error viewing invoice:', error);
+        logger.error('[IPC] Error viewing invoice:', error);
         return { success: false, error: error.message };
       }
     });
 
     ipcMain.handle('invoice:regenerate', async (event, invoiceId) => {
       try {
-        logger.debug('[MAIN] invoice:regenerate called with invoiceId:', invoiceId);
+        logger.debug('[IPC] invoice:regenerate called with invoiceId:', invoiceId);
         
         const filePath = await this.invoiceGenerator.regenerateInvoice(invoiceId);
         
-        logger.debug('[MAIN] invoice:regenerate completed successfully');
+        logger.debug('[IPC] invoice:regenerate completed successfully');
         return { success: true, filePath };
       } catch (error) {
-        logger.error('[MAIN] Error regenerating invoice:', error);
+        logger.error('[IPC] Error regenerating invoice:', error);
         return { success: false, error: error.message };
       }
     });
@@ -662,7 +663,7 @@ class IpcService {
           return { success: false, error: 'Export cancelled' };
         }
       } catch (error) {
-        logger.error('[MAIN] Error exporting to CSV:', error);
+        logger.error('[IPC] Error exporting to CSV:', error);
         return { success: false, error: error.message };
       }
     });
@@ -718,7 +719,7 @@ class IpcService {
           return { success: false, error: 'Export cancelled' };
         }
       } catch (error) {
-        logger.error('[MAIN] Error exporting to JSON:', error);
+        logger.error('[IPC] Error exporting to JSON:', error);
         return { success: false, error: error.message };
       }
     });
@@ -726,7 +727,7 @@ class IpcService {
 
   setupTrayHandlers() {
     ipcMain.on('tray:timer-status-changed', (event, timerData) => {
-      logger.debug('[MAIN] Timer status changed:', timerData);
+      logger.debug('[IPC] Timer status changed:', timerData);
       if (this.trayService) {
         this.trayService.updateTimerStatus(timerData);
         
@@ -760,41 +761,36 @@ class IpcService {
           throw new Error('Seeding is only available in development.');
         }
         
-        logger.debug('[MAIN] dev:runSeed: Starting database nuke and reseed');
-        
-        try {
-          logger.debug('[MAIN] dev:runSeed: Nuking database...');
-          await this.database.nukeDatabase();
-          logger.debug('[MAIN] dev:runSeed: Database nuked successfully');
-        } catch (nukeError) {
-          logger.error('[MAIN] dev:runSeed: Error nuking database:', nukeError);
-          throw new Error('Failed to clear database: ' + nukeError.message);
-        }
+        logger.debug('[IPC] dev:runSeed: Starting database reset and reseed');
         
         const { execFile } = require('child_process');
-        const path = require('path');
-        const projectRoot = path.join(__dirname, '..', '..', '..');
-        const seedPath = path.join(projectRoot, 'prisma', 'seed.js');
+        const projectRoot = this.pathService.getProjectRoot();
         const env = {
           ...process.env,
-          ELECTRON_RUN_AS_NODE: '1',
-          DATABASE_URL: `file:${path.join(projectRoot, 'prisma', process.env.MAIN_DB ?? 'myhours.db')}`,
+          DATABASE_URL: this.pathService.getDatabaseUrl(),
         };
         
-        logger.debug('[MAIN] dev:runSeed: Running seed script...');
+        logger.debug('[IPC] dev:runSeed: Running prisma migrate reset...');
         await new Promise((resolve, reject) => {
-          const child = execFile(process.execPath, [seedPath], { env, cwd: projectRoot }, (err) => {
+          const child = execFile('npx', [
+            'prisma', 
+            'migrate', 
+            'reset', 
+            '--force',
+            '--schema', 
+            './prisma/schema.prisma'
+          ], { env, cwd: projectRoot }, (err) => {
             if (err) return reject(err);
             resolve();
           });
-          child.stdout?.on('data', (d) => logger.debug('[SEED]', d.toString().trim()));
-          child.stderr?.on('data', (d) => logger.error('[SEED]', d.toString().trim()));
+          child.stdout?.on('data', (d) => logger.debug('[PRISMA-RESET]', d.toString().trim()));
+          child.stderr?.on('data', (d) => logger.error('[PRISMA-RESET]', d.toString().trim()));
         });
         
-        logger.debug('[MAIN] dev:runSeed: Completed successfully');
+        logger.debug('[IPC] dev:runSeed: Database reset and seeding completed successfully');
         return { success: true };
       } catch (error) {
-        logger.error('[MAIN] dev:runSeed error:', error);
+        logger.error('[IPC] dev:runSeed error:', error);
         return { success: false, error: error.message };
       }
     });

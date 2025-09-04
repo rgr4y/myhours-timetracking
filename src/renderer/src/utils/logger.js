@@ -59,15 +59,21 @@ const createLogger = () => {
       return (...args) => {
         // Always call local console first for immediate feedback
         if (console[prop] && typeof console[prop] === 'function') {
-          console[prop](`[LOGGER-${prop.toUpperCase()}]`, ...args);
+          console[prop](`[RNDRLOG-${prop.toUpperCase()}]`, ...args);
         } else {
-          console.log(`[LOGGER-${prop.toUpperCase()}]`, ...args);
+          console.log(`[RNDRLOG-${prop.toUpperCase()}]`, ...args);
         }
 
         // Forward to backend logger via IPC or queue for later
         if (hasElectronAPI()) {
           try {
-            window.electronAPI.console.log(prop, ...args);
+            // Call the appropriate method on electronAPI.console
+            if (window.electronAPI.console[prop] && typeof window.electronAPI.console[prop] === 'function') {
+              window.electronAPI.console[prop](...args);
+            } else {
+              // Fallback for unsupported methods
+              window.electronAPI.console.log(prop, ...args);
+            }
             // If we have queued messages, flush them now
             if (messageQueue.length > 0) {
               flushQueue();

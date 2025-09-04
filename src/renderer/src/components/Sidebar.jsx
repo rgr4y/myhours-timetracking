@@ -152,7 +152,7 @@ const Sidebar = () => {
       </VersionFooter>
 
       {showYay && (
-        <Modal onClick={() => setShowYay(false)}>
+        <Modal show={showYay} onClick={() => setShowYay(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()} maxWidth="360px">
             <ModalHeader>
               <ModalTitle>yay!</ModalTitle>

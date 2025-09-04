@@ -567,7 +567,7 @@ const Settings = () => {
 
       {/* Clear All Data Confirmation Modal */}
       {showClearDataModal && (
-        <Modal onClick={() => {
+        <Modal show={showClearDataModal} onClick={() => {
           setShowClearDataModal(false);
           setConfirmationText('');
         }}>
