@@ -53,7 +53,7 @@ jobs:
       - name: Add macOS-specific build vars
         if: matrix.platform == 'mac'
         run: |
-          echo "BUILD_ARM64=1" >> .env
+          echo "BUILD_MAC_INTEL=1" >> .env
           echo "MAC_TARGET=dmg" >> .env
           echo "BUILD_LINUX=1" >> .env
           echo "LINUX_TARGET=AppImage" >> .env

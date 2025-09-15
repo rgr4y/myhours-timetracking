@@ -71,8 +71,8 @@ npm run build
 By default it builds only for your current OS. You can toggle targets via `.env`:
 
 ```ini
-# macOS: enable Apple Silicon in addition to x64
-BUILD_ARM64=1
+# macOS: enable Apple Intel in addition to arm64
+BUILD_MAC_INTEL=1
 
 # Cross‑builds (off by default). Set to 1/true to include these.
 BUILD_MAC=0     # Build mac from non‑mac host
@@ -86,7 +86,7 @@ MAC_TARGET=dir
 
 Notes:
 
-- On macOS, default is `--mac --x64`; add `BUILD_ARM64=1` for universal output.
+- On macOS, default is `--mac --arm64`; add `BUILD_MAC_INTEL=1` for universal output.
 - Windows/Linux builds require appropriate host tooling/CI; they’re disabled unless opted‑in.
 
 ## Database & Seeding

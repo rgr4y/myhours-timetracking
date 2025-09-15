@@ -56,7 +56,7 @@ function run(cmd, args) {
     loadDotEnvIntoProcess(envPath);
 
     const truthy = (v) => /^(1|true|yes|on)$/i.test(String(v || ''));
-    const enableArm = truthy(process.env.BUILD_ARM64);
+    const enableIntel = truthy(process.env.BUILD_MAC_INTEL);
     const buildMac =
       process.platform === 'darwin' || truthy(process.env.BUILD_MAC);
     const buildWin =
@@ -102,8 +102,8 @@ function run(cmd, args) {
     }
 
     // Add architecture flags once at the end
-    args.push('--x64');
-    if (enableArm && buildMac) args.push('--arm64'); // Only add ARM64 for macOS
+    args.push('--arm64');
+    if (enableIntel && buildMac) args.push('--x64'); // Only add ARM64 for macOS
 
     // Pass through any additional arguments (like --publish=always)
     const additionalArgs = process.argv.slice(2);
