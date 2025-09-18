@@ -2,13 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 
-// child_process stub
-vi.mock('child_process', () => ({ execSync: vi.fn() }))
-
 // Mock child_process with mutable execSync for tests
-vi.mock('child_process', () => ({
-  execSync: vi.fn(),
-}))
+vi.mock('child_process', async () => {
+  const actual = await vi.importActual('child_process')
+  const execSync = vi.fn()
+  return {
+    ...actual,
+    execSync,
+    default: {
+      ...(actual.default ?? actual),
+      execSync,
+    },
+  }
+})
 
 // Fresh module per test for isolated spies
 async function freshService() {

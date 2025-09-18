@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
-const { PrismaClient } = require('@prisma/client');
-const fs = require('fs');
-const path = require('path');
-const { app } = require('electron');
+import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import readline from 'readline';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * CSV Import Script for MyHours Time Tracking
@@ -49,7 +54,6 @@ class CSVImporter {
     
     if (!dbPath) {
       // Try to find the packaged app's database first
-      const os = require('os');
       const homeDir = os.homedir();
       
       // Common packaged app locations on macOS
@@ -75,7 +79,7 @@ class CSVImporter {
       // If none found, try Electron app.getPath as last resort
       if (!dbPath) {
         try {
-          const { app } = require('electron');
+          const { app } = await import('electron');
           const userDataDir = app.getPath('userData');
           dbPath = path.join(userDataDir, 'myhours.db');
           isPackagedDb = true;
@@ -116,7 +120,6 @@ class CSVImporter {
   }
 
   async promptConfirmation(message) {
-    const readline = require('readline');
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout
@@ -515,8 +518,10 @@ async function main() {
 }
 
 // Handle the case where this script is run outside of Electron
-if (require.main === module) {
+const scriptPath = fileURLToPath(import.meta.url);
+if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
   main().catch(console.error);
 }
 
-module.exports = { CSVImporter };
+export { CSVImporter };
+export default CSVImporter;

@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from 'vitest'
 import { createMainWindowMock, withDarwinPlatform } from '../helpers/electron-main-test-harness'
 
 // Force 'electron' to use our test double module
-vi.mock('electron', () => require('../../mocks/electron.js'))
+vi.mock('electron', async () => ({
+  ...(await import('../../mocks/electron.js')),
+}))
 
 describe('AutoUpdaterService (dev mock)', () => {
   it('registers IPC, manages feed URL, and simulates download/install', async () => {
@@ -17,7 +19,7 @@ describe('AutoUpdaterService (dev mock)', () => {
       const electron = await import('electron')
       const versionService = { getBaseVersion: () => '1.2.3' }
       const service = new AutoUpdaterService(mainWindow, versionService, true, electron)
-      service.setup()
+      await service.setup()
 
       // feed URL getters/setters
       const getFeed = ipcMain._handlers.get('update:getFeedUrl')

@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const { execSync } = require('child_process');
+import { PrismaClient } from '@prisma/client';
+import { execSync } from 'child_process';
 
 const prisma = new PrismaClient();
 

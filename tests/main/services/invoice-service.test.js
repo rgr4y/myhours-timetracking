@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import InvoiceGenerator from '../../../src/main/services/invoice-service.js';
 
 // Force 'electron' to use our test double module
-vi.mock('electron', () => require('../../mocks/electron.js'));
+vi.mock('electron', async () => ({
+  ...(await import('../../mocks/electron.js')),
+}));
 
 // Mock the other Node.js modules used
 vi.mock('handlebars', () => ({
@@ -11,8 +13,12 @@ vi.mock('handlebars', () => ({
 }));
 
 vi.mock('path', () => ({
-  default: { join: vi.fn().mockReturnValue('/mock/path') },
-  join: vi.fn().mockReturnValue('/mock/path')
+  default: {
+    join: vi.fn().mockReturnValue('/mock/path'),
+    dirname: vi.fn().mockReturnValue('/mock')
+  },
+  join: vi.fn().mockReturnValue('/mock/path'),
+  dirname: vi.fn().mockReturnValue('/mock')
 }));
 
 vi.mock('fs', () => ({

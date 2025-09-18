@@ -18,7 +18,7 @@ git commit -m "$LAST_MSG"
 git push origin
 
 # 6. Get version from package.json
-VERSION=$(node -p "require('./package.json').version")
+VERSION=$(node --input-type=module -e "import fs from 'fs'; console.log(JSON.parse(fs.readFileSync('./package.json','utf8')).version)")
 TAG="v$VERSION"
 
 git tag "$TAG"

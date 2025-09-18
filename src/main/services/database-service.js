@@ -1,11 +1,12 @@
-const { PrismaClient } = require('@prisma/client');
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const { app } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const PathService = require('./path-service');
-const logger = require('./logger-service');
+import { PrismaClient } from '@prisma/client';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { app } from 'electron';
+import path from 'path';
+import fs from 'fs';
+
+import PathService from './path-service.js';
+import logger from './logger-service.js';
 const truthy = (v) => /^(1|true|yes|on)$/i.test(String(v || ''));
 const execAsync = promisify(exec);
 
@@ -1398,4 +1399,4 @@ class DatabaseService {
   }
 }
 
-module.exports = DatabaseService;
+export default DatabaseService;

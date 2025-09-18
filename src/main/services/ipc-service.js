@@ -1,6 +1,15 @@
-const { ipcMain, dialog, app } = require('electron');
-const logger = require('./logger-service');
-const PathService = require('./path-service');
+import { ipcMain, dialog, app, shell, BrowserWindow } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { promises as fsPromises } from 'fs';
+import { execFile } from 'child_process';
+import { fileURLToPath } from 'url';
+
+import logger from './logger-service.js';
+import PathService from './path-service.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class IpcService {
   constructor(mainWindow, database, invoiceGenerator, versionService) {
@@ -40,7 +49,6 @@ class IpcService {
     // External URL handler
     ipcMain.handle('app:openExternal', async (_event, url) => {
       try {
-        const { shell } = require('electron');
         await shell.openExternal(url);
         return true;
       } catch (error) {
@@ -522,8 +530,7 @@ class IpcService {
         });
 
         if (!result.canceled && result.filePath) {
-          const fs = require('fs').promises;
-          await fs.copyFile(filePath, result.filePath);
+          await fsPromises.copyFile(filePath, result.filePath);
           logger.debug('[IPC] invoice:download completed successfully');
           return { success: true, filePath: result.filePath };
         } else {
@@ -547,9 +554,6 @@ class IpcService {
         const filePath = await this.invoiceGenerator.generatePDFFromStoredData(invoice);
         
         // Create a new window with Electron's internal PDF viewer
-        const { BrowserWindow } = require('electron');
-        const path = require('path');
-        
         const pdfWindow = new BrowserWindow({
           width: 1000,
           height: 800,
@@ -579,7 +583,6 @@ class IpcService {
 
         // Clean up the temporary file when window is closed
         pdfWindow.on('closed', () => {
-          const fs = require('fs');
           try {
             if (fs.existsSync(filePath)) {
               fs.unlinkSync(filePath);
@@ -656,8 +659,7 @@ class IpcService {
         });
         
         if (!result.canceled && result.filePath) {
-          const fs = require('fs').promises;
-          await fs.writeFile(result.filePath, csvContent, 'utf8');
+          await fsPromises.writeFile(result.filePath, csvContent, 'utf8');
           return { success: true, filePath: result.filePath, entriesCount: timeEntries.length };
         } else {
           return { success: false, error: 'Export cancelled' };
@@ -712,8 +714,7 @@ class IpcService {
         });
         
         if (!result.canceled && result.filePath) {
-          const fs = require('fs').promises;
-          await fs.writeFile(result.filePath, jsonContent, 'utf8');
+          await fsPromises.writeFile(result.filePath, jsonContent, 'utf8');
           return { success: true, filePath: result.filePath, entriesCount: timeEntries.length };
         } else {
           return { success: false, error: 'Export cancelled' };
@@ -763,7 +764,6 @@ class IpcService {
         
         logger.debug('[IPC] dev:runSeed: Starting database reset and reseed');
         
-        const { execFile } = require('child_process');
         const projectRoot = this.pathService.getProjectRoot();
         const env = {
           ...process.env,
@@ -797,4 +797,4 @@ class IpcService {
   }
 }
 
-module.exports = IpcService;
+export default IpcService;

@@ -1,5 +1,4 @@
-const { app } = require('electron');
-const path = require('path');
+import { app } from 'electron';
 
 /**
  * Cross-platform tray service that provides common tray APIs
@@ -193,4 +192,4 @@ class TrayService {
   }
 }
 
-module.exports = TrayService;
+export default TrayService;

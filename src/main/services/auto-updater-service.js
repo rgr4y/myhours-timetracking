@@ -1,5 +1,6 @@
-const electronBuiltin = require('electron');
-const logger = require('./logger-service');
+import * as electronBuiltin from 'electron';
+
+import logger from './logger-service.js';
 
 class AutoUpdaterService {
   constructor(mainWindow, versionService, isDev, electronModule) {
@@ -16,7 +17,7 @@ class AutoUpdaterService {
     };
   }
 
-  setup() {
+  async setup() {
     // Only support macOS for updater features per requirement
     if (process.platform !== 'darwin') {
       logger.debug('[UPDATER] Disabled: non-macOS platform');
@@ -27,7 +28,7 @@ class AutoUpdaterService {
     if (this.isDev) {
       this.setupMockUpdater();
     } else {
-      this.setupNativeUpdater();
+      await this.setupNativeUpdater();
     }
   }
 
@@ -44,43 +45,45 @@ class AutoUpdaterService {
     };
 
     const fetchJson = async (url) => {
+      const parsed = new URL(url);
+      const isHttps = parsed.protocol === 'https:';
+      const httpModule = await import(isHttps ? 'https' : 'http');
+      const httpClient = httpModule.default ?? httpModule;
+
       return new Promise((resolve, reject) => {
         try {
-          const { URL } = require('url');
-          const parsed = new URL(url);
-          const isHttps = parsed.protocol === 'https:';
-          const http = require(isHttps ? 'https' : 'http');
-          const req = http.request({
+          const req = httpClient.request({
             hostname: parsed.hostname,
             port: parsed.port,
             path: parsed.pathname + (parsed.search || ''),
             method: 'GET',
             timeout: 4000,
-            headers: { 'Accept': 'application/json' }
+            headers: { Accept: 'application/json' }
           }, (res) => {
             let data = '';
             res.setEncoding('utf8');
-            res.on('data', chunk => { data += chunk; });
+            res.on('data', (chunk) => { data += chunk; });
             res.on('end', () => {
               if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
                 try {
                   const json = JSON.parse(data);
                   resolve(json);
-                } catch (e) {
-                  reject(new Error(`Invalid JSON from feed: ${e.message}`));
+                } catch (error) {
+                  reject(new Error(`Invalid JSON from feed: ${error.message}`));
                 }
               } else {
                 reject(new Error(`HTTP ${res.statusCode} from feed`));
               }
             });
           });
+
           req.on('timeout', () => {
             req.destroy(new Error('request timeout'));
           });
           req.on('error', reject);
           req.end();
-        } catch (e) {
-          reject(e);
+        } catch (error) {
+          reject(error);
         }
       });
     };
@@ -180,10 +183,14 @@ class AutoUpdaterService {
     });
   }
 
-  setupNativeUpdater() {
+  async setupNativeUpdater() {
     try {
       // Lazy load electron-updater only in native setup
-      const { autoUpdater } = require('electron-updater');
+      const updaterModule = await import('electron-updater');
+      const autoUpdater = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater;
+      if (!autoUpdater) {
+        throw new Error('electron-updater module unavailable');
+      }
       this._autoUpdater = autoUpdater;
       // Configure auto-updater
       this._autoUpdater.logger = console;
@@ -299,4 +306,4 @@ class AutoUpdaterService {
   }
 }
 
-module.exports = AutoUpdaterService;
+export default AutoUpdaterService;

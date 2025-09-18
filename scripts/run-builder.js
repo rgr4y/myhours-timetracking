@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-const { spawnSync } = require('child_process');
-const { existsSync, readFileSync } = require('fs');
-const { join } = require('path');
+import { spawnSync } from 'child_process';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 
 function loadDotEnvIntoProcess(dotenvPath) {
   if (!existsSync(dotenvPath)) return;

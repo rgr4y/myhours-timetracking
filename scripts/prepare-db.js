@@ -1,7 +1,13 @@
 #!/usr/bin/env node
-const { spawnSync } = require('child_process');
-const { mkdirSync, copyFileSync } = require('fs');
-const { join, resolve } = require('path');
+import { spawnSync } from 'child_process';
+import { mkdirSync, copyFileSync } from 'fs';
+import path, { join, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Prepare a writable SQLite template DB by running migrations at build time.
 // This avoids needing Prisma CLI/migrations at runtime in the packaged app.
@@ -35,4 +41,3 @@ function run(cmd, args, opts = {}) {
   copyFileSync(tmpDbPath, outTemplate);
   console.log(`[db] Prepared template DB at ${outTemplate}`);
 })();
-

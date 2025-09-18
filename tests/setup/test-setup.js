@@ -11,8 +11,10 @@ if (typeof globalThis !== 'undefined') {
   globalThis.React = React
 }
 
-// Global Electron main-process mock to ensure require('electron') resolves consistently in tests
-vi.mock('electron', () => require('../mocks/electron.js'))
+// Global Electron main-process mock to ensure imports resolve consistently in tests
+vi.mock('electron', async () => ({
+  ...(await import('../mocks/electron.js')),
+}))
 global.window.electronAPI = {
   clients: {
     getAll: vi.fn(() => Promise.resolve([])),

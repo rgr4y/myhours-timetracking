@@ -2,7 +2,8 @@
   "name": "myhours",
   "version": "0.0.59",
   "description": "Cross-platform time tracking app with invoicing",
-  "main": "src/main/main.js",
+  "main": "src/main/main.cjs",
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rgr4y/myhours-timetracking.git"
@@ -43,17 +44,12 @@
     },
     "asarUnpack": [
       "node_modules/@prisma/client/**",
-      "node_modules/.prisma/**"
+      "node_modules/.prisma/**",
+      "node_modules/prisma/**",
+      "src/main/**/*",
+      "package.json"
     ],
     "extraResources": [
-      {
-        "from": "node_modules/@prisma/client",
-        "to": "node_modules/@prisma/client"
-      },
-      {
-        "from": "node_modules/.prisma",
-        "to": "node_modules/.prisma"
-      },
       {
         "from": "prisma/schema.prisma",
         "to": "prisma/schema.prisma"

@@ -1,7 +1,7 @@
-const winston = require('winston');
-const path = require('path');
-const { app } = require('electron');
-const fs = require('fs');
+import winston from 'winston';
+import path from 'path';
+import { app } from 'electron';
+import fs from 'fs';
 
 // Global BigInt serialization fix for JSON logging
 const originalJSONStringify = JSON.stringify;
@@ -202,4 +202,6 @@ class LoggerService {
 }
 
 // Export singleton instance
-module.exports = new LoggerService();
+const loggerService = new LoggerService();
+
+export default loggerService;

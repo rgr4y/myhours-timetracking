@@ -39,8 +39,13 @@ describe('PathService (packaged)', () => {
     const seedPath = svc.getSeedScriptPath()
     expect(seedPath).toBe(path.join(resourcesPath, 'prisma', 'seed.js'))
 
+    const unpackedPrismaDir = path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'prisma', 'build')
+    fs.mkdirSync(unpackedPrismaDir, { recursive: true })
+    const unpackedPrismaBinary = path.join(unpackedPrismaDir, 'index.js')
+    fs.writeFileSync(unpackedPrismaBinary, '// stub prisma binary')
+
     const prismaBin = svc.getPrismaBinaryPath()
-    expect(prismaBin).toBe(path.join(resourcesPath, 'node_modules', 'prisma', 'build', 'index.js'))
+    expect(prismaBin).toBe(unpackedPrismaBinary)
 
     const projectRoot = svc.getProjectRoot()
     expect(projectRoot).toBe(resourcesPath)

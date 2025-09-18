@@ -1,13 +1,13 @@
-const childProcess = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const electronBuiltin = require('electron');
+import { execSync as defaultExecSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import * as electronBuiltin from 'electron';
 
 class VersionService {
   constructor(electronModule, options = {}) {
     this.electron = electronModule || electronBuiltin;
     this.packageJsonPath = path.join(process.cwd(), 'package.json');
-    this.execSync = options.execSync || childProcess.execSync;
+    this.execSync = options.execSync || defaultExecSync;
   }
 
   /**
@@ -118,4 +118,4 @@ class VersionService {
   }
 }
 
-module.exports = VersionService;
+export default VersionService;

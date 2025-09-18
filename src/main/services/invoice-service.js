@@ -1,8 +1,12 @@
-const handlebars = require('handlebars');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const { dialog, BrowserWindow } = require('electron');
+import handlebars from 'handlebars';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
+import { dialog, BrowserWindow } from 'electron';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class InvoiceGenerator {
   constructor(dependencies = {}) {
@@ -588,4 +592,4 @@ class InvoiceGenerator {
   }
 }
 
-module.exports = InvoiceGenerator;
+export default InvoiceGenerator;

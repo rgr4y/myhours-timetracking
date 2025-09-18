@@ -1,8 +1,13 @@
-const { Tray, Menu, nativeImage, app } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const TrayService = require('./tray-service');
-const logger = require('./logger-service');
+import { Tray, Menu, nativeImage, app } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+import TrayService from './tray-service.js';
+import logger from './logger-service.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 class WindowsTrayService extends TrayService {
   constructor(mainWindow, databaseService) {
     super(mainWindow, databaseService);
@@ -281,4 +286,4 @@ class WindowsTrayService extends TrayService {
   }
 }
 
-module.exports = WindowsTrayService;
+export default WindowsTrayService;

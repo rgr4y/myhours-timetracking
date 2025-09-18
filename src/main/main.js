@@ -1,7 +1,17 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
-const path = require('path');
-const VersionService = require('./services/version-service');
-const logger = require('./services/logger-service');
+import { app, BrowserWindow, dialog, shell } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+import VersionService from './services/version-service.js';
+import logger from './services/logger-service.js';
+import DatabaseService from './services/database-service.js';
+import InvoiceGenerator from './services/invoice-service.js';
+import IpcService from './services/ipc-service.js';
+import AutoUpdaterService from './services/auto-updater-service.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Initialize logger early
 logger.initialize();
@@ -16,7 +26,7 @@ logger.main('info', 'Environment', { isDev, isPackaged: app.isPackaged });
 
 // Configure development-specific settings
 if (isDev) {
-  const { configureDevelopment } = require('./helpers/development');
+  const { configureDevelopment } = await import('./helpers/development.js');
   configureDevelopment();
 }
 
@@ -44,18 +54,7 @@ if (!gotTheLock) {
   });
 }
 
-const DatabaseService = require('./services/database-service');
-const InvoiceGenerator = require('./services/invoice-service');
-const IpcService = require('./services/ipc-service');
-const AutoUpdaterService = require('./services/auto-updater-service');
-
-// Platform-specific tray services
-let TrayService = null;
-if (process.platform === 'darwin') {
-  TrayService = require('./services/tray-macos');
-} else if (process.platform === 'win32') {
-  TrayService = require('./services/tray-windows');
-}
+// Platform-specific tray services are loaded lazily within initialize()
 
 class MyHoursApp {
   constructor() {
@@ -80,7 +79,7 @@ class MyHoursApp {
         nodeIntegration: false,
         contextIsolation: true,
         enableRemoteModule: false,
-        preload: path.join(__dirname, 'preload.js')
+        preload: path.join(__dirname, 'preload.cjs')
       },
       // Use the default title bar on macOS to ensure traffic lights and window title are visible
       titleBarStyle: 'default',
@@ -110,7 +109,7 @@ class MyHoursApp {
       const devUrl = 'http://localhost:3010';
       logger.debug('[MAIN] Waiting for dev server:', devUrl);
       try {
-        const { waitForDevServer } = require('./helpers/development');
+        const { waitForDevServer } = await import('./helpers/development.js');
         await waitForDevServer(devUrl, 2000, 300);
       } catch (e) {
         logger.warn('[MAIN] Dev server wait timed out, attempting to load anyway');
@@ -119,9 +118,9 @@ class MyHoursApp {
       this.mainWindow.loadURL(devUrl);
       this.mainWindow.webContents.openDevTools();
     } else {
-      const indexPath = path.join(__dirname, '../renderer/build/index.html');
+      const appPath = app.getAppPath();
+      const indexPath = path.join(appPath, 'src', 'renderer', 'build', 'index.html');
       logger.debug('[MAIN] Loading production file:', indexPath);
-      const fs = require('fs');
       logger.debug('[MAIN] index.html exists?', fs.existsSync(indexPath));
       this.mainWindow.loadFile(indexPath);
     }
@@ -230,7 +229,7 @@ class MyHoursApp {
     
     // Setup WebSocket server for browser debugging (dev only)
     if (isDev) {
-      const { setupWebSocketServer } = require('./helpers/development');
+      const { setupWebSocketServer } = await import('./helpers/development.js');
       this.wsServer = await setupWebSocketServer();
     }
     
@@ -240,7 +239,7 @@ class MyHoursApp {
 
     // Setup updater service (mock in dev on macOS, native in prod macOS)
     this.autoUpdaterService = new AutoUpdaterService(this.mainWindow, this.versionService, isDev);
-    this.autoUpdaterService.setup();
+    await this.autoUpdaterService.setup();
 
     // Check for updates in production
     if (!isDev && process.platform === 'darwin') {
@@ -250,6 +249,13 @@ class MyHoursApp {
     }
 
     // Initialize tray service (cross-platform)
+    let TrayService = null;
+    if (process.platform === 'darwin') {
+      TrayService = (await import('./services/tray-macos.js')).default;
+    } else if (process.platform === 'win32') {
+      TrayService = (await import('./services/tray-windows.js')).default;
+    }
+
     if (TrayService) {
       this.trayService = new TrayService(this.mainWindow, this.database);
       const trayInitialized = this.trayService.initialize();

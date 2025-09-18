@@ -1,6 +1,10 @@
-const electronBuiltin = require('electron');
-const path = require('path');
-const fs = require('fs');
+import * as electronBuiltin from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Centralized path resolution service for myHours app
@@ -100,9 +104,19 @@ class PathService {
    */
   getPrismaBinaryPath() {
     if (this.isPackaged) {
-      // Production: Prisma binary is in the resources node_modules
       const base = this.resourcesPath || path.dirname(this.appPath);
-      return path.join(base, 'node_modules', 'prisma', 'build', 'index.js');
+      const candidates = [
+        path.join(base, 'app.asar.unpacked', 'node_modules', 'prisma', 'build', 'index.js'),
+        path.join(base, 'node_modules', 'prisma', 'build', 'index.js')
+      ];
+
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          return candidate;
+        }
+      }
+
+      return candidates[0];
     } else {
       // Development: Use npx prisma (CLI handles path resolution)
       return 'npx prisma';
@@ -209,4 +223,4 @@ class PathService {
   }
 }
 
-module.exports = PathService;
+export default PathService;
