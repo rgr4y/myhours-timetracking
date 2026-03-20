@@ -44,9 +44,7 @@
     },
     "afterPack": "./scripts/afterPack.cjs",
     "asarUnpack": [
-      "node_modules/@prisma/client/**",
-      "node_modules/.prisma/**",
-      "node_modules/prisma/**",
+      "node_modules/**/*",
       "src/main/**/*",
       "package.json"
     ],
@@ -75,13 +73,22 @@
       "src/main/**/*",
       "src/renderer/build/**/*",
       "assets/**/*",
-      "node_modules/**/*",
       "node_modules/.prisma/**/*",
       "prisma/schema.prisma",
       "prisma/seed.js",
       "prisma/template.db",
       "prisma/migrations/**/*",
-      "!prisma/myhours.db"
+      "!prisma/myhours.db",
+      "!src/renderer/build/**/*.dmg",
+      "!src/renderer/build/**/*.exe",
+      "!src/renderer/build/**/*.AppImage",
+      "!node_modules/@prisma/client/runtime/query_engine_bg.*",
+      "!node_modules/@prisma/client/runtime/query_compiler_bg.*",
+      "!node_modules/@prisma/client/runtime/edge*",
+      "!node_modules/@prisma/client/runtime/wasm*",
+      "!node_modules/@prisma/client/runtime/react-native*",
+      "!node_modules/@prisma/client/runtime/index-browser*",
+      "!node_modules/@prisma/client/generator-build/**"
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -131,6 +138,7 @@
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
     "@playwright/test": "^1.55.0",
+    "prisma": "^6.15.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
@@ -156,7 +164,6 @@
     "@prisma/client": "^6.15.0",
     "electron-updater": "^6.1.4",
     "handlebars": "^4.7.8",
-    "prisma": "^6.15.0",
     "puppeteer-core": "^21.3.6",
     "update-browserslist-db": "^1.2.3",
     "winston": "^3.17.0"
