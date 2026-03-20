@@ -1,13 +1,14 @@
-import { PrismaClient } from '@prisma/client';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { app } from 'electron';
-import path from 'path';
-import fs from 'fs';
+import pkg from "@prisma/client";
+const { PrismaClient } = pkg;
+import { exec } from "child_process";
+import { promisify } from "util";
+import { app } from "electron";
+import path from "path";
+import fs from "fs";
 
-import PathService from './path-service.js';
-import logger from './logger-service.js';
-const truthy = (v) => /^(1|true|yes|on)$/i.test(String(v || ''));
+import PathService from "./path-service.js";
+import logger from "./logger-service.js";
+const truthy = (v) => /^(1|true|yes|on)$/i.test(String(v || ""));
 const execAsync = promisify(exec);
 
 class DatabaseService {
@@ -25,7 +26,7 @@ class DatabaseService {
     logger.database(
       "debug",
       "Path service configuration",
-      this.pathService.getDebugInfo()
+      this.pathService.getDebugInfo(),
     );
 
     // Bootstrap from template if needed
@@ -75,12 +76,18 @@ class DatabaseService {
     // Check for data column in invoices table (new migration)
     try {
       await this.prisma.$queryRaw`SELECT data FROM invoices LIMIT 1`;
-      logger.database("info", "Latest migration (invoice data field) already applied");
+      logger.database(
+        "info",
+        "Latest migration (invoice data field) already applied",
+      );
     } catch (error) {
       logger.database("info", "Adding data column to invoices table");
       await this.prisma
         .$executeRaw`ALTER TABLE "invoices" ADD COLUMN "data" TEXT DEFAULT '{}'`;
-      logger.database("info", "Invoice data field migration applied successfully");
+      logger.database(
+        "info",
+        "Invoice data field migration applied successfully",
+      );
     }
   }
 
@@ -129,7 +136,7 @@ class DatabaseService {
         logger.database(
           "info",
           "Database already contains data, skipping seed",
-          { clientCount }
+          { clientCount },
         );
       }
     } catch (error) {
@@ -163,7 +170,7 @@ class DatabaseService {
           logger.warn(
             "[DATABASE] Failed to delete old backup:",
             file.name,
-            deleteError.message
+            deleteError.message,
           );
         }
       }
@@ -180,17 +187,17 @@ class DatabaseService {
   async removeDemoData() {
     try {
       logger.database("info", "Starting database clear operation");
-      
+
       // Disable foreign key constraints
       await this.prisma.$executeRaw`PRAGMA foreign_keys = OFF`;
-      
+
       // Clear all data in the correct order (ignore FK constraints)
       await this.prisma.timeEntry.deleteMany();
       await this.prisma.invoice.deleteMany();
       await this.prisma.task.deleteMany();
       await this.prisma.project.deleteMany();
       await this.prisma.client.deleteMany();
-      
+
       // Clear transient settings that reference IDs
       try {
         await this.prisma.setting.delete({
@@ -207,10 +214,10 @@ class DatabaseService {
           where: { key: "lastUsedTaskId" },
         });
       } catch (_) {}
-      
+
       // Re-enable foreign key constraints
       await this.prisma.$executeRaw`PRAGMA foreign_keys = ON`;
-      
+
       logger.database("info", "Database clear completed successfully");
       return { success: true };
     } catch (error) {
@@ -220,7 +227,7 @@ class DatabaseService {
       } catch (fkError) {
         logger.error("Failed to re-enable foreign key constraints:", fkError);
       }
-      
+
       logger.error("[DATABASE] Error removing demo data:", error);
       throw error;
     }
@@ -270,7 +277,7 @@ class DatabaseService {
 
       if (activeTimers.length > 1) {
         logger.warn(
-          `[DATABASE] Found ${activeTimers.length} active timers, stopping older ones`
+          `[DATABASE] Found ${activeTimers.length} active timers, stopping older ones`,
         );
 
         // Keep the first (most recent) timer, stop the rest
@@ -291,7 +298,7 @@ class DatabaseService {
           });
 
           logger.debug(
-            `[DATABASE] Auto-stopped duplicate active timer ${timer.id} with duration ${duration} minutes`
+            `[DATABASE] Auto-stopped duplicate active timer ${timer.id} with duration ${duration} minutes`,
           );
         }
 
@@ -328,7 +335,7 @@ class DatabaseService {
         });
 
         logger.debug(
-          `[DATABASE] Stopped active timer ${timer.id} with duration ${duration} minutes`
+          `[DATABASE] Stopped active timer ${timer.id} with duration ${duration} minutes`,
         );
       }
 
@@ -381,7 +388,7 @@ class DatabaseService {
 
         // Use the found active timer instead
         logger.debug(
-          `[DATABASE] Using active timer ${anyActiveTimer.id} instead of ${timeEntryId}`
+          `[DATABASE] Using active timer ${anyActiveTimer.id} instead of ${timeEntryId}`,
         );
         return this.stopTimer(anyActiveTimer.id, roundTo);
       }
@@ -400,7 +407,7 @@ class DatabaseService {
         // Round up to the nearest roundTo minutes
         roundedDuration = Math.ceil(duration / roundTo) * roundTo;
         logger.debug(
-          `[DATABASE] Duration: ${duration}m, rounded to ${roundTo}m intervals: ${roundedDuration}m`
+          `[DATABASE] Duration: ${duration}m, rounded to ${roundTo}m intervals: ${roundedDuration}m`,
         );
       }
 
@@ -519,10 +526,10 @@ class DatabaseService {
       if (filters.startDate && filters.endDate) {
         const startDate = new Date(filters.startDate);
         const endDate = new Date(filters.endDate);
-        
+
         // Set endDate to end of day (23:59:59.999) to include all entries on that day
         endDate.setHours(23, 59, 59, 999);
-        
+
         where.startTime = {
           gte: startDate,
           lte: endDate,
@@ -573,7 +580,7 @@ class DatabaseService {
 
       const timeEntries = await this.prisma.timeEntry.findMany({
         where: {
-          id: { in: entryIds.map(id => parseInt(id)) }
+          id: { in: entryIds.map((id) => parseInt(id)) },
         },
         include: {
           client: true,
@@ -610,7 +617,7 @@ class DatabaseService {
         "[DATABASE] updateTimeEntry called with id:",
         id,
         "data:",
-        data
+        data,
       );
 
       if (!data || Object.keys(data).length === 0) {
@@ -637,14 +644,14 @@ class DatabaseService {
         "[DATABASE] Processing projectId:",
         cleanData.projectId,
         "and taskId:",
-        cleanData.taskId
+        cleanData.taskId,
       );
 
       // Handle date and time fields - combine date with startTime and endTime
       if (cleanData.date && cleanData.startTime) {
         const startDateTime = this.parseTimeWithDate(
           cleanData.startTime,
-          cleanData.date
+          cleanData.date,
         );
         if (startDateTime) cleanData.startTime = startDateTime;
       }
@@ -652,7 +659,7 @@ class DatabaseService {
       if (cleanData.date && cleanData.endTime) {
         const endDateTime = this.parseTimeWithDate(
           cleanData.endTime,
-          cleanData.date
+          cleanData.date,
         );
         if (endDateTime) cleanData.endTime = endDateTime;
       }
@@ -758,14 +765,14 @@ class DatabaseService {
         "[DATABASE] Processing create with projectId:",
         cleanData.projectId,
         "and taskId:",
-        cleanData.taskId
+        cleanData.taskId,
       );
 
       // Handle date and time fields - combine date with startTime and endTime
       if (cleanData.date && cleanData.startTime) {
         const startDateTime = this.parseTimeWithDate(
           cleanData.startTime,
-          cleanData.date
+          cleanData.date,
         );
         if (startDateTime) cleanData.startTime = startDateTime;
       }
@@ -773,7 +780,7 @@ class DatabaseService {
       if (cleanData.date && cleanData.endTime) {
         const endDateTime = this.parseTimeWithDate(
           cleanData.endTime,
-          cleanData.date
+          cleanData.date,
         );
         if (endDateTime) cleanData.endTime = endDateTime;
       }
@@ -852,7 +859,7 @@ class DatabaseService {
         })),
       });
       */
-     
+
       return clients;
     } catch (error) {
       logger.database("error", "Error getting clients", {
@@ -1202,7 +1209,7 @@ class DatabaseService {
             },
           });
           return fullInvoice;
-        })
+        }),
       );
 
       return invoicesWithRelations;
@@ -1216,7 +1223,7 @@ class DatabaseService {
     try {
       const result = await this.prisma.invoice.update({
         where: { id: parseInt(id) },
-        data: { status: 'voided' },
+        data: { status: "voided" },
       });
       logger.debug("[DATABASE] Invoice voided:", id);
       return result;
@@ -1230,14 +1237,17 @@ class DatabaseService {
     try {
       const result = await this.prisma.timeEntry.updateMany({
         where: {
-          id: { in: entryIds.map(id => parseInt(id)) },
+          id: { in: entryIds.map((id) => parseInt(id)) },
         },
         data: {
           isInvoiced: false,
           invoiceId: null,
         },
       });
-      logger.debug("[DATABASE] Time entries unmarked as invoiced:", entryIds.length);
+      logger.debug(
+        "[DATABASE] Time entries unmarked as invoiced:",
+        entryIds.length,
+      );
       return result;
     } catch (error) {
       logger.error("Error unmarking time entries as invoiced:", error);
@@ -1381,7 +1391,7 @@ class DatabaseService {
           periodStart: toYMD(minDate),
           periodEnd: toYMD(maxDate),
           status: "generated",
-          data: templateData ? JSON.stringify(templateData) : "{}"
+          data: templateData ? JSON.stringify(templateData) : "{}",
         },
       });
 
